@@ -67,6 +67,18 @@ odin-lint/
 - ✅ Rule registry can manage multiple rules
 - ✅ Basic rule application pipeline working
 
+**Next Steps:**
+- ✅ Enhanced AST module with visitor pattern
+- ✅ Created C001 test fixtures (pass/fail)
+- [ ] Add tree-sitter-odin as a dependency
+- [ ] Implement AST parsing with tree-sitter
+- [ ] Update C001 rule with real AST analysis
+- [ ] Implement remaining correctness rules
+
+**Test Fixtures Created:**
+- `test/fixtures/pass/c001_proper_free.odin` - Proper defer free
+- `test/fixtures/fail/c001_allocation.odin` - Missing defer free
+
 ### Milestone 2 (Config + Suspicious/Style Tiers)
 - Add `odin-lint.toml` config parser.
 - Implement 5 suspicious and 4 style rules.
