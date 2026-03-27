@@ -2,7 +2,7 @@ package core
 
 import "core:fmt"
 import "core:os"
-import "core:runtime"
+import "base:runtime"
 
 // TreeSitterParser represents the tree-sitter parser
 TreeSitterParser :: struct {
@@ -65,4 +65,30 @@ walkAST :: proc(node: ^ASTNode, visitor: proc(node: ^ASTNode) -> bool) {
     for &child in node.children {
         walkAST(&child, visitor)
     }
+}
+
+// ASTVisitor defines the visitor interface for AST nodes
+ASTVisitor :: struct {
+    enter_node: proc(node: ^ASTNode) -> bool,
+    leave_node: proc(node: ^ASTNode),
+}
+
+// visitAST visits the AST using a visitor pattern
+visitAST :: proc(node: ^ASTNode, visitor: ASTVisitor) {
+    if node == nil {
+        return
+    }
+    
+    // Enter node
+    if !visitor.enter_node(node) {
+        return  // Stop visiting if enter returns false
+    }
+    
+    // Visit children
+    for &child in node.children {
+        visitAST(&child, visitor)
+    }
+    
+    // Leave node
+    visitor.leave_node(node)
 }
