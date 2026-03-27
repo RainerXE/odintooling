@@ -49,6 +49,12 @@ c001Matcher :: proc(file_path: string, node: rawptr) -> Diagnostic {
     fmt.println("C001 matcher called (placeholder)")
     
     // For now, return empty diagnostic (no violation)
+    // When tree-sitter is integrated, this will:
+    // 1. Convert rawptr to ASTNode
+    // 2. Use visitor pattern to find allocations
+    // 3. Check for matching defer free statements
+    // 4. Return diagnostics for violations
+    
     return Diagnostic{}
 }
 
