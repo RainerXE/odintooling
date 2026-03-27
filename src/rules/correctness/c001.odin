@@ -1,0 +1,63 @@
+package correctness
+
+import "core:fmt"
+import "core:os"
+import "core:strings"
+
+// Diagnostic represents a linting diagnostic
+Diagnostic :: struct {
+    file:    string,
+    line:    int,
+    column:  int,
+    rule_id: string,
+    tier:    string,
+    message: string,
+    fix:     string,
+    has_fix: bool,
+}
+
+// Rule represents a linting rule
+Rule :: struct {
+    id: string,
+    tier: string,
+    matcher: proc(file_path: string, node: rawptr) -> Diagnostic,
+    message: proc() -> string,
+    fix_hint: proc() -> string,
+}
+
+// C001: Allocation without matching defer free in same scope
+// Inspired by: Rust clippy::mem_forget
+
+// C001Rule creates the C001 rule
+C001Rule :: proc() -> Rule {
+    return Rule{
+        id = "C001",
+        tier = "correctness",
+        matcher = c001Matcher,
+        message = c001Message,
+        fix_hint = c001FixHint,
+    }
+}
+
+// c001Matcher checks for allocations without defer free
+c001Matcher :: proc(file_path: string, node: rawptr) -> Diagnostic {
+    // Placeholder - actual implementation will:
+    // 1. Check if node is an allocation (make, new, etc.)
+    // 2. Verify no matching defer free in same scope
+    // 3. Return diagnostic if violation found
+    
+    fmt.println("C001 matcher called (placeholder)")
+    
+    // For now, return empty diagnostic (no violation)
+    return Diagnostic{}
+}
+
+// c001Message returns the rule message
+c001Message :: proc() -> string {
+    return "Allocation without matching defer free in same scope"
+}
+
+// c001FixHint returns the fix hint
+c001FixHint :: proc() -> string {
+    return "Add defer free() immediately after allocation"
+}
