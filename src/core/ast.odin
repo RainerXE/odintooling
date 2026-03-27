@@ -27,16 +27,50 @@ deinitParser :: proc(parser: TreeSitterParser) {
     // Placeholder for actual cleanup
 }
 
+// TreeSitterASTParser represents a parser using tree-sitter
+TreeSitterASTParser :: struct {
+    adapter: TreeSitterASTAdapter,
+}
+
+// initTreeSitterParser initializes a tree-sitter-based parser
+initTreeSitterParser :: proc() -> (TreeSitterASTParser, bool) {
+    adapter, ok := initASTAdapter()
+    if !ok {
+        return TreeSitterASTParser{}, false
+    }
+    
+    return TreeSitterASTParser{
+        adapter = adapter,
+    }, true
+}
+
+// deinitTreeSitterParser cleans up the parser
+deinitTreeSitterParser :: proc(parser: TreeSitterASTParser) {
+    deinitASTAdapter(parser.adapter)
+}
+
 // parseFile parses an Odin file and returns the AST root node
-parseFile :: proc(parser: TreeSitterParser, file_path: string) -> rawptr {
+parseFile :: proc(parser: TreeSitterASTParser, file_path: string) -> (ASTNode, bool) {
     fmt.println("Parsing file:", file_path)
     
-    // Placeholder - actual implementation will:
-    // 1. Read file content
-    // 2. Parse with tree-sitter
-    // 3. Return root node
+    // Read file content
+    content, err := os.read_entire_file_from_path(file_path, context.allocator)
+    if err != nil {
+        fmt.println("Error reading file:", err)
+        return ASTNode{}, false
+    }
+    defer delete(content)
     
-    return nil
+    content_str := string(content)
+    
+    // Parse with tree-sitter
+    ast_root, ok := parseToAST(parser.adapter, content_str)
+    if !ok {
+        fmt.println("Error parsing file:", file_path)
+        return ASTNode{}, false
+    }
+    
+    return ast_root, true
 }
 
 // ASTNode represents a node in the AST

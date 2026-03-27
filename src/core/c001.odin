@@ -1,30 +1,10 @@
-package correctness
+package core
 
 import "core:fmt"
 import "core:os"
 import "core:strings"
 
-// Diagnostic represents a linting diagnostic
-Diagnostic :: struct {
-    file:    string,
-    line:    int,
-    column:  int,
-    rule_id: string,
-    tier:    string,
-    message: string,
-    fix:     string,
-    has_fix: bool,
-}
-
-// Rule represents a linting rule
-Rule :: struct {
-    id: string,
-    tier: string,
-    matcher: proc(file_path: string, node: rawptr) -> Diagnostic,
-    message: proc() -> string,
-    fix_hint: proc() -> string,
-}
-
+// C001 rule implementation
 // C001: Allocation without matching defer free in same scope
 // Inspired by: Rust clippy::mem_forget
 
@@ -40,7 +20,7 @@ C001Rule :: proc() -> Rule {
 }
 
 // c001Matcher checks for allocations without defer free
-c001Matcher :: proc(file_path: string, node: rawptr) -> Diagnostic {
+c001Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
     // Placeholder - actual implementation will:
     // 1. Check if node is an allocation (make, new, etc.)
     // 2. Verify no matching defer free in same scope
