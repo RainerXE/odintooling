@@ -3,32 +3,38 @@ package core
 import "core:fmt"
 import "core:os"
 import "core:strings"
+import "../rules/correctness"
 
-// Diagnostic represents a linting diagnostic
-Diagnostic :: struct {
-    file:    string,
-    line:    int,
-    column:  int,
-    rule_id: string,
-    tier:    string,
-    message: string,
-    fix:     string,
-    has_fix: bool,
+// Use types from correctness package
+
+// RuleRegistry manages all linting rules
+RuleRegistry :: struct {
+    rules: map[string]correctness.Rule,
 }
 
-// ASTWalker represents the AST walker
-ASTWalker :: struct {
-    // Placeholder for AST walker implementation
+// initRuleRegistry creates a new rule registry
+initRuleRegistry :: proc() -> RuleRegistry {
+    return RuleRegistry{
+        rules = make(map[string]correctness.Rule),
+    }
 }
 
-// walkAST walks the AST and applies rules
-walkAST :: proc(walker: ^ASTWalker, node: rawptr) {
-    // Placeholder for AST walking logic
-    fmt.println("Walking AST node")
+// registerRule adds a rule to the registry
+registerRule :: proc(registry: ^RuleRegistry, rule: correctness.Rule) {
+    registry.rules[rule.id] = rule
+}
+
+// getRule gets a rule by ID
+getRule :: proc(registry: RuleRegistry, id: string) -> (correctness.Rule, bool) {
+    rule, ok := registry.rules[id]
+    if !ok {
+        return correctness.Rule{}, false
+    }
+    return rule, true
 }
 
 // emitDiagnostic emits a diagnostic
-emitDiagnostic :: proc(diag: Diagnostic) {
+emitDiagnostic :: proc(diag: correctness.Diagnostic) {
     // Format diagnostic output
     fmt.printf("%s:%d:%d: %s [%s] %s",
                diag.file, diag.line, diag.column,
@@ -42,7 +48,7 @@ emitDiagnostic :: proc(diag: Diagnostic) {
 }
 
 // stubRule is a stub rule for pipeline validation
-stubRule :: proc(file_path: string) -> (Diagnostic, bool) {
+stubRule :: proc(file_path: string) -> (correctness.Diagnostic, bool) {
     // Check if file contains "TODO_FIXME" pattern
     // This is a placeholder - actual implementation will use tree-sitter
     
@@ -51,13 +57,13 @@ stubRule :: proc(file_path: string) -> (Diagnostic, bool) {
     // Simple file content check for now
     content, err := os.read_entire_file_from_path(file_path, context.allocator)
     if err != nil {
-        return {}, false
+        return correctness.Diagnostic{}, false
     }
     defer delete(content)
     
     content_str := string(content)
     if strings.contains(content_str, "TODO_FIXME") {
-        return Diagnostic{
+        return correctness.Diagnostic{
             file = file_path,
             line = 1,
             column = 1,
@@ -69,7 +75,7 @@ stubRule :: proc(file_path: string) -> (Diagnostic, bool) {
         }, true
     }
     
-    return {}, false
+    return correctness.Diagnostic{}, false
 }
 
 // main entry point
@@ -87,17 +93,31 @@ main :: proc() {
     
     fmt.println("Processing file:", file_path)
     
-    // Create AST walker
-    walker := ASTWalker{}
+    // Initialize rule registry
+    registry := initRuleRegistry()
     
-    // Parse file (placeholder - will use tree-sitter)
-    // For now, we'll just apply the stub rule
+    // Register rules
+    registerRule(&registry, correctness.C001Rule())
     
-    // Apply stub rule
-    diag, found := stubRule(file_path)
-    if found {
+    // Apply all rules
+    diagnostics_found := false
+    // Apply C001 rule
+    c001_rule := correctness.C001Rule()
+    diag := c001_rule.matcher(file_path, nil)
+    if diag.message != "" {
         emitDiagnostic(diag)
-        os.exit(1)  // Exit with error code for correctness findings
+        diagnostics_found = true
+    }
+    
+    // Also run stub rule for now
+    stub_diag, stub_found := stubRule(file_path)
+    if stub_found {
+        emitDiagnostic(stub_diag)
+        diagnostics_found = true
+    }
+    
+    if diagnostics_found {
+        os.exit(1)  // Exit with error code for findings
     }
     
     fmt.println("No diagnostics found")
