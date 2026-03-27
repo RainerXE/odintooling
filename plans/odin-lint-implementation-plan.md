@@ -51,12 +51,21 @@ odin-lint/
 - ✅ CLI exit codes working (0 for clean, 1 for findings)
 - ✅ Basic test harness functional
 
-### Milestone 1 (Correctness Tier)
-- Implement 8 correctness rules.
-- Rule registry and isolation.
-- Fixture coverage (3 pass + 3 fail per rule).
-- Documentation for each rule.
-- Ensure zero false positives.
+### 🏗️ Milestone 1 (Correctness Tier) - IN PROGRESS
+- ✅ Rule registry and isolation system implemented.
+- ✅ C001 rule skeleton created (allocation without defer free).
+- [ ] Implement remaining 7 correctness rules (C002-C008).
+- [ ] Fixture coverage (3 pass + 3 fail per rule).
+- [ ] Documentation for each rule.
+- [ ] Ensure zero false positives.
+
+**Current Focus:** Implementing tree-sitter integration for AST parsing
+
+**Progress:**
+- ✅ Rule system architecture working
+- ✅ C001 rule integrated and functional
+- ✅ Rule registry can manage multiple rules
+- ✅ Basic rule application pipeline working
 
 ### Milestone 2 (Config + Suspicious/Style Tiers)
 - Add `odin-lint.toml` config parser.

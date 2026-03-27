@@ -3,38 +3,56 @@ package core
 import "core:fmt"
 import "core:os"
 import "core:strings"
-import "../rules/correctness"
 
-// Use types from correctness package
+// Diagnostic represents a linting diagnostic
+Diagnostic :: struct {
+    file:    string,
+    line:    int,
+    column:  int,
+    rule_id: string,
+    tier:    string,
+    message: string,
+    fix:     string,
+    has_fix: bool,
+}
+
+// Rule represents a linting rule
+Rule :: struct {
+    id: string,
+    tier: string,
+    matcher: proc(file_path: string, node: rawptr) -> Diagnostic,
+    message: proc() -> string,
+    fix_hint: proc() -> string,
+}
 
 // RuleRegistry manages all linting rules
 RuleRegistry :: struct {
-    rules: map[string]correctness.Rule,
+    rules: map[string]Rule,
 }
 
 // initRuleRegistry creates a new rule registry
 initRuleRegistry :: proc() -> RuleRegistry {
     return RuleRegistry{
-        rules = make(map[string]correctness.Rule),
+        rules = make(map[string]Rule),
     }
 }
 
 // registerRule adds a rule to the registry
-registerRule :: proc(registry: ^RuleRegistry, rule: correctness.Rule) {
+registerRule :: proc(registry: ^RuleRegistry, rule: Rule) {
     registry.rules[rule.id] = rule
 }
 
 // getRule gets a rule by ID
-getRule :: proc(registry: RuleRegistry, id: string) -> (correctness.Rule, bool) {
+getRule :: proc(registry: RuleRegistry, id: string) -> (Rule, bool) {
     rule, ok := registry.rules[id]
     if !ok {
-        return correctness.Rule{}, false
+        return {}, false
     }
     return rule, true
 }
 
 // emitDiagnostic emits a diagnostic
-emitDiagnostic :: proc(diag: correctness.Diagnostic) {
+emitDiagnostic :: proc(diag: Diagnostic) {
     // Format diagnostic output
     fmt.printf("%s:%d:%d: %s [%s] %s",
                diag.file, diag.line, diag.column,
@@ -48,7 +66,7 @@ emitDiagnostic :: proc(diag: correctness.Diagnostic) {
 }
 
 // stubRule is a stub rule for pipeline validation
-stubRule :: proc(file_path: string) -> (correctness.Diagnostic, bool) {
+stubRule :: proc(file_path: string) -> (Diagnostic, bool) {
     // Check if file contains "TODO_FIXME" pattern
     // This is a placeholder - actual implementation will use tree-sitter
     
@@ -57,13 +75,13 @@ stubRule :: proc(file_path: string) -> (correctness.Diagnostic, bool) {
     // Simple file content check for now
     content, err := os.read_entire_file_from_path(file_path, context.allocator)
     if err != nil {
-        return correctness.Diagnostic{}, false
+        return {}, false
     }
     defer delete(content)
     
     content_str := string(content)
     if strings.contains(content_str, "TODO_FIXME") {
-        return correctness.Diagnostic{
+        return Diagnostic{
             file = file_path,
             line = 1,
             column = 1,
@@ -75,7 +93,7 @@ stubRule :: proc(file_path: string) -> (correctness.Diagnostic, bool) {
         }, true
     }
     
-    return correctness.Diagnostic{}, false
+    return {}, false
 }
 
 // main entry point
@@ -98,21 +116,31 @@ main :: proc() {
     
     // Register rules
     registerRule(&registry, correctness.C001Rule())
+    // TODO: Add more rules as they're implemented
+    
+    // Initialize AST parser
+    parser := initParser()
+    defer deinitParser(parser)
+    
+    // Parse file to get AST
+    ast_root := parseFile(parser, file_path)
     
     // Apply all rules
     diagnostics_found := false
-    // Apply C001 rule
-    c001_rule := correctness.C001Rule()
-    diag := c001_rule.matcher(file_path, nil)
-    if diag.message != "" {
-        emitDiagnostic(diag)
-        diagnostics_found = true
-    }
+    for key, rule := registry.rules {
+        if rule.tier == "correctness" {  // Only correctness tier for now
+            diag := rule.matcher(file_path, ast_root)
+            // Check if diagnostic is valid (has non-empty message)
+            if diag.message != "" {
+                emitDiagnostic(diag)
+                diagnostics_found = true
+            }
+        }
     
     // Also run stub rule for now
-    stub_diag, stub_found := stubRule(file_path)
-    if stub_found {
-        emitDiagnostic(stub_diag)
+    diag, found := stubRule(file_path)
+    if found {
+        emitDiagnostic(diag)
         diagnostics_found = true
     }
     
