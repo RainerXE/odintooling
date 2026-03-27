@@ -3,38 +3,56 @@ package core
 import "core:fmt"
 import "core:os"
 import "core:strings"
-import "../rules/correctness"
 
-// Use types from correctness package
+// Diagnostic represents a linting diagnostic
+Diagnostic :: struct {
+    file:    string,
+    line:    int,
+    column:  int,
+    rule_id: string,
+    tier:    string,
+    message: string,
+    fix:     string,
+    has_fix: bool,
+}
+
+// Rule represents a linting rule
+Rule :: struct {
+    id: string,
+    tier: string,
+    matcher: proc(file_path: string, node: ^ASTNode) -> Diagnostic,
+    message: proc() -> string,
+    fix_hint: proc() -> string,
+}
 
 // RuleRegistry manages all linting rules
 RuleRegistry :: struct {
-    rules: map[string]correctness.Rule,
+    rules: map[string] Rule,
 }
 
 // initRuleRegistry creates a new rule registry
 initRuleRegistry :: proc() -> RuleRegistry {
     return RuleRegistry{
-        rules = make(map[string]correctness.Rule),
+        rules = make(map[string] Rule),
     }
 }
 
 // registerRule adds a rule to the registry
-registerRule :: proc(registry: ^RuleRegistry, rule: correctness.Rule) {
+registerRule :: proc(registry: ^RuleRegistry, rule:  Rule) {
     registry.rules[rule.id] = rule
 }
 
 // getRule gets a rule by ID
-getRule :: proc(registry: RuleRegistry, id: string) -> (correctness.Rule, bool) {
+getRule :: proc(registry: RuleRegistry, id: string) -> ( Rule, bool) {
     rule, ok := registry.rules[id]
     if !ok {
-        return correctness.Rule{}, false
+        return  Rule{}, false
     }
     return rule, true
 }
 
 // emitDiagnostic emits a diagnostic
-emitDiagnostic :: proc(diag: correctness.Diagnostic) {
+emitDiagnostic :: proc(diag:  Diagnostic) {
     // Format diagnostic output
     fmt.printf("%s:%d:%d: %s [%s] %s",
                diag.file, diag.line, diag.column,
@@ -48,7 +66,7 @@ emitDiagnostic :: proc(diag: correctness.Diagnostic) {
 }
 
 // stubRule is a stub rule for pipeline validation
-stubRule :: proc(file_path: string) -> (correctness.Diagnostic, bool) {
+stubRule :: proc(file_path: string) -> ( Diagnostic, bool) {
     // Check if file contains "TODO_FIXME" pattern
     // This is a placeholder - actual implementation will use tree-sitter
     
@@ -57,13 +75,13 @@ stubRule :: proc(file_path: string) -> (correctness.Diagnostic, bool) {
     // Simple file content check for now
     content, err := os.read_entire_file_from_path(file_path, context.allocator)
     if err != nil {
-        return correctness.Diagnostic{}, false
+        return  Diagnostic{}, false
     }
     defer delete(content)
     
     content_str := string(content)
     if strings.contains(content_str, "TODO_FIXME") {
-        return correctness.Diagnostic{
+        return  Diagnostic{
             file = file_path,
             line = 1,
             column = 1,
@@ -75,7 +93,7 @@ stubRule :: proc(file_path: string) -> (correctness.Diagnostic, bool) {
         }, true
     }
     
-    return correctness.Diagnostic{}, false
+    return  Diagnostic{}, false
 }
 
 // main entry point
@@ -93,17 +111,32 @@ main :: proc() {
     
     fmt.println("Processing file:", file_path)
     
+    // Initialize tree-sitter AST parser
+    ts_parser, ts_ok := initTreeSitterParser()
+    if !ts_ok {
+        fmt.println("Failed to initialize tree-sitter parser")
+        os.exit(1)
+    }
+    
+    // Parse file to get AST
+    ast_root, parse_ok := parseFile(ts_parser, file_path)
+    if !parse_ok {
+        fmt.println("Failed to parse file:", file_path)
+        deinitTreeSitterParser(ts_parser)
+        os.exit(1)
+    }
+    
     // Initialize rule registry
     registry := initRuleRegistry()
     
     // Register rules
-    registerRule(&registry, correctness.C001Rule())
+    registerRule(&registry, C001Rule())
     
     // Apply all rules
     diagnostics_found := false
-    // Apply C001 rule
-    c001_rule := correctness.C001Rule()
-    diag := c001_rule.matcher(file_path, nil)
+    // Apply C001 rule with parsed AST
+    c001_rule := C001Rule()
+    diag := c001_rule.matcher(file_path, &ast_root)
     if diag.message != "" {
         emitDiagnostic(diag)
         diagnostics_found = true
@@ -117,9 +150,11 @@ main :: proc() {
     }
     
     if diagnostics_found {
+        deinitTreeSitterParser(ts_parser)
         os.exit(1)  // Exit with error code for findings
     }
     
+    deinitTreeSitterParser(ts_parser)
     fmt.println("No diagnostics found")
     os.exit(0)
 }
