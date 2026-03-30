@@ -1,0 +1,28 @@
+{
+  "name": "odin-lint",
+  "version": "0.1.0",
+  "description": "A static analysis tool for the Odin programming language",
+  "author": "RuiShin Projects",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "tree-sitter-odin",
+      "source": "https://github.com/amaanq/tree-sitter-odin",
+      "version": "latest"
+    }
+  ],
+  "build": {
+    "output": "artifacts/odin-lint",
+    "flags": ["-define:DEBUG=true"]
+  },
+  "packages": [
+    {
+      "path": "src/core",
+      "name": "core"
+    },
+    {
+      "path": "src/rules/correctness",
+      "name": "correctness"
+    }
+  ]
+}
