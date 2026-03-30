@@ -1,4 +1,0 @@
-Starting odin-lint
-Processing file: test/fixtures/fail/todo_fixme.odin
-Checking stub rule for: test/fixtures/fail/todo_fixme.odin
-
