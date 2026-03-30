@@ -11,10 +11,10 @@
 	"profiles": [
 		{ "name": "default", "checker_path": ["src"], "defines": { "ODIN_DEBUG": "false" }},
 		{ "name": "linux_profile", "os": "linux", "checker_path": ["src/main.odin"], "defines": { "ODIN_DEBUG": "false" }},
-		{ "name": "mac_profile", "os": "darwin", "arch": "arm64", "defines": { "ODIN_DEBUG": "false" }},
+		{ "name": "mac_profile", "os": "darwin", "arch": "arm64", "checker_path": ["src/main.odin"], "defines": { "ODIN_DEBUG": "false" }},
 		{ "name": "windows_profile", "os": "windows", "checker_path": ["src"], "defines": { "ODIN_DEBUG": "false" }}
 	]
-	"enable": true,
+,	"enable": false,
 	"plugins": [{
 		"name": "odin-lint",
 		"path": "/Users/rainer/SynologyDrive/Development/MyODIN/odintooling/artifacts/odin_lint_plugin.dylib",

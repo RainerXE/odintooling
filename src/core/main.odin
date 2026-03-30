@@ -3,6 +3,8 @@ package core
 import "core:fmt"
 import "core:os"
 import "core:strings"
+// LSP integration is handled by OLS (Odin Language Server)
+// C002 rule is now in the same package
 
 // Diagnostic represents a linting diagnostic
 Diagnostic :: struct {
@@ -103,11 +105,29 @@ main :: proc() {
     // Parse command line arguments
     args := os.args
     if len(args) < 2 {
-        fmt.println("Usage: odin-lint <file>")
+        fmt.println("Usage: odin-lint <file> [--lsp|--ast] [--server]")
+        fmt.println("  --lsp: Run in LSP mode for editor integration")
+        fmt.println("  --lsp --server: Run as standalone LSP server")
+        fmt.println("  --ast: Export AST in JSON format")
         os.exit(1)
     }
     
     file_path := args[1]
+    
+    // Check for special modes
+    ast_mode := false
+    
+    if len(args) > 2 {
+        if args[2] == "--ast" {
+            ast_mode = true
+            fmt.println("Running in AST export mode")
+        }
+    }
+    
+    if ast_mode {
+        runASTExport(file_path)
+        return
+    }
     
     fmt.println("Processing file:", file_path)
     
@@ -131,6 +151,7 @@ main :: proc() {
     
     // Register rules
     registerRule(&registry, C001Rule())
+    registerRule(&registry, C002Rule())
     
     // Apply all rules
     diagnostics_found := false
@@ -139,6 +160,14 @@ main :: proc() {
     diag := c001_rule.matcher(file_path, &ast_root)
     if diag.message != "" {
         emitDiagnostic(diag)
+        diagnostics_found = true
+    }
+    
+    // Apply C002 rule with parsed AST
+    c002_rule := C002Rule()
+    diag2 := c002_rule.matcher(file_path, &ast_root)
+    if diag2.message != "" {
+        emitDiagnostic(diag2)
         diagnostics_found = true
     }
     
