@@ -19,6 +19,11 @@ C002Rule :: proc() -> Rule {
     }
 }
 
+// Helper: Check if a statement is a cleanup function (free/delete)
+is_cleanup_function :: proc(text: string) -> bool {
+    return strings.contains(text, "free") || strings.contains(text, "delete")
+}
+
 // c002Matcher checks for defer free on wrong pointer
 c002Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
     // Check if this node is a defer statement with free/delete

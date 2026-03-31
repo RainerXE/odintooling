@@ -1,0 +1,80 @@
+package core
+
+import "core:fmt"
+import "core:log"
+import "core:mem"
+import "core:odin/ast"
+import "base:runtime"
+
+// PluginDiagnostic represents a linting diagnostic (C-compatible)
+PluginDiagnostic :: struct {
+    file:    ^byte,  // cstring
+    line:    i32,
+    column:  i32,
+    rule_id: ^byte,  // cstring
+    tier:    ^byte,  // cstring
+    message: ^byte,  // cstring
+    fix:     ^byte,  // cstring
+    has_fix: bool,
+}
+
+// File analysis
+odin_lint_analyze_file :: proc "c" (file_path: ^byte, ast_root: rawptr) -> rawptr {
+    // Cannot use fmt.printf in C-compatible functions (no context)
+    ast_node := cast(^ast.Node)(ast_root)
+    
+    // TODO: Apply rules (simplified for now)
+    // In a real implementation, this would analyze the AST and return diagnostics
+    
+    return nil
+}
+
+// Convert Diagnostic to PluginDiagnostic (C-compatible)
+convert_to_plugin_diagnostic :: proc(diag: Diagnostic) -> ^PluginDiagnostic {
+    plugin_diag := new(PluginDiagnostic)
+    plugin_diag.file = cstring(diag.file)
+    plugin_diag.line = i32(diag.line)
+    plugin_diag.column = i32(diag.column)
+    plugin_diag.rule_id = cstring(diag.rule_id)
+    plugin_diag.tier = cstring(diag.tier)
+    plugin_diag.message = cstring(diag.message)
+    plugin_diag.fix = cstring(diag.fix)
+    plugin_diag.has_fix = diag.has_fix
+    return plugin_diag
+}
+
+// Configuration schema
+odin_lint_get_config_schema :: proc "c" () -> ^byte {
+    schema := `{
+        "type": "object",
+        "properties": {
+            "rules": {
+                "type": "object",
+                "properties": {
+                    "C001": {
+                        "type": "object",
+                        "properties": {
+                            "enabled": {"type": "boolean"},
+                            "severity": {"type": "string", "enum": ["error", "warning", "info"]}
+                        }
+                    },
+                    "C002": {
+                        "type": "object",
+                        "properties": {
+                            "enabled": {"type": "boolean"},
+                            "severity": {"type": "string", "enum": ["error", "warning", "info"]}
+                        }
+                    }
+                }
+            }
+        }
+    }`
+    return cstring(schema)
+}
+
+// Configuration validation
+odin_lint_validate_config :: proc "c" (config: rawptr) -> bool {
+    return true
+}
+
+}
