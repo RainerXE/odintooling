@@ -7,7 +7,7 @@ The core linting tool with two modes:
 
 #### CLI Mode
 - **Purpose**: Standalone command-line tool for linting Odin code.
-- **Build**: Compiled via `build.sh` → produces a standalone binary.
+- **Build**: Compiled via `scripts/build.sh` → produces a standalone binary.
 - **Usage**:
   ```sh
   odin-lint <file.odin> [--ast] [--lsp]

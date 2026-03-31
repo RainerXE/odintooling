@@ -23,15 +23,38 @@
 
 ```
 odin-lint/
-├── src/
+├── artifacts/                    # All build outputs (executables, libraries)
+├── build/                        # Odin-based build system
+├── docs/                         # Documentation and references
+│   └── ODIN_STYLE_GUIDE_v2.md     # Style guide reference
+├── ffi/                          # C libraries that are part of our solution
+│   └── tree_sitter/              # Tree-sitter integration
+│       ├── tree-sitter-api.h
+│       ├── tree_sitter.h
+│       └── tree-sitter-lib/       # submodule
+│           └── tree-sitter-odin/  # submodule
+├── plans/                        # Planning files (single source of truth)
+│   ├── odin-lint-implementation-planV4.md  # Primary plan
+│   ├── odin-lint-ols-integration-plan.md  # OLS-specific plan
+│   ├── ols-plugin-system-analysis.md      # OLS plugin analysis
+│   ├── treesitter-integration-plan.md     # Tree-sitter integration
+│   └── REF_AGENT_PROMPT_MILESTONE2.md     # Agent prompt reference
+├── scripts/                      # All scripts
+│   ├── build.sh                          # Main build script
+│   ├── build_external_tree_sitter.sh     # Tree-sitter build
+│   ├── build_plugin.sh                   # Plugin build
+│   ├── scripts.md                        # Build documentation
+│   └── ... (other build scripts)
+├── src/                          # Source code
 │   ├── core/
 │   │   ├── main.odin              # CLI entry point
-│   │   ├── ast.odin               # AST types + walker (placeholder → real)
-│   │   ├── tree_sitter.odin       # tree-sitter FFI (CLI path only)
-│   │   ├── c001.odin              # C001 rule (CLI version)
-│   │   ├── c002.odin              # C002 rule (CLI version)
-│   │   ├── plugin_main.odin       # .dylib entry point for OLS plugin
-│   │   └── integration.odin       # OLS plugin analyze_file impl
+│   │   ├── ast.odin               # AST types + walker
+│   │   ├── tree_sitter.odin       # tree-sitter FFI
+│   │   ├── tree_sitter_bindings.odin # FFI bindings
+│   │   ├── c001.odin              # C001 rule
+│   │   ├── c002.odin              # C002 rule
+│   │   ├── plugin_main.odin       # .dylib entry point
+│   │   └── integration.odin       # OLS plugin integration
 │   ├── rules/
 │   │   └── correctness/
 │   │       ├── c001.odin          # Rule using ^ast.File (OLS path)
@@ -39,15 +62,18 @@ odin-lint/
 │   │       └── ...c003-c008.odin
 │   └── integrations/
 │       └── ols/                   # OLS plugin glue code
-├── ffi/
-│   └── tree_sitter/
-│       ├── tree-sitter-api.h
-│       ├── tree_sitter.h
-│       └── tree-sitter-lib/       # submodule
-│           └── tree-sitter-odin/  # submodule
-├── vendor/
-│   └── ols/                       # OLS fork with plugin system
-│       └── src/server/
+├── test/                         # All tests
+│   ├── fixtures/
+│   │   ├── pass/
+│   │   └── fail/
+│   └── unit/
+└── vendor/                       # External Odin projects
+    └── ols/                       # OLS fork with plugin system
+        ├── ols.json              # OLS project file
+        ├── README.md            # OLS documentation
+        └── src/
+            └── server/
+```
 │           ├── plugin.odin        # OLSPlugin interface ✅
 │           ├── plugin_manager.odin # Lifecycle management ✅ (gaps to fix)
 │           └── plugin_dynamic.odin # dynlib loading ✅ (gaps to fix)

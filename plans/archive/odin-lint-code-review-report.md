@@ -132,7 +132,7 @@ src/
 - `build-plugin`: Shared library (`.dylib`).
 
 #### Actual:
-- `build.sh`: Exists but not tested.
+- `scripts/build.sh`: Exists but not tested.
 - No `Makefile` or structured build targets.
 
 ---
