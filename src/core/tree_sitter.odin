@@ -6,6 +6,10 @@ import "core:c"
 import "core:strings"
 import "base:runtime"
 
+// Tree-sitter version constants for ABI compatibility checking
+TREE_SITTER_LANGUAGE_VERSION :: 15
+TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION :: 13
+
 
 
 // Tree-sitter integration module
@@ -37,11 +41,30 @@ initTreeSitter :: proc() -> (TSParser, TSLanguage, bool) {
     }
     fmt.println("✅ DEBUG: Odin language loaded successfully")
 
+    // Check language ABI version for compatibility
+    fmt.println("DEBUG: Checking language ABI version...")
+    language_abi_version := ts_language_abi_version(language)
+    fmt.println("DEBUG: Language ABI version:", language_abi_version)
+    fmt.println("DEBUG: Core library version:", TREE_SITTER_LANGUAGE_VERSION)
+    fmt.println("DEBUG: Min compatible version:", TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION)
+    
+    // Check for version compatibility
+    if language_abi_version < TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION {
+        fmt.println("❌ DEBUG: Language ABI version", language_abi_version, "is too old!")
+        fmt.println("DEBUG: Minimum required:", TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION)
+        ts_parser_delete(parser)
+        return nil, nil, false
+    }
+    if language_abi_version > TREE_SITTER_LANGUAGE_VERSION {
+        fmt.println("⚠️  DEBUG: Language ABI version", language_abi_version, "is newer than core", TREE_SITTER_LANGUAGE_VERSION)
+    }
+
     // Set the language in the parser
     fmt.println("DEBUG: Setting parser language...")
     success := ts_parser_set_language(parser, language)
     if !success {
-        fmt.println("❌ DEBUG: ts_parser_set_language() returned false")
+        fmt.println("❌ DEBUG: ts_parser_set_language() returned false - VERSION MISMATCH!")
+        fmt.println("DEBUG: This usually means the grammar was built with an incompatible tree-sitter version")
         ts_parser_delete(parser)
         return nil, nil, false
     }
