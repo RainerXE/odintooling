@@ -7,15 +7,16 @@
 ## Table of Contents
 1. [Folder Structure](#1-folder-structure)
 2. [Honest Milestone Status](#2-honest-milestone-status)
-3. [Current Work: Milestone 2 — OLS Wiring](#3-current-work-milestone-2)
-4. [Milestone 3 — Real Rule Analysis](#4-milestone-3-real-rule-analysis)
-5. [Milestone 4 — Standalone CLI + Tree-sitter](#5-milestone-4-standalone-cli)
-6. [Milestone 5 — Additional Rules + AI Integration](#6-milestone-5)
+3. [Current Work: Milestone 2 — Grammar Update & Rule Implementation](#3-current-work-milestone-2)
+4. [Milestone 3 — Complete CLI Rule Set](#4-milestone-3-complete-cli-rule-set)
+5. [Milestone 4 — OLS Plugin Integration](#5-milestone-4-ols-plugin-integration)
+6. [Milestone 5 — Advanced Features](#6-milestone-5-advanced-features)
 7. [Gates](#7-gates)
 8. [AST Strategy](#8-ast-strategy)
 9. [FFI Integration](#9-ffi-integration)
 10. [Testing](#10-testing)
 11. [Build System](#11-build-system)
+12. [Tree-sitter Grammar Update Strategy](#12-tree-sitter-grammar-update-strategy)
 
 ---
 
@@ -128,82 +129,98 @@ All gate 0 criteria met:
 
 **Honest status: CLI is now functional. Tree-sitter FFI works correctly. Real linting functionality is operational.**
 
-### ⚠️ Milestone 1B — OLS Plugin System (PARTIALLY COMPLETE)
+### ⚠️ Milestone 1B — OLS Plugin System (DEPRIORITIZED - WRONG PRIORITY)
 
-**What is genuinely done:**
-- `OLSPlugin` struct interface in `vendor/ols/src/server/plugin.odin`
-- `PluginManager` lifecycle in `plugin_manager.odin`
-- `platform_load_plugin` / `platform_get_function` in `plugin_dynamic.odin`
-- `DiagnosticType` enum exists in `diagnostics.odin`
-- odin-lint builds as `.dylib`; simple test plugin loads successfully
+**IMPORTANT CORRECTION**: This milestone has been deprioritized. The OLS plugin system should NOT be worked on until the CLI is fully functional with a complete rule set. This was a strategic error in the original planning.
 
-**What is NOT done:**
-- `initialize_plugins()` never called in `main.odin`
-- `analyze_with_plugins()` never called from document pipeline
-- `load_plugin_library()` in `plugin_manager.odin` still simulates
-  (doesn't call `platform_load_plugin`)
-- No `DiagnosticType.Plugin` enum member
-- `PluginDiagnostic` and `Diagnostic` types not reconciled
+**Current Status**: Plugin system exists but is incomplete and should remain on hold.
 
-**Corrected status: Plugin system designed; not yet wired into OLS.**
+**When to resume**: Only after Milestone 3 (Complete CLI Rule Set) is achieved. The CLI must be production-ready before OLS integration.
+
+**Rationale**:
+- CLI is the foundation - must be fully functional first
+- OLS integration depends on working rules and stable CLI
+- Tree-sitter grammar needs updating before OLS work
+- Current OLS plugin system is unfinished and should not be prioritized
 
 ---
 
-## 3. Current Work: Milestone 2 — OLS Plugin System (NOW PRIORITY) 🔄
+## 3. Current Work: Milestone 2 — Grammar Update & Rule Implementation
 
-**Goal:** Now that CLI tree-sitter integration is working, wire the OLS plugin system.
-The OLS plugin must be able to use the same tree-sitter parsing infrastructure
-that the CLI uses.
+**Goal:** Update the outdated tree-sitter Odin grammar and implement real linting rules.
+This is the correct priority - CLI must be fully functional before OLS integration.
 
-**Priority Shift:** With CLI working, we can now focus on OLS integration.
+**Priority Correction:** OLS integration (Milestone 4) is deprioritized. Focus is now on:
+1. Updating the 2-year-old Odin grammar
+2. Implementing comprehensive rule set
+3. Making CLI production-ready
 
 ### Tasks (in order — each is a prerequisite for the next)
 
-**2.1 — Create shared tree-sitter module**
-- Factor out tree-sitter initialization and parsing into a shared module
-- Make it usable by both CLI and OLS plugin
-- Ensure no duplicate code between the two paths
+**2.1 — Update Tree-sitter Odin Grammar**
+**CRITICAL**: The grammar in `ffi/tree_sitter/tree-sitter-odin/` is ~2 years old.
 
-**2.2 — Implement OLS plugin entry point**
-File: `src/core/plugin_main.odin`
-- Implement `initialize_plugin()` function
-- Wire up tree-sitter parsing in the plugin context
-- Ensure plugin can parse files using the same logic as CLI
+**Steps**:
+- Check current Odin language version vs grammar version
+- Update grammar to match latest Odin syntax
+- Test grammar with latest tree-sitter library
+- Rebuild `libtree-sitter-odin.a` with updated grammar
+- Verify grammar works with our CLI
 
-**2.3 — Wire plugin into OLS lifecycle**
-File: `vendor/ols/src/server/plugin_manager.odin`
-- Call `initialize_plugins()` in OLS main initialization
-- Call `analyze_with_plugins()` from document analysis pipeline
-- Fix `load_plugin_library()` to use real dynamic loading
+**2.2 — Implement Real C001 Rule (Memory Allocation)**
+File: `src/core/c001.odin`
+- Replace placeholder with real AST traversal
+- Detect `make`/`new` allocations in tree-sitter AST
+- Check for matching `defer free` in same scope
+- Generate real diagnostics with correct positions
+- Test with real Odin code examples
 
-**2.4 — Implement real rule analysis in plugin**
-- Port C001 and C002 rules to work with tree-sitter AST in plugin context
-- Ensure rules generate proper OLS diagnostics
-- Test with real Odin files in editor
+**2.3 — Implement Real C002 Rule (Defer Free Issues)**
+File: `src/core/c002.odin`
+- Replace string matching with real AST analysis
+- Detect defer free on wrong pointer types
+- Use actual node types and relationships
+- Generate accurate diagnostics
+- Test with real Odin code examples
 
-### Gate 2 (OLS Plugin Working)
-- [ ] OLS plugin loads successfully
-- [ ] Plugin can parse Odin files using tree-sitter
-- [ ] C001 and C002 rules work in editor context
-- [ ] Diagnostics appear correctly in VS Code
-- [ ] No crashes in OLS with plugin enabled
+**2.4 — Implement Additional Core Rules (C003-C008)**
+- C003: Inconsistent naming conventions
+- C004: Private procedure naming violations
+- C005: Internal procedure naming violations
+- C006: Public procedure naming violations
+- C007: Type naming violations (must be PascalCase)
+- C008: Acronym consistency violations
+
+**2.5 — CLI Enhancements**
+- Implement proper `--help` flag handling
+- Add `--list-rules` flag to show available rules
+- Improve error messages and exit codes
+- Add JSON output format for tool integration
+
+### Gate 2 (CLI with Real Rules)
+- [ ] Tree-sitter Odin grammar updated to latest version
+- [ ] C001 detects real allocation issues in test files
+- [ ] C002 detects real defer free issues in test files
+- [ ] At least 4 additional rules implemented (C003-C006)
+- [ ] `--help` and `--list-rules` flags working
+- [ ] CLI can analyze real Odin projects
+- [ ] No false positives on valid Odin code
 
 
 ---
 
-## 4. Milestone 2 — OLS Plugin System (DEPRIORITIZED) ⏸
+## 4. Milestone 4 — OLS Plugin Integration (DEPRIORITIZED - CORRECT PRIORITY)
 
-**Status:** This milestone is deprioritized until CLI works properly.
-OLS integration cannot proceed until the core linting functionality
-is working in the command-line version.
+**Status:** This milestone is deprioritized until CLI is fully functional.
+OLS integration cannot proceed until the CLI has a complete rule set and is production-ready.
 
 **Rationale:**
-- CLI is the foundation - must work first
-- OLS plugin depends on working rule analysis
-- Tree-sitter FFI must be proven in CLI before OLS integration
-- Current OLS plugin system is unfinished and broken
+- CLI must be fully functional first (Milestones 2-3)
+- OLS plugin depends on working rules and stable CLI
+- Tree-sitter grammar needs updating before OLS work
+- Current OLS plugin system is unfinished and should not be prioritized
 
-**When to resume:** Only after Gate 1 (CLI Working) is achieved.
+**When to resume:** Only after Gate 3 (Production-Ready CLI) is achieved.
 
 ### Tasks
 
@@ -347,11 +364,11 @@ This is separate from the lint pipeline — purely an export feature.
 - **Style Rules (C009-C016):** Naming conventions, consistency enforcement
 - **Total:** 16+ rules covering correctness and style
 
-**Corrected Priority:**
-- **Current Focus:** Gate 2 (OLS Plugin) - Wire OLS integration now that CLI works
-- **Next Phase:** Gate 3 (Full CLI) - Complete rule set + style enforcement
-- **Status:** Gate 1 (CLI Working) ✅ COMPLETED - CLI can parse real Odin files
-- **Honest Status:** CLI is functional, ready for OLS integration
+**Corrected Priority (CRITICAL UPDATE):**
+- **Current Focus:** Gate 2 (Grammar Update & Real Rules) - Make CLI fully functional
+- **Next Phase:** Gate 3 (Complete CLI) - Full rule set + production features
+- **Deprioritized:** OLS integration (Gate 4) until CLI is production-ready
+- **Honest Status:** Gate 1 ✅ COMPLETED, now focusing on grammar and rules
 
 
 ---
@@ -521,4 +538,67 @@ The plugin `.dylib` must be built with:
 
 ---
 
-*odin-lint Implementation Plan v4 · Built for the Odin community*
+## 12. Tree-sitter Grammar Update Strategy
+
+### Problem Statement
+
+The tree-sitter Odin grammar in `ffi/tree_sitter/tree-sitter-odin/` is approximately **2 years old**. During this time:
+- Odin language has evolved with new syntax features
+- Tree-sitter library has had updates and bug fixes
+- Our grammar may not support current Odin syntax
+- This could cause parsing errors or missing syntax elements
+
+### Update Strategy
+
+**Step 1: Version Assessment**
+- Check current Odin language version (from odin compiler)
+- Check tree-sitter-odin grammar version (from grammar repository)
+- Check tree-sitter library version (from our build)
+- Identify compatibility gaps
+
+**Step 2: Grammar Update**
+- Fork/update the tree-sitter-odin grammar repository
+- Merge latest changes from upstream
+- Test grammar with current Odin syntax
+- Fix any parsing issues
+
+**Step 3: Rebuild Static Library**
+```bash
+cd ffi/tree_sitter/tree-sitter-odin
+# Update grammar files
+git pull upstream main
+# Rebuild static library
+make
+# Copy to our project
+cp libtree-sitter-odin.a ../../tree-sitter-lib/
+```
+
+**Step 4: Integration Testing**
+- Test with our CLI: `./odin-lint test.odin`
+- Verify all syntax elements parse correctly
+- Test with complex Odin code (structs, generics, etc.)
+- Check for any parsing regressions
+
+**Step 5: Fallback Plan**
+If grammar update causes issues:
+- Keep old grammar as backup
+- Implement gradual update strategy
+- Add version compatibility checks
+
+### Grammar Maintenance Plan
+
+**Going Forward:**
+- Schedule quarterly grammar updates
+- Automate grammar version checking
+- Add grammar update to CI/CD pipeline
+- Monitor Odin language changes
+
+### Critical Dependencies
+
+- Tree-sitter library version compatibility
+- Odin language syntax stability
+- Grammar repository maintenance
+
+---
+
+*odin-lint Implementation Plan v4 · Corrected Priority · Built for the Odin community*
