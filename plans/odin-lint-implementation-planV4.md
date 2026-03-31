@@ -103,26 +103,24 @@ All gate 0 criteria met:
 - Test fixtures: `pass/empty.odin`, `fail/todo_fixme.odin`
 - Build script working
 
-### ⚠️ Milestone 1 — AST Integration (PARTIALLY COMPLETE)
+### ❌ Milestone 1 — CLI Tree-sitter Integration (INCOMPLETE)
 
 **What is genuinely done:**
-- `ASTNode` struct with position metadata
-- `walkAST` / `visitAST` traversal skeleton
-- C001 and C002 rule _structure_ (matcher/message/fix_hint pattern)
-- FFI directory structure with tree-sitter headers
-- tree-sitter git submodules added
+- `ASTNode` struct with position metadata exists
+- Basic rule structure (C001, C002) is defined
+- Tree-sitter libraries are built (`libtree-sitter.a`)
+- FFI bindings are declared in `tree_sitter_bindings.odin`
 
-**What is NOT done (plan overstated):**
-- tree-sitter FFI bindings return `false` from every function
-- `initTreeSitterParser()` always fails — `ok = false`
-- `parseFile()` therefore always fails
-- C001 and C002 matchers operate on a fake placeholder `ASTNode{}`
-  with `node_type = "placeholder"` and no children
-- The rules detect nothing in real code
-- Gate 1 criterion "AST-based linter works with zero false positives"
-  is NOT met because the linter doesn't analyse anything
+**What is NOT working (critical issues):**
+- ❌ `initTreeSitterParser()` always fails — returns `ok = false`
+- ❌ No actual tree-sitter language loading (language parameter is nil)
+- ❌ `parseFile()` cannot parse real Odin files
+- ❌ C001 matcher returns empty diagnostics (pure placeholder)
+- ❌ C002 uses string matching heuristics, not real AST analysis
+- ❌ CLI cannot actually analyze real Odin code
+- ❌ No working file parsing or diagnostic generation
 
-**Corrected status: Milestone 1 infrastructure exists; analysis does not work.**
+**Honest status: CLI is fundamentally broken. Tree-sitter FFI exists but doesn't work. No real linting functionality.**
 
 ### ⚠️ Milestone 1B — OLS Plugin System (PARTIALLY COMPLETE)
 
@@ -145,64 +143,83 @@ All gate 0 criteria met:
 
 ---
 
-## 3. Current Work: Milestone 2 — OLS Wiring 🔄
+## 3. Current Work: Milestone 1 — Fix CLI Tree-sitter Integration 🔄
 
-**Goal:** Full path from "file saved in editor" → odin-lint plugin called
-→ diagnostic appears in editor. A hard-coded test diagnostic is acceptable
-at this stage. Real rule analysis comes in Milestone 3.
+**Goal:** Get `odin-lint <file>` working with real tree-sitter parsing.
+The CLI must be able to parse real Odin files and generate diagnostics
+before any OLS integration work.
+
+**Priority Shift:** OLS integration (Milestones 2-3) is deprioritized until
+CLI works properly. The command-line version must work first.
 
 ### Tasks (in order — each is a prerequisite for the next)
 
-**2.1 — Connect `load_plugin_library` to `platform_load_plugin`**
-File: `vendor/ols/src/server/plugin_manager.odin`
-- Replace simulation with real `platform_load_plugin()` call
-- Add symbol resolution via `dynlib.symbol_address("get_odin_lint_plugin")`
-- Wire returned proc pointer into `OLSPlugin` struct
+**1.1 — Fix tree-sitter language loading**
+File: `src/core/tree_sitter.odin`
+- Load Odin grammar from `libtree-sitter-odin.a`
+- Implement `ts_language_symbol()` or equivalent to get Odin language
+- Set language in parser: `ts_parser_set_language(parser, language)`
+- Verify language loading works (check return values)
 
-**2.2 — Add `DiagnosticType.Plugin`**
-File: `vendor/ols/src/server/diagnostics.odin`
-- Extend enum: `DiagnosticType :: enum { Syntax, Unused, Check, Plugin }`
+**1.2 — Fix FFI bindings to return success**
+File: `src/core/tree_sitter_bindings.odin`
+- Verify all foreign function declarations are correct
+- Check that `ts_parser_new()` actually creates a parser
+- Ensure `ts_parser_parse_string()` can parse real source code
+- Fix any linkage issues with the static library
 
-**2.3 — Initialise `PluginManager` in OLS startup**
-File: `vendor/ols/src/main.odin`
-- Create `plugin_manager` as package-level state in `server` package
-- Call `initialize_plugins()` after logger is set up
-- Call `shutdown_plugins()` on exit via `defer`
+**1.3 — Implement real file parsing**
+File: `src/core/tree_sitter.odin`
+- Fix `parseFile()` to use real tree-sitter parsing
+- Convert `TSTree` to our `ASTNode` structure properly
+- Handle parse errors gracefully
+- Test with real Odin files
 
-**2.4 — Call `analyze_with_plugins` in document pipeline**
-File: `vendor/ols/src/server/documents.odin`
-- Find where `add_diagnostics(.Syntax, ...)` is called after parse
-- Add `analyze_with_plugins()` call and feed results to `.Plugin` bucket
+**1.4 — Implement real C001 rule analysis**
+File: `src/core/c001.odin`
+- Replace placeholder with real AST traversal
+- Detect `make`/`new` allocations in AST
+- Check for matching `defer free` in same scope
+- Generate real diagnostics with correct positions
 
-**2.5 — Resolve `PluginDiagnostic` vs `Diagnostic` type mismatch**
-File: `vendor/ols/src/server/plugin.odin` + `types.odin`
-- Extend native `Diagnostic` with optional `rule_id`, `fix_suggestion` fields
-- Remove `PluginDiagnostic` type
+**1.5 — Implement real C002 rule analysis**
+File: `src/core/c002.odin`
+- Replace string matching with real AST analysis
+- Detect defer free on wrong pointer types
+- Use actual node types and relationships
+- Generate accurate diagnostics
 
-**2.6 — Implement `get_odin_lint_plugin` export in odin-lint**
-File: `src/core/plugin_main.odin`
-- Export `get_odin_lint_plugin :: proc "c" () -> ^OLSPlugin`
-- Return static `OLSPlugin` struct with placeholder `analyze_file` that
-  returns one hard-coded test diagnostic
+**1.6 — Fix CLI file handling**
+File: `src/core/main.odin`
+- Implement proper `--help` flag handling
+- Add better error messages for file operations
+- Handle edge cases (missing files, invalid paths)
+- Improve exit codes and diagnostic output
 
-### Gate 2 (Wiring)
-- [ ] OLS log: `"[PluginManager] Loaded plugin 'odin-lint'"` at startup
-- [ ] Opening a `.odin` file: plugin `analyze_file` is called (log confirms)
-- [ ] A diagnostic with `source: "odin-lint"` appears in editor Problems panel
-- [ ] Zero crashes when plugin is not configured (graceful no-op)
+### Gate 1 (CLI Working)
+- [ ] `odin-lint test.odin` successfully parses real Odin file
+- [ ] C001 detects real allocation issues
+- [ ] C002 detects real defer free issues
+- [ ] `--help` flag works properly
+- [ ] No crashes on valid Odin files
+- [ ] Proper exit codes (0 for success, 1 for findings)
 
 
 ---
 
-## 4. Milestone 3 — Real Rule Analysis via OLS AST 🔜
+## 4. Milestone 2 — OLS Plugin System (DEPRIORITIZED) ⏸
 
-**Goal:** C001 fires on genuine violations using the `^ast.File` that OLS
-provides. No tree-sitter required for this milestone.
+**Status:** This milestone is deprioritized until CLI works properly.
+OLS integration cannot proceed until the core linting functionality
+is working in the command-line version.
 
-**Critical insight:** The OLS plugin receives `^ast.File` (from
-`core:odin/ast`) — the same AST Odin's own compiler uses. Rules written
-for the OLS plugin path use `ast.walk()` and the `ast.Visitor` pattern,
-not tree-sitter. This is simpler and more accurate.
+**Rationale:**
+- CLI is the foundation - must work first
+- OLS plugin depends on working rule analysis
+- Tree-sitter FFI must be proven in CLI before OLS integration
+- Current OLS plugin system is unfinished and broken
+
+**When to resume:** Only after Gate 1 (CLI Working) is achieved.
 
 ### Tasks
 
@@ -236,17 +253,17 @@ File: `src/core/integration.odin`
 
 ---
 
-## 5. Milestone 4 — Standalone CLI + Tree-sitter 🔜
+## 5. Milestone 3 — Standalone CLI + Tree-sitter (NEXT AFTER CLI FIX) 🔜
 
-**Goal:** `odin-lint <file>` works without OLS. This requires tree-sitter
-because the CLI has no access to OLS's parser.
+**Goal:** Complete the CLI implementation with full tree-sitter integration.
+This milestone builds on the fixes from Milestone 1.
 
-The OLS plugin and the CLI are **two separate analysis paths**:
+**Prerequisite:** Gate 1 (CLI Working) must be achieved first.
 
-| Path | AST source | Status |
-|------|-----------|--------|
-| OLS plugin | `^ast.File` from OLS | Milestones 2–3 |
-| Standalone CLI | tree-sitter via FFI | This milestone |
+**The CLI path:**
+- Uses tree-sitter FFI for parsing (no OLS dependency)
+- Must work independently of OLS
+- Foundation for all future work
 
 ### Tasks
 
@@ -313,16 +330,17 @@ This is separate from the lint pipeline — purely an export feature.
 
 | Gate | Milestone | Key Criterion |
 |------|-----------|--------------|
-| 0 | Foundation | CLI works, stub rule fires, test harness functional |
-| 1 | AST infra | ~~AST-based linter works~~ → **Deferred to Gate 3** |
-| 2 | OLS wiring | Hard-coded plugin diagnostic appears in editor |
-| 3 | Real analysis | C001+C002 fire on real code, zero false positives |
-| 4 | Standalone CLI | tree-sitter wired, CLI works without OLS |
-| 5 | Full rule set | 8 correctness rules, all fixtures pass |
+| 0 | Foundation | ✅ CLI skeleton, stub rule, basic build |
+| 1 | CLI Fix | ❌ Real tree-sitter parsing, C001/C002 working |
+| 2 | OLS Plugin | ⏸ Deprioritized until CLI works |
+| 3 | Full CLI | 🔜 Complete CLI with all rules |
+| 4 | OLS Integration | 🔜 Plugin system with real analysis |
+| 5 | Full Rule Set | 🔜 All 8 rules, comprehensive testing |
 
-*Note: Gate 1 from v3 plan was incorrectly marked as passed. The AST
-infrastructure exists but tree-sitter is a placeholder. Real AST analysis
-is now Gate 3 (OLS path) and Gate 4 (CLI path).*
+**Corrected Priority:**
+- **Current Focus:** Gate 1 (CLI Fix) - Get basic linting working
+- **Deprioritized:** OLS integration (Gates 2, 4) until CLI is solid
+- **Honest Status:** Gate 1 is NOT passed - CLI is fundamentally broken
 
 
 ---
