@@ -39,6 +39,10 @@ foreign {
 	ts_node_child_count :: proc "c"(node: TSNode) -> c.uint ---;
 	ts_node_child :: proc "c"(node: TSNode, index: c.uint) -> TSNode ---;
 
+	// Language functions
+	// Odin language from tree-sitter-odin library
+	tree_sitter_odin :: proc "c"() -> TSLanguage ---;
+
 	// Language functions (would need Odin language implementation)
 	// ts_language_symbol_count :: proc "c"(language: TSLanguage) -> c.uint ---;
 	// ts_language_symbol_name :: proc "c"(language: TSLanguage, symbol: c.ushort) -> ^c.char ---;
