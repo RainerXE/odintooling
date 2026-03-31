@@ -613,3 +613,43 @@ If grammar update causes issues:
 ---
 
 *odin-lint Implementation Plan v4 · Corrected Priority · Built for the Odin community*
+
+## Future Vision: odin-assist (Beyond Current Scope)
+
+### The odintooling Suite
+
+Our project is named **odintooling** (not just odin-lint) because it represents a **suite of Odin development tools**:
+
+1. **odin-lint** ✅ (Current focus) - Static analysis and linting
+2. **odin-assist** 💡 (Future) - Interactive code assistance
+3. **odin-metrics** 📊 (Future) - Code quality metrics
+4. **odin-refactor** 🔄 (Future) - Automated refactoring
+
+### odin-assist Concept
+
+**Purpose**: "How do I do this in Odin?" - Interactive code assistance tool
+
+**Key Features (Future)**:
+- **Pattern Examples**: `odin-assist patterns "http server"`
+- **API Usage**: `odin-assist usage "os.read_file"`
+- **Best Practices**: `odin-assist best-practice "error handling"`
+- **Code Generation**: `odin-assist generate "json struct User"`
+- **Documentation Lookup**: `odin-assist docs "context system"`
+
+**Implementation Approach**:
+- Pattern database with curated Odin examples
+- API documentation extraction from core libraries
+- Code templates for common patterns
+- Interactive REPL mode for exploration
+- Editor integration for inline assistance
+
+**When to Consider**: After odin-lint reaches production maturity (Gate 3+)
+
+### Why This Separation Matters
+
+1. **Focus**: Each tool has a clear, single purpose
+2. **Quality**: Specialized tools do one thing well
+3. **Extensibility**: Suite can grow with new tools
+4. **Ecosystem**: Provides complete Odin development experience
+
+The **odintooling** name reflects this broader vision - we're building the foundation for a comprehensive Odin tooling ecosystem!
