@@ -67,6 +67,168 @@ emitDiagnostic :: proc(diag:  Diagnostic) {
     fmt.println()
 }
 
+// analyzeWithBlocks performs block-aware AST analysis
+analyzeWithBlocks :: proc(analyzer: ^BlockAnalyzer, node: ^ASTNode, file_path: string) {
+    // Traverse the AST with scope awareness
+    traverseASTWithScope(analyzer, node, file_path)
+}
+
+// traverseASTWithScope traverses AST while managing scope stack
+traverseASTWithScope :: proc(analyzer: ^BlockAnalyzer, node: ^ASTNode, file_path: string) {
+    // Determine node type and handle accordingly
+    switch node.node_type {
+        case "source_file":
+            // Source file is the root - traverse children
+            for &child in node.children {
+                traverseASTWithScope(analyzer, &child, file_path)
+            }
+            
+        case "block":
+            // Push new block scope
+            pushScope(analyzer, node, BlockType.BLOCK)
+            
+            // Analyze statements in this block
+            for &child in node.children {
+                analyzeStatement(analyzer, &child, file_path)
+            }
+            
+            // Pop scope and validate
+            _, diagnostics := popScope(analyzer)
+            for &diag in diagnostics {
+                diag.file = file_path
+                addDiagnostic(analyzer, diag)
+            }
+            
+        case "procedure_declaration":
+            // Procedure creates a new scope
+            pushScope(analyzer, node, BlockType.PROCEDURE)
+            
+            // Analyze procedure body
+            for &child in node.children {
+                traverseASTWithScope(analyzer, &child, file_path)
+            }
+            
+            // Pop scope and validate
+            _, diagnostics := popScope(analyzer)
+            for &diag in diagnostics {
+                diag.file = file_path
+                addDiagnostic(analyzer, diag)
+            }
+            
+        case "if_statement":
+            // If statement with potential blocks
+            pushScope(analyzer, node, BlockType.IF)
+            for &child in node.children {
+                traverseASTWithScope(analyzer, &child, file_path)
+            }
+            _, diagnostics := popScope(analyzer)
+            for &diag in diagnostics {
+                diag.file = file_path
+                addDiagnostic(analyzer, diag)
+            }
+            
+        case "for_statement":
+            pushScope(analyzer, node, BlockType.FOR)
+            for child in node.children {
+                traverseASTWithScope(analyzer, &child, file_path)
+            }
+            _, diagnostics := popScope(analyzer)
+            for diag in diagnostics {
+                diag.file = file_path
+                addDiagnostic(analyzer, diag)
+            }
+            
+        case "while_statement":
+            pushScope(analyzer, node, BlockType.WHILE)
+            for child in node.children {
+                traverseASTWithScope(analyzer, &child, file_path)
+            }
+            _, diagnostics := popScope(analyzer)
+            for diag in diagnostics {
+                diag.file = file_path
+                addDiagnostic(analyzer, diag)
+            }
+            
+        default:
+            // Handle other node types
+            analyzeStatement(analyzer, node, file_path)
+    }
+}
+
+// analyzeStatement analyzes individual statements within a scope
+analyzeStatement :: proc(analyzer: ^BlockAnalyzer, node: ^ASTNode, file_path: string) {
+    current_scope := getCurrentScope(analyzer)
+    if current_scope == nil {
+        return
+    }
+    
+    switch node.node_type {
+        case "assignment_statement":
+            // Check for allocations: data := make(...)
+            if len(node.children) >= 3 {
+                if node.children[1].text == ":=" {  // Assignment operator
+                    // Check if right side is an allocation call
+                    for i in 2..<len(node.children) {
+                        if node.children[i].node_type == "call_expression" {
+                            // This might be an allocation
+                            alloc := Allocation{
+                                node = &node.children[i],
+                                variable = node.children[0].text,  // Left side variable
+                                line = node.start_line,
+                                col = node.start_column,
+                                function = "unknown",  // TODO: Extract function name
+                                is_freed = false,
+                            }
+                            trackAllocation(analyzer, alloc)
+                            break
+                        }
+                    }
+                }
+            }
+            
+        case "defer_statement":
+            // Track defer statements
+            defer_stmt := DeferStatement{
+                node = node,
+                line = node.start_line,
+                col = node.start_column,
+                function = "unknown",  // TODO: Extract function name
+                target = "unknown",    // TODO: Extract target variable
+            }
+            trackDefer(analyzer, defer_stmt)
+            
+        case "variable_declaration":
+            // Track variable declarations
+            var_name := ""
+            var_type := ""
+            
+            // Extract variable name and type
+            for &child in node.children {
+                if child.node_type == "identifier" && var_name == "" {
+                    var_name = child.text
+                }
+                if child.node_type == "type" {
+                    var_type = child.text
+                }
+            }
+            
+            if var_name != "" {
+                var_info := VariableInfo{
+                    name = var_name,
+                    declaration = node,
+                    line = node.start_line,
+                    col = node.start_column,
+                    type = var_type,
+                    is_used = false,
+                    is_freed = false,
+                }
+                trackVariable(analyzer, var_info)
+            }
+            
+        // Add more statement types as needed
+    }
+}
+
 // stubRule is a stub rule for pipeline validation
 stubRule :: proc(file_path: string) -> ( Diagnostic, bool) {
     // Check if file contains "TODO_FIXME" pattern
@@ -147,32 +309,24 @@ main :: proc() {
         os.exit(1)
     }
     
-    // Initialize rule registry
-    registry := initRuleRegistry()
+    // Initialize block analyzer for scope-aware analysis
+    block_analyzer := initBlockAnalyzer()
     
-    // Register rules
-    registerRule(&registry, C001Rule())
-    registerRule(&registry, C002Rule())
+    // Perform block-based analysis of the AST
+    analyzeWithBlocks(&block_analyzer, &ast_root, file_path)
     
-    // Apply all rules
-    diagnostics_found := false
-    // Apply C001 rule with parsed AST
-    c001_rule := C001Rule()
-    diag := c001_rule.matcher(file_path, &ast_root)
-    if diag.message != "" {
+    // Get diagnostics from block analyzer
+    block_diagnostics := getDiagnostics(&block_analyzer)
+    
+    // Apply diagnostics from block analysis
+    for &diag in block_diagnostics {
+        // Set the file path for each diagnostic
+        diag.file = file_path
         emitDiagnostic(diag)
         diagnostics_found = true
     }
     
-    // Apply C002 rule with parsed AST
-    c002_rule := C002Rule()
-    diag2 := c002_rule.matcher(file_path, &ast_root)
-    if diag2.message != "" {
-        emitDiagnostic(diag2)
-        diagnostics_found = true
-    }
-    
-    // Also run stub rule for now
+    // Also run stub rule for now (will be removed later)
     stub_diag, stub_found := stubRule(file_path)
     if stub_found {
         emitDiagnostic(stub_diag)

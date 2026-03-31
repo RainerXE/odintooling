@@ -16,7 +16,7 @@ BlockAnalyzer :: struct {
     diagnostics: [dynamic]Diagnostic,
     
     // Configuration
-    check_brace_matching: bool = true,  // C0000: Mismatched braces
+    check_brace_matching: bool,
 }
 
 // Scope represents a code block with its own variable and analysis context
@@ -124,7 +124,7 @@ popScope :: proc(analyzer: ^BlockAnalyzer) -> (^Scope, []Diagnostic) {
     }
     
     scope := analyzer.current_scope
-    analyzer.scope_stack = analyzer.scope_stack[0..<len(analyzer.scope_stack)-1]
+    analyzer.scope_stack = analyzer.scope_stack[0:len(analyzer.scope_stack)-1]
     
     if len(analyzer.scope_stack) > 0 {
         analyzer.current_scope = &analyzer.scope_stack[len(analyzer.scope_stack) - 1]
@@ -143,7 +143,7 @@ validateScope :: proc(scope: ^Scope) -> []Diagnostic {
     diagnostics := make([dynamic]Diagnostic, 0)
     
     // Check for unmatched allocations (C001)
-    for &alloc in scope.allocations {
+    for alloc in scope.allocations {
         if !alloc.is_freed {
             runtime.append_elem(&diagnostics, Diagnostic{
                 file = "",  // Will be set by caller
@@ -159,8 +159,8 @@ validateScope :: proc(scope: ^Scope) -> []Diagnostic {
     }
     
     // Check for suspicious defer patterns (C002)
-    for &defer in scope.defers {
-        if isSuspiciousDefer(&defer) {
+    for defer in scope.defers {
+        if isSuspiciousDefer(defer) {
             runtime.append_elem(&diagnostics, Diagnostic{
                 file = "",  // Will be set by caller
                 line = defer.line,
@@ -178,7 +178,7 @@ validateScope :: proc(scope: ^Scope) -> []Diagnostic {
 }
 
 // isSuspiciousDefer checks if defer might be using wrong pointer
-isSuspiciousDefer :: proc(defer: ^DeferStatement) -> bool {
+isSuspiciousDefer :: proc(defer: DeferStatement) -> bool {
     // Pattern 1: Reassignment before free
     if strings.contains(defer.node.text, "=") {
         return true
