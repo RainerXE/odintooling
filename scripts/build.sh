@@ -3,8 +3,9 @@
 echo "Building odin-lint with tree-sitter integration..."
 
 # Build the main application with tree-sitter static library linking
-odin build src/core -out:artifacts/odin-lint -define:DEBUG=true \
-    -extra-linker-flags:"-Lffi/tree_sitter/tree-sitter-lib/lib/src/macos -ltree-sitter"
+odin build src/core -out:artifacts/odin-lint \
+    -extra-linker-flags:"-Lffi/tree_sitter/tree-sitter-lib -ltree-sitter \
+    -Lffi/tree_sitter/tree-sitter-odin -ltree-sitter-odin"
 
 if [ $? -eq 0 ]; then
     echo "✅ Build successful!"
