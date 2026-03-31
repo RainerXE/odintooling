@@ -43,6 +43,9 @@ foreign {
 	// Odin language from tree-sitter-odin library
 	tree_sitter_odin :: proc "c"() -> TSLanguage ---;
 
+	// Language version functions for debugging ABI compatibility
+	ts_language_abi_version :: proc "c"(language: TSLanguage) -> c.uint ---;
+
 	// Language functions (would need Odin language implementation)
 	// ts_language_symbol_count :: proc "c"(language: TSLanguage) -> c.uint ---;
 	// ts_language_symbol_name :: proc "c"(language: TSLanguage, symbol: c.ushort) -> ^c.char ---;
