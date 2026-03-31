@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# ❌ UNFINISHED - OLS integration is corrupt/unfinished
 
 VERSION="dev-$(date -u '+%Y-%m-%d')-$(git rev-parse --short HEAD)"
 
