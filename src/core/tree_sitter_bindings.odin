@@ -53,8 +53,9 @@ foreign {
 	ts_language_abi_version :: proc "c"(language: TSLanguage) -> c.uint ---;
 
 	// Tree functions for debugging
-ts_tree_language :: proc "c"(tree: TSTree) -> TSLanguage ---;
-ts_tree_root_node_with_offset :: proc "c"(tree: TSTree, offset: c.uint, extent: TSPoint) -> TSNode ---;
+	ts_tree_language :: proc "c"(tree: TSTree) -> TSLanguage ---;
+	ts_tree_root_node_with_offset :: proc "c"(tree: TSTree, offset: c.uint, extent: TSPoint) -> TSNode ---;
+	ts_tree_print_dot_graph :: proc "c"(tree: TSTree, file_descriptor: c.int) ---;
 
 	// Language functions (would need Odin language implementation)
 	// ts_language_symbol_count :: proc "c"(language: TSLanguage) -> c.uint ---;
