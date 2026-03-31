@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# ❌ UNFINISHED - OLS integration is corrupt/unfinished
 echo "Building odin-lint and OLS..."
 
 # Build odin-lint
@@ -13,7 +14,7 @@ fi
 
 # Build OLS
 echo "Building OLS..."
-./scripts/build_ols.sh
+./scripts/build_ols_standalone.sh
 
 if [ $? -ne 0 ]; then
     echo "OLS build failed!"

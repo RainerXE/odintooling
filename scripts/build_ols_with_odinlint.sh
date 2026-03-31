@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# ❌ UNFINISHED - OLS integration is corrupt/unfinished
 echo "Building OLS with odin-lint plugin support..."
 
 # Build OLS from vendor directory

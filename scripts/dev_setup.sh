@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# ❌ UNFINISHED - OLS integration is corrupt/unfinished
 echo "Setting up development environment for odin-lint + OLS integration..."
 
 # Create artifacts directory if it doesn't exist
