@@ -5,10 +5,16 @@ import "core:c"
 // Tree-sitter types (opaque pointers)
 TSParser :: distinct rawptr;
 TSTree :: distinct rawptr;
-TSNode :: distinct rawptr;
 TSLanguage :: distinct rawptr;
 TSQuery :: distinct rawptr;
 TSQueryCursor :: distinct rawptr;
+
+// TSNode is a value type struct, not a pointer
+TSNode :: struct {
+    ctx: [4]rawptr,  // opaque internal state — do not touch
+    id:  rawptr,
+    tree: rawptr,
+}
 
 // Tree-sitter structures
 TSPoint :: struct {
@@ -44,6 +50,7 @@ foreign {
 	ts_node_end_byte :: proc "c"(node: TSNode) -> c.uint ---;
 	ts_node_child_count :: proc "c"(node: TSNode) -> c.uint ---;
 	ts_node_child :: proc "c"(node: TSNode, index: c.uint) -> TSNode ---;
+	ts_node_is_null :: proc "c"(node: TSNode) -> c.bool ---;
 
 	// Language functions
 	// Odin language from tree-sitter-odin library

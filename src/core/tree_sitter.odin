@@ -104,15 +104,15 @@ getRootNode :: proc(tree: TSTree) -> TSNode {
     fmt.println("=== DEBUG: Getting root node ===")
     if tree == nil {
         fmt.println("❌ DEBUG: tree is nil")
-        return nil
+        return TSNode{}
     }
     fmt.println("DEBUG: Tree is valid, calling ts_tree_root_node...")
     
     // This is where the crash occurs - let's see if we can catch it
     root := ts_tree_root_node(tree)
-    if root == nil {
-        fmt.println("❌ DEBUG: ts_tree_root_node() returned nil")
-        return nil
+    if ts_node_is_null(root) {
+        fmt.println("❌ DEBUG: ts_tree_root_node() returned null node")
+        return TSNode{}
     }
     fmt.println("✅ DEBUG: Root node obtained successfully")
     
@@ -121,7 +121,7 @@ getRootNode :: proc(tree: TSTree) -> TSNode {
 
 // convertToASTNode converts a tree-sitter node to our ASTNode format
 convertToASTNode :: proc(ts_node: TSNode, source: string) -> ASTNode {
-    if ts_node == nil {
+    if ts_node_is_null(ts_node) {
         return ASTNode{
             node_type = "invalid",
             start_line = 1,
@@ -138,7 +138,7 @@ convertToASTNode :: proc(ts_node: TSNode, source: string) -> ASTNode {
     node_type := "unknown" // Default value
     if node_type_ptr != nil {
         // Convert ^u8 to string - tree-sitter returns null-terminated C strings
-        node_type = strings.string_from_null_terminated_ptr(node_type_ptr, len(source))
+        node_type = strings.string_from_null_terminated_ptr(node_type_ptr, 1024)
     }
     
     // Get node position
@@ -153,7 +153,7 @@ convertToASTNode :: proc(ts_node: TSNode, source: string) -> ASTNode {
     child_count := ts_node_child_count(ts_node)
     for i in 0..<int(child_count) {
         child_node := ts_node_child(ts_node, c.uint(i))
-        if child_node != nil {
+        if !ts_node_is_null(child_node) {
             child_ast := convertToASTNode(child_node, source)
             runtime.append_elem(&children, child_ast)
         }
@@ -218,14 +218,14 @@ parseToAST :: proc(adapter: TreeSitterASTAdapter, source: string) -> (ASTNode, b
     
     // Try regular root node first
     root := getRootNode(tree)
-    if root == nil {
-        fmt.println("❌ DEBUG: ts_tree_root_node() returned nil, trying with offset...")
+    if ts_node_is_null(root) {
+        fmt.println("❌ DEBUG: ts_tree_root_node() returned null node, trying with offset...")
         
         // Try root node with zero offset as fallback
         zero_point := TSPoint{row = 0, column = 0}
         root = ts_tree_root_node_with_offset(tree, 0, zero_point)
-        if root == nil {
-            fmt.println("❌ DEBUG: ts_tree_root_node_with_offset() also returned nil")
+        if ts_node_is_null(root) {
+            fmt.println("❌ DEBUG: ts_tree_root_node_with_offset() also returned null node")
             return ASTNode{}, false
         }
         fmt.println("✅ DEBUG: Root node obtained using offset method")
