@@ -25,10 +25,22 @@ initTreeSitter :: proc() -> (TSParser, TSLanguage, bool) {
         return nil, nil, false
     }
     
-    // Load Odin language grammar (placeholder - need to implement)
-    // For now, we'll return nil for language
-    language: TSLanguage
-    
+    // Load Odin language grammar from tree-sitter-odin library
+    language := tree_sitter_odin()
+    if language == nil {
+        fmt.println("Failed to load Odin language grammar")
+        ts_parser_delete(parser)
+        return nil, nil, false
+    }
+
+    // Set the language in the parser
+    success := ts_parser_set_language(parser, language)
+    if !success {
+        fmt.println("Failed to set parser language")
+        ts_parser_delete(parser)
+        return nil, nil, false
+    }
+
     return parser, language, true
 }
 
@@ -45,22 +57,13 @@ deinitTreeSitter :: proc(parser: TSParser, language: TSLanguage) {
 parseSource :: proc(parser: TSParser, language: TSLanguage, source: string) -> (TSTree, bool) {
     fmt.println("Parsing source with tree-sitter")
     
-    // Set parser language (placeholder - need to implement)
-    // if language != nil {
-    //     success := ts_parser_set_language(parser, language)
-    //     if !success {
-    //         fmt.println("Failed to set parser language")
-    //         return nil, false
-    //     }
-    // }
-    
     // Parse source code
     // Convert string to cstring, then get ^u8 pointer for the C function
     source_cstr := strings.unsafe_string_to_cstring(source)
     source_ptr := (^u8)(source_cstr)
     tree := ts_parser_parse_string(parser, nil, source_ptr, c.uint(len(source)))
     if tree == nil {
-        fmt.println("Failed to parse source")
+        fmt.println("Failed to parse source - tree is nil")
         return nil, false
     }
     
@@ -164,7 +167,12 @@ parseToAST :: proc(adapter: TreeSitterASTAdapter, source: string) -> (ASTNode, b
     }
     
     root := getRootNode(tree)
-    ast_root := convertToASTNode(root, source)
+    if root == nil {
+        fmt.println("Failed to get root node from parsed tree")
+        return ASTNode{}, false
+    }
     
+    ast_root := convertToASTNode(root, source)
+
     return ast_root, true
 }
