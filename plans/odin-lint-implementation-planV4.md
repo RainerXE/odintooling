@@ -62,11 +62,13 @@ odin-lint/
 │   │       └── ...c003-c008.odin
 │   └── integrations/
 │       └── ols/                   # OLS plugin glue code
-├── test/                         # All tests
+├── tests/                        # All tests
+│   ├── archive/                  # Historical OLS tests
 │   ├── fixtures/
 │   │   ├── pass/
 │   │   └── fail/
-│   └── unit/
+│   ├── error.odin                # Simple test file
+│   └── test.odin                 # Basic test file
 └── vendor/                       # External Odin projects
     └── ols/                       # OLS fork with plugin system
         ├── ols.json              # OLS project file
