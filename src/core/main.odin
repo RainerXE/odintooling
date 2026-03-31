@@ -125,7 +125,8 @@ main :: proc() {
     }
     
     if ast_mode {
-        runASTExport(file_path)
+        // runASTExport(file_path)  // TODO: Implement
+        fmt.println("AST export not implemented yet")
         return
     }
     
