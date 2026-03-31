@@ -2,24 +2,33 @@ package build
 
 import "core:fmt"
 import "core:os"
+import "core:c/libc"
+import "core:strings"
 
-main :: proc() {
-    fmt.println("Building odin-lint plugin as shared library...")
+// build_plugin builds the odin-lint plugin as a shared library
+// This is used when integrating with OLS (Odin Language Server)
+// Returns: exit code (0 for success)
+build_plugin :: proc() -> int {
+    fmt.println("🔌 Building odin-lint plugin as shared library...")
     
     // Build the plugin as a shared library
-    // We need to build the plugin integration code
-    err := os.exec("odin", "build", "src/integrations/ols", 
-                    "-out:artifacts/odin_lint_plugin", 
-                    "-shared",
-                    "-define:DEBUG=true")
+    build_cmd := fmt.tprintf(
+        "odin build %s/integrations/ols -out:%s/odin_lint_plugin -shared -define:DEBUG=true",
+        "src",
+        "artifacts"
+    )
     
-    if err != 0 {
-        fmt.fprintln(os.stderr, "Plugin build failed with exit code:", err)
-        os.exit(1)
+    fmt.println("🔨 Executing:", build_cmd)
+    
+    // Execute the build
+    exit_code := libc.system(strings.clone_to_cstring(build_cmd))
+    
+    if exit_code == 0 {
+        fmt.println("✅ Plugin build successful!")
+        fmt.println("📁 Output: artifacts/odin_lint_plugin")
+    } else {
+        fmt.println("❌ Plugin build failed with exit code:", exit_code)
     }
     
-    fmt.println("Plugin build successful!")
-    fmt.println("Shared library created at: artifacts/odin_lint_plugin.so (or .dll/.dylib)")
-    
-    os.exit(0)
+    return exit_code
 }
