@@ -253,45 +253,66 @@ File: `src/core/integration.odin`
 
 ---
 
-## 5. Milestone 3 — Standalone CLI + Tree-sitter (NEXT AFTER CLI FIX) 🔜
+## 5. Milestone 3 — Full CLI Rule Set + Style Enforcement 🔜
 
-**Goal:** Complete the CLI implementation with full tree-sitter integration.
-This milestone builds on the fixes from Milestone 1.
+**Goal:** Implement comprehensive rule set including style guide enforcement.
+This milestone turns odin-lint into a complete linting tool.
 
 **Prerequisite:** Gate 1 (CLI Working) must be achieved first.
 
-**The CLI path:**
-- Uses tree-sitter FFI for parsing (no OLS dependency)
-- Must work independently of OLS
-- Foundation for all future work
+**Scope:**
+- Complete all 8+ correctness rules (C001-C019)
+- Add style guide enforcement rules
+- Comprehensive test coverage
+- Production-ready CLI tool
 
 ### Tasks
 
-**4.1 — Implement real tree-sitter FFI bindings**
-File: `src/core/tree_sitter.odin`
-- Build `libtree-sitter.a` and `tree-sitter-odin` grammar library
-- Write real `foreign import` declarations
-- Implement `ts_parser_new`, `ts_parser_set_language`,
-  `ts_parser_parse_string`, `ts_node_type`, `ts_node_start_point` etc.
-- Remove all placeholder stubs
+**3.1 — Implement remaining correctness rules (C003-C008)**
+- **C003**: Inconsistent naming conventions
+- **C004**: Private procedure naming violations
+- **C005**: Internal procedure naming violations  
+- **C006**: Public procedure naming violations
+- **C007**: Type naming violations (must be PascalCase)
+- **C008**: Acronym consistency violations
 
-**4.2 — Implement `parseFile` using real tree-sitter**
-- Parse file content into a real `TSTree`
-- Walk tree nodes and populate `ASTNode` structs with real data
+**3.2 — Implement style guide enforcement rules**
+- **C009**: Boolean naming violations (no negatives)
+- **C010**: Pointer parameter naming inconsistencies
+- **C011**: Unchecked pointer dereferencing
+- **C012**: Missing nil checks
+- **C013**: Undocumented optional pointers
 
-**4.3 — Port C001 rule to use real `ASTNode` from tree-sitter**
-- Replace `strings.contains(node.node_type, "make")` text matching
-  with proper node type checks (`"call_expression"` + callee identity)
+**3.3 — Implement error handling rules**
+- **C014**: Ignored error returns
+- **C015**: Inconsistent error propagation
+- **C016**: Missing error context
 
-**4.4 — Archive `src/core/lsp_server.odin`**
-- Move to `archive/lsp_server.odin.bak`
-- Remove from build — standalone LSP server is the wrong architecture
+**3.4 — Complete rule infrastructure**
+- Rule registry system for all 16+ rules
+- Unified diagnostic reporting
+- Rule configuration system
+- Rule suppression comments (// odin-lint:disable C001)
 
-### Gate 4 (Standalone CLI)
-- [ ] `odin-lint test/fixtures/fail/c001_allocation.odin` exits 1 with C001
-- [ ] `odin-lint test/fixtures/pass/c001_proper_free.odin` exits 0
-- [ ] `odin-lint` on a 500-line Odin file completes in under 2 seconds
-- [ ] No memory leaks (tree-sitter resources freed via defer)
+**3.5 — Comprehensive test fixtures**
+- Create `test/fixtures/fail/` for each rule
+- Create `test/fixtures/pass/` for each rule
+- Test against real Odin codebases
+- Performance testing on large files
+
+**3.6 — CLI enhancements**
+- `--list-rules` flag to show available rules
+- `--enable/--disable` flags for rule selection
+- `--config` flag for rule configuration
+- JSON output format for tool integration
+
+### Gate 3 (Full CLI)
+- [ ] All 16+ rules implemented and tested
+- [ ] `odin-lint --list-rules` shows all available rules
+- [ ] Each rule has 3+ pass and 3+ fail test fixtures
+- [ ] Zero false positives on `odin/core/` stdlib
+- [ ] CLI completes in under 1s on 1000-line files
+- [ ] JSON output format works for tool integration
 
 ---
 
@@ -333,12 +354,18 @@ This is separate from the lint pipeline — purely an export feature.
 | 0 | Foundation | ✅ CLI skeleton, stub rule, basic build |
 | 1 | CLI Fix | ❌ Real tree-sitter parsing, C001/C002 working |
 | 2 | OLS Plugin | ⏸ Deprioritized until CLI works |
-| 3 | Full CLI | 🔜 Complete CLI with all rules |
+| 3 | Full CLI | 🔜 16+ rules, style enforcement, production-ready |
 | 4 | OLS Integration | 🔜 Plugin system with real analysis |
-| 5 | Full Rule Set | 🔜 All 8 rules, comprehensive testing |
+| 5 | Advanced Features | 🔜 AI integration, custom rules, IDE plugins |
+
+**Updated Rule Plan:**
+- **Correctness Rules (C001-C008):** Memory safety, allocation patterns
+- **Style Rules (C009-C016):** Naming conventions, consistency enforcement
+- **Total:** 16+ rules covering correctness and style
 
 **Corrected Priority:**
 - **Current Focus:** Gate 1 (CLI Fix) - Get basic linting working
+- **Next Phase:** Gate 3 (Full CLI) - Complete rule set + style enforcement
 - **Deprioritized:** OLS integration (Gates 2, 4) until CLI is solid
 - **Honest Status:** Gate 1 is NOT passed - CLI is fundamentally broken
 
