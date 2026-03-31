@@ -216,10 +216,19 @@ parseToAST :: proc(adapter: TreeSitterASTAdapter, source: string) -> (ASTNode, b
     }
     fmt.println("✅ DEBUG: Tree language is valid")
     
+    // Try regular root node first
     root := getRootNode(tree)
     if root == nil {
-        fmt.println("Failed to get root node from parsed tree")
-        return ASTNode{}, false
+        fmt.println("❌ DEBUG: ts_tree_root_node() returned nil, trying with offset...")
+        
+        // Try root node with zero offset as fallback
+        zero_point := TSPoint{row = 0, column = 0}
+        root = ts_tree_root_node_with_offset(tree, 0, zero_point)
+        if root == nil {
+            fmt.println("❌ DEBUG: ts_tree_root_node_with_offset() also returned nil")
+            return ASTNode{}, false
+        }
+        fmt.println("✅ DEBUG: Root node obtained using offset method")
     }
     
     ast_root := convertToASTNode(root, source)

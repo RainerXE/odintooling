@@ -10,6 +10,12 @@ TSLanguage :: distinct rawptr;
 TSQuery :: distinct rawptr;
 TSQueryCursor :: distinct rawptr;
 
+// Tree-sitter structures
+TSPoint :: struct {
+    row: c.uint,
+    column: c.uint,
+}
+
 // Tree-sitter bindings
 // Based on the tree-sitter C API: https://tree-sitter.github.io/tree-sitter/using-parsers#the-tree-sitter-c-api
 
@@ -48,6 +54,7 @@ foreign {
 
 	// Tree functions for debugging
 ts_tree_language :: proc "c"(tree: TSTree) -> TSLanguage ---;
+ts_tree_root_node_with_offset :: proc "c"(tree: TSTree, offset: c.uint, extent: TSPoint) -> TSNode ---;
 
 	// Language functions (would need Odin language implementation)
 	// ts_language_symbol_count :: proc "c"(language: TSLanguage) -> c.uint ---;
