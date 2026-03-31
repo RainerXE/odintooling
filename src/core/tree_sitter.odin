@@ -207,6 +207,15 @@ parseToAST :: proc(adapter: TreeSitterASTAdapter, source: string) -> (ASTNode, b
         return ASTNode{}, false
     }
     
+    // Debug: Check if tree is valid by trying to access its language
+    fmt.println("DEBUG: Checking tree language...")
+    tree_language := ts_tree_language(tree)
+    if tree_language == nil {
+        fmt.println("❌ DEBUG: ts_tree_language() returned nil - tree may be corrupted")
+        return ASTNode{}, false
+    }
+    fmt.println("✅ DEBUG: Tree language is valid")
+    
     root := getRootNode(tree)
     if root == nil {
         fmt.println("Failed to get root node from parsed tree")
