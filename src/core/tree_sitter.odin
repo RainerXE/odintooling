@@ -145,6 +145,10 @@ convertToASTNode :: proc(ts_node: TSNode, source: string) -> ASTNode {
     start_byte := ts_node_start_byte(ts_node)
     end_byte := ts_node_end_byte(ts_node)
     
+    // Get line and column positions
+    start_point := ts_node_start_point(ts_node)
+    end_point := ts_node_end_point(ts_node)
+    
     // Extract text from source
     text := source[int(start_byte):int(end_byte)]
     
@@ -167,10 +171,10 @@ convertToASTNode :: proc(ts_node: TSNode, source: string) -> ASTNode {
     
     return ASTNode{
         node_type = node_type,
-        start_line = 1, // Placeholder
-        start_column = 1, // Placeholder
-        end_line = 1, // Placeholder
-        end_column = 1, // Placeholder
+        start_line = int(start_point.row) + 1, // tree-sitter uses 0-based line numbers
+        start_column = int(start_point.column) + 1, // tree-sitter uses 0-based column numbers
+        end_line = int(end_point.row) + 1,
+        end_column = int(end_point.column) + 1,
         text = text,
         children = children[:],
     }
