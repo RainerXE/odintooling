@@ -48,6 +48,8 @@ foreign {
 	ts_node_type :: proc "c"(node: TSNode) -> cstring ---;
 	ts_node_start_byte :: proc "c"(node: TSNode) -> c.uint ---;
 	ts_node_end_byte :: proc "c"(node: TSNode) -> c.uint ---;
+	ts_node_start_point :: proc "c"(node: TSNode) -> TSPoint ---;
+	ts_node_end_point :: proc "c"(node: TSNode) -> TSPoint ---;
 	ts_node_child_count :: proc "c"(node: TSNode) -> c.uint ---;
 	ts_node_child :: proc "c"(node: TSNode, index: c.uint) -> TSNode ---;
 	ts_node_is_null :: proc "c"(node: TSNode) -> c.bool ---;
