@@ -6,6 +6,15 @@ import "core:strings"
 // LSP integration is handled by OLS (Odin Language Server)
 // C002 rule is now in the same package
 
+// DiagnosticType represents the category of a diagnostic
+DiagnosticType :: enum {
+    NONE,           // No issues found
+    VIOLATION,      // Normal rule violation
+    CONTEXTUAL,     // Violation with special context (performance, etc.)
+    INTERNAL_ERROR, // Linter internal failure (parse error, file error, etc.)
+    INFO,           // Informational message
+}
+
 // Diagnostic represents a linting diagnostic
 Diagnostic :: struct {
     file:    string,
@@ -16,6 +25,7 @@ Diagnostic :: struct {
     message: string,
     fix:     string,
     has_fix: bool,
+    diag_type: DiagnosticType,
 }
 
 // Rule represents a linting rule
@@ -53,18 +63,66 @@ getRule :: proc(registry: RuleRegistry, id: string) -> ( Rule, bool) {
     return rule, true
 }
 
-// emitDiagnostic emits a diagnostic
+// emitDiagnostic emits a diagnostic with appropriate formatting based on type
 emitDiagnostic :: proc(diag:  Diagnostic) {
-    // Format diagnostic output
-    fmt.printf("%s:%d:%d: %s [%s] %s",
-               diag.file, diag.line, diag.column,
-               diag.rule_id, diag.tier, diag.message)
+    // Format diagnostic output based on type
+    switch diag.diag_type {
+        case .INTERNAL_ERROR:
+            fmt.printf("🟣 %s:%d:%d: INTERNAL ERROR - %s",
+                       diag.file, diag.line, diag.column, diag.message)
+        case .CONTEXTUAL:
+            fmt.printf("🟡 %s:%d:%d: %s [%s] %s",
+                       diag.file, diag.line, diag.column,
+                       diag.rule_id, diag.tier, diag.message)
+        case .INFO:
+            fmt.printf("🔵 %s:%d:%d: INFO - %s",
+                       diag.file, diag.line, diag.column, diag.message)
+        case .VIOLATION, .NONE:  // NONE shouldn't normally be emitted
+            fmt.printf("🔴 %s:%d:%d: %s [%s] %s",
+                       diag.file, diag.line, diag.column,
+                       diag.rule_id, diag.tier, diag.message)
+    }
     
     if diag.has_fix {
         fmt.printf("\nFix: %s", diag.fix)
     }
     
     fmt.println()
+}
+
+// dedupDiagnostics removes duplicate diagnostics
+// Key: (file, line, column, rule_id) - same violation at same location
+dedupDiagnostics :: proc(diags: []Diagnostic) -> []Diagnostic {
+    seen := make(map[string]bool)
+    result: [dynamic]Diagnostic
+    
+    for d in diags {
+        // Create unique key for this diagnostic
+        key := fmt.tprintf("%s:%d:%d:%s", d.file, d.line, d.column, d.rule_id)
+        
+        // Only add if we haven't seen this exact violation before
+        if key not_in seen {
+            seen[key] = true
+            append(&result, d)
+        }
+    }
+    
+    return result[:]
+}
+
+// createInternalError creates an internal error diagnostic
+createInternalError :: proc(file_path: string, line: int, column: int, error_msg: string) -> Diagnostic {
+    return Diagnostic{
+        file = file_path,
+        line = line,
+        column = column,
+        rule_id = "INTERNAL",
+        tier = "error",
+        message = error_msg,
+        fix = "This is a linter internal error - please report to developers",
+        has_fix = false,
+        diag_type = DiagnosticType.INTERNAL_ERROR,
+    }
 }
 
 // stubRule is a stub rule for pipeline validation
@@ -92,6 +150,7 @@ stubRule :: proc(file_path: string) -> ( Diagnostic, bool) {
             message = "Found TODO_FIXME procedure",
             fix = "Rename or remove TODO_FIXME procedure",
             has_fix = true,
+            diag_type = DiagnosticType.VIOLATION,
         }, true
     }
     
@@ -135,14 +194,17 @@ main :: proc() {
     // Initialize tree-sitter AST parser
     ts_parser, ts_ok := initTreeSitterParser()
     if !ts_ok {
-        fmt.println("Failed to initialize tree-sitter parser")
+        internal_error := createInternalError(file_path, 1, 1, "Failed to initialize tree-sitter parser")
+        emitDiagnostic(internal_error)
+        deinitTreeSitterParser(ts_parser)
         os.exit(1)
     }
     
     // Parse file to get AST
     ast_root, parse_ok := parseFile(ts_parser, file_path)
     if !parse_ok {
-        fmt.println("Failed to parse file:", file_path)
+        internal_error := createInternalError(file_path, 1, 1, "Failed to parse file - syntax error or unsupported Odin syntax")
+        emitDiagnostic(internal_error)
         deinitTreeSitterParser(ts_parser)
         os.exit(1)
     }
@@ -158,10 +220,26 @@ main :: proc() {
     diagnostics_found := false
     // Apply C001 rule with parsed AST
     c001_rule := C001Rule()
-    diag := c001_rule.matcher(file_path, &ast_root)
-    if diag.message != "" {
-        emitDiagnostic(diag)
-        diagnostics_found = true
+    // Special handling for C001 which can return multiple diagnostics
+    if c001_rule.id == "C001" {
+        // Use the multi-diagnostic version for C001
+        c001_diagnostics := c001Matcher(file_path, &ast_root)  // Import this from c001.odin
+        
+        // Remove duplicates before emitting
+        unique_diagnostics := dedupDiagnostics(c001_diagnostics)
+        
+        for diag in unique_diagnostics {
+            if diag.message != "" {
+                emitDiagnostic(diag)
+                diagnostics_found = true
+            }
+        }
+    } else {
+        diag := c001_rule.matcher(file_path, &ast_root)
+        if diag.message != "" {
+            emitDiagnostic(diag)
+            diagnostics_found = true
+        }
     }
     
     // Apply C002 rule with parsed AST
