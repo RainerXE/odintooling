@@ -3,7 +3,7 @@ package core
 import "core:fmt"
 import "core:os"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 
 // C001 Enhanced - Memory allocation safety with multiple cleanup patterns
 //
@@ -29,7 +29,7 @@ C001Config :: struct {
     required_patterns: [dynamic]AllocationCleanupPattern,
     
     // Allow allocations without explicit free if using tracking allocator
-    allow_tracking_allocators: bool = true,
+    allow_tracking_allocators: bool,
     
     // Custom cleanup function names to recognize
     custom_cleanup_functions: [dynamic]string,
@@ -47,16 +47,26 @@ C001EnhancedRule :: proc() -> Rule {
 }
 
 // Configuration for different codebases
-ols_config :: C001Config{
-    required_patterns = [AllocationCleanupPattern.STANDARD, AllocationCleanupPattern.MEMORY],
-    allow_tracking_allocators = true,
-    custom_cleanup_functions = ["mem.free", "context.free"],
-}
+ols_config :: C001Config
+standard_config :: C001Config
 
-standard_config :: C001Config{
-    required_patterns = [AllocationCleanupPattern.STANDARD],
-    allow_tracking_allocators = false,
-    custom_cleanup_functions = ["free"],
+// Initialize configurations
+init_configs :: proc() {
+    // Initialize ols_config
+    ols_config.required_patterns = make([dynamic]AllocationCleanupPattern, 0)
+    append(&ols_config.required_patterns, AllocationCleanupPattern.STANDARD)
+    append(&ols_config.required_patterns, AllocationCleanupPattern.MEMORY)
+    ols_config.allow_tracking_allocators = true
+    ols_config.custom_cleanup_functions = make([dynamic]string, 0)
+    append(&ols_config.custom_cleanup_functions, "mem.free")
+    append(&ols_config.custom_cleanup_functions, "context.free")
+    
+    // Initialize standard_config
+    standard_config.required_patterns = make([dynamic]AllocationCleanupPattern, 0)
+    append(&standard_config.required_patterns, AllocationCleanupPattern.STANDARD)
+    standard_config.allow_tracking_allocators = false
+    standard_config.custom_cleanup_functions = make([dynamic]string, 0)
+    append(&standard_config.custom_cleanup_functions, "free")
 }
 
 // Enhanced matcher that checks for multiple cleanup patterns
