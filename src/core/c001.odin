@@ -8,6 +8,24 @@ import "core:strings"
 // C001: Allocation without matching defer free in same scope
 // Inspired by: Rust clippy::mem_forget
 
+// C001ScopeContext :: struct for block-level analysis
+C001ScopeContext :: struct {
+    allocations: [dynamic]AllocationInfo,
+    defers:      [dynamic]DeferInfo,
+    has_arena:   bool,
+    returns_var: map[string]bool,
+}
+
+AllocationInfo :: struct {
+    var_name: string,
+    line:     int,
+    col:      int,
+}
+
+DeferInfo :: struct {
+    freed_var: string,
+}
+
 // C001Rule creates the C001 rule
 C001Rule :: proc() -> Rule {
     return Rule{
@@ -21,42 +39,16 @@ C001Rule :: proc() -> Rule {
 
 // c001Matcher checks for allocations without defer free
 c001Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
-    // Simplified implementation: Look for allocation patterns in the entire file
-    // This is a heuristic approach that may have some false positives/negatives
-    
-    // Check if this is a call_expression node (potential allocation)
-    if node.node_type == "call_expression" {
-        // For now, we'll use a simple heuristic:
-        // If we find an allocation keyword, assume it needs checking
-        // In production, we'd do proper scope analysis
-        if is_allocation_node(node) {
-            // Check if file contains defer free patterns
-            // This is a simplified check - real implementation needs scope analysis
-            content, err := os.read_entire_file_from_path(file_path, context.allocator)
-            if err == nil {
-                content_str := string(content)
-                defer_free_found := strings.contains(content_str, "defer free") ||
-                                   strings.contains(content_str, "defer delete") ||
-                                   strings.contains(content_str, "defer os.free") ||
-                                   strings.contains(content_str, "defer mem.free")
-                
-                if !defer_free_found {
-                    return Diagnostic{
-                        file = file_path,
-                        line = node.start_line,
-                        column = node.start_column,
-                        rule_id = "C001",
-                        tier = "correctness",
-                        message = "Allocation without matching defer free in same scope",
-                        fix = "Add defer free() immediately after allocation",
-                        has_fix = true,
-                    }
-                }
-            }
+    // Check if this is a block node (tree-sitter uses "block", not "block_statement")
+    if node.node_type == "block" {
+        // Check block for C001 violations
+        diagnostics := check_block_for_c001(node, file_path)
+        if len(diagnostics) > 0 {
+            return diagnostics[:][0]  // Return first diagnostic found
         }
     }
     
-    // Check children recursively for allocations
+    // Recursively check children for block nodes
     for &child in node.children {
         diag := c001Matcher(file_path, &child)
         if diag.message != "" {
@@ -67,37 +59,212 @@ c001Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
     return Diagnostic{}
 }
 
-// is_allocation_node checks if a node represents an allocation
-is_allocation_node :: proc(node: ^ASTNode) -> bool {
-    // Check node type first - call_expression nodes are likely allocations
-    if node.node_type == "call_expression" {
-        return true  // We'll check the actual function name in the parent context
+// check_block_for_c001 checks a block for C001 violations
+check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic {
+    ctx := C001ScopeContext{}
+    
+    // Collect allocations and defers in this block
+    for &child in block.children {
+        if is_allocation_assignment(&child, file_path) {
+            var_name := extract_lhs_name(&child)
+            if var_name != "" {
+                append(&ctx.allocations, AllocationInfo{
+                    var_name = var_name,
+                    line = child.start_line,
+                    col = child.start_column,
+                })
+            }
+        }
+        if is_defer_free(&child) {
+            freed := extract_freed_var_name(&child)
+            if freed != "" {
+                append(&ctx.defers, DeferInfo{freed_var = freed})
+            }
+        }
+        if changes_context_allocator(&child) {
+            ctx.has_arena = true
+        }
+        if is_return_statement(&child) {
+            returned_var := extract_returned_var_name(&child)
+            if returned_var != "" {
+                ctx.returns_var[returned_var] = true
+            }
+        }
     }
     
-    // Also check for identifier nodes that might be allocation functions
-    if node.node_type == "identifier" {
-        return node.text == "make" || node.text == "new" || node.text == "malloc" || 
-               node.text == "calloc" || node.text == "realloc"
+    // Skip if context.allocator is reassigned
+    if ctx.has_arena {
+        return {}
+    }
+    
+    // Check allocations against defers
+    diagnostics: [dynamic]Diagnostic
+    defer_frees := make(map[string]bool)
+    for defer_info in ctx.defers {
+        defer_frees[defer_info.freed_var] = true
+    }
+    
+    for alloc in ctx.allocations {
+        // Skip if variable is returned
+        if alloc.var_name in ctx.returns_var {
+            continue
+        }
+        
+        // Skip if variable is defer-freed
+        if alloc.var_name in defer_frees {
+            continue
+        }
+        
+        // Check if allocation uses temp_allocator
+        if uses_temp_allocator(alloc) {
+            continue
+        }
+        
+        // Fire diagnostic
+        append(&diagnostics, Diagnostic{
+            file = file_path,
+            line = alloc.line,
+            column = alloc.col,
+            rule_id = "C001",
+            tier = "correctness",
+            message = "Allocation without matching defer free in same scope",
+            fix = "Add defer free() immediately after allocation",
+            has_fix = true,
+        })
+    }
+    
+    return diagnostics[:]
+}
+
+// is_allocation_assignment checks if node is an allocation assignment
+is_allocation_assignment :: proc(node: ^ASTNode, file_path: string) -> bool {
+    if node.node_type != "assignment_statement" {
+        return false
+    }
+    
+    // Check if RHS is a call to make/new
+    for &child in node.children {
+        if child.node_type == "call_expression" {
+            for &grandchild in child.children {
+                if grandchild.node_type == "identifier" {
+                    // Read source file to get actual text
+                    content, err := os.read_entire_file_from_path(file_path, context.allocator)
+                    if err == nil {
+                        content_str := string(content)
+                        // Calculate the actual byte position
+                        // For simplicity, let's find the line and then the column within that line
+                        lines := strings.split(content_str, "\n")
+                        if grandchild.start_line - 1 < len(lines) {
+                            line_content := lines[grandchild.start_line - 1]
+                            if grandchild.start_column - 1 < len(line_content) {
+                                // Extract text starting from the column position
+                                remaining := line_content[grandchild.start_column - 1:]
+                                // Check if it starts with "make" or "new"
+                                if strings.has_prefix(remaining, "make") || strings.has_prefix(remaining, "new") {
+                                    return true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     return false
 }
 
-// has_matching_defer_free checks if allocation has proper cleanup
-has_matching_defer_free :: proc(node: ^ASTNode) -> bool {
-    // Check if this node or its siblings contain defer free statements
-    // This is a simplified approach - full implementation would need:
-    // 1. Extract the allocated variable name from the assignment
-    // 2. Search through sibling nodes for defer statements
-    // 3. Parse defer statements to find free/delete calls
-    // 4. Match variable names between allocation and free
+// extract_lhs_name extracts the variable name from LHS of assignment
+extract_lhs_name :: proc(node: ^ASTNode) -> string {
+    for &child in node.children {
+        if child.node_type == "identifier" {
+            return child.text
+        }
+    }
+    return ""
+}
+
+// is_defer_free checks if node is a defer free statement
+is_defer_free :: proc(node: ^ASTNode) -> bool {
+    if node.node_type != "defer_statement" {
+        return false
+    }
     
-    // For now, we'll do a simple text search in the node's text
-    // This catches most cases but may have false positives/negatives
-    return strings.contains(node.text, "defer free") ||
-           strings.contains(node.text, "defer delete") ||
-           strings.contains(node.text, "defer os.free") ||
-           strings.contains(node.text, "defer mem.free")
+    // Check if defer calls free/delete
+    for &child in node.children {
+        if child.node_type == "call_expression" {
+            for &grandchild in child.children {
+                if grandchild.node_type == "identifier" {
+                    if grandchild.text == "free" || grandchild.text == "delete" {
+                        return true
+                    }
+                }
+            }
+        }
+    }
+    
+    return false
+}
+
+// extract_freed_var_name extracts the variable name from defer free
+extract_freed_var_name :: proc(node: ^ASTNode) -> string {
+    for &child in node.children {
+        if child.node_type == "call_expression" {
+            for &grandchild in child.children {
+                if grandchild.node_type == "identifier" {
+                    return grandchild.text
+                }
+            }
+        }
+    }
+    return ""
+}
+
+// changes_context_allocator checks if node reassigns context.allocator
+changes_context_allocator :: proc(node: ^ASTNode) -> bool {
+    if node.node_type != "assignment_statement" {
+        return false
+    }
+    
+    // Check if LHS is context.allocator
+    for &child in node.children {
+        if child.node_type == "field_expression" {
+            for &grandchild in child.children {
+                if grandchild.node_type == "identifier" && grandchild.text == "context" {
+                    for &greatgrandchild in child.children {
+                        if greatgrandchild.node_type == "field_identifier" && 
+                           greatgrandchild.text == "allocator" {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return false
+}
+
+// is_return_statement checks if node is a return statement
+is_return_statement :: proc(node: ^ASTNode) -> bool {
+    return node.node_type == "return_statement"
+}
+
+// extract_returned_var_name extracts the variable name from return statement
+extract_returned_var_name :: proc(node: ^ASTNode) -> string {
+    for &child in node.children {
+        if child.node_type == "identifier" {
+            return child.text
+        }
+    }
+    return ""
+}
+
+// uses_temp_allocator checks if allocation uses temp_allocator
+uses_temp_allocator :: proc(alloc: AllocationInfo) -> bool {
+    // This would require checking the allocator argument in the call
+    // For now, we'll skip this check as it requires more complex analysis
+    return false
 }
 
 // c001Message returns the rule message
