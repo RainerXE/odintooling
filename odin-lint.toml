@@ -1,0 +1,35 @@
+# odin-lint configuration file
+# This file controls which rules run on which paths
+
+[rules]
+# Global rule configuration
+C001.severity = "error"  # Can be: error, warn, info, off
+
+[ignore]
+# Paths to completely exclude from linting
+# Uses glob patterns
+paths = [
+    "vendor/**",      # Exclude vendor directories
+    "core/**",        # Exclude core library (as discussed)
+    "generated/**",   # Exclude generated code
+    "test/fixtures/**" # Exclude test fixtures
+]
+
+# Per-rule path exclusions
+[rules.C001]
+# Additional paths to exclude specifically for C001
+exclude_paths = [
+    "examples/**",    # Example code might have intentional leaks
+    "benchmarks/**"   # Performance-critical code
+]
+
+# Rule-specific configuration
+[rules.C001.config]
+# Only check these specific allocation functions
+alloc_functions = ["make", "new"]  # Exact match only
+
+# Ignore allocations in these contexts
+ignore_contexts = [
+    "performance_critical",
+    "test_code"
+]
