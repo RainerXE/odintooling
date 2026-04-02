@@ -7,8 +7,12 @@ echo
 
 # Configuration
 LINT_BINARY="./artifacts/odin-lint"
-OUTPUT_FILE="ols_focused_analysis_$(date +%Y%m%d).txt"
-DETAILED_REPORT="ols_focused_detailed_$(date +%Y%m%d).txt"
+OUTPUT_DIR="test_results"
+OUTPUT_FILE="$OUTPUT_DIR/ols_focused_analysis_$(date +%Y%m%d).txt"
+DETAILED_REPORT="$OUTPUT_DIR/ols_focused_detailed_$(date +%Y%m%d).txt"
+
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
 
 # Initialize counters
 files_with_violations=0

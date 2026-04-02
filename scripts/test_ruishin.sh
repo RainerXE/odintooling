@@ -1,26 +1,23 @@
 #!/bin/bash
 
-# RuiShin Library Test
-# Tests all Odin files in RuiShin/src recursively
-# Generates detailed violation report
+# Simple RuiShin Library Test
+# Removed set -e to avoid exiting on non-critical errors
 
-set -e
-
-echo "🔬 RuiShin Library Test"
+echo "🔬 Simple RuiShin Library Test"
 echo "===================================="
 echo ""
 
 # Configuration
 RUISHIN_ROOT="/Users/rainer/Development/MyODIN/RuiShin/src"
 OUTPUT_DIR="test_results/ruishin"
-REPORT_FILE="$OUTPUT_DIR/ruishin_report_$(date +%Y%m%d).md"
+REPORT_FILE="$OUTPUT_DIR/ruishin_simple_report_$(date +%Y%m%d).md"
 LINT_BINARY="./artifacts/odin-lint"
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
 # Initialize report
-echo "# RuiShin Library Test Report" > "$REPORT_FILE"
+echo "# Simple RuiShin Library Test Report" > "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 echo "**Generated**: $(date)" >> "$REPORT_FILE"
 echo "**Linter**: odin-lint" >> "$REPORT_FILE"
@@ -30,7 +27,6 @@ echo "" >> "$REPORT_FILE"
 # Statistics
 total_files=0
 total_violations=0
-contextual_violations=0
 internal_errors=0
 clean_files=0
 
@@ -38,27 +34,24 @@ clean_files=0
 echo "📁 Testing RuiShin source code..."
 
 # Find all .odin files recursively
-file_count=0
 while IFS= read -r file; do
     total_files=$((total_files + 1))
-    file_count=$((file_count + 1))
+    
+    echo "Testing file $total_files: $file"
     
     # Run linter
     output=$($LINT_BINARY "$file" 2>&1)
     
-    # Count violations (ensure single line output)
-    violation_count=$(echo "$output" | grep -c "C001" | tr -d '\n')
-    contextual_count=$(echo "$output" | grep -c "Intentional" | tr -d '\n')
-    error_count=$(echo "$output" | grep -c "INTERNAL ERROR" | tr -d '\n')
+    # Count violations
+    violation_count=$(echo "$output" | grep -c "C001" || true)
+    error_count=$(echo "$output" | grep -c "INTERNAL ERROR" || true)
     
-    # Default to 0 if empty
+    # Ensure numeric values
     violation_count=${violation_count:-0}
-    contextual_count=${contextual_count:-0}
     error_count=${error_count:-0}
     
     if [ "$violation_count" -gt 0 ]; then
         total_violations=$((total_violations + violation_count))
-        contextual_violations=$((contextual_violations + contextual_count))
         
         echo "### 🔴 Violations in: $file" >> "$REPORT_FILE"
         echo "" >> "$REPORT_FILE"
@@ -80,7 +73,7 @@ while IFS= read -r file; do
     
 done < <(find "$RUISHIN_ROOT" -name "*.odin" -type f 2>/dev/null)
 
-echo "Files tested: $file_count"
+echo "Files tested: $total_files"
 
 # Generate summary
 echo "" >> "$REPORT_FILE"
@@ -90,15 +83,14 @@ echo "| Metric | Count |" >> "$REPORT_FILE"
 echo "|--------|-------|" >> "$REPORT_FILE"
 echo "| **Files Tested** | $total_files |" >> "$REPORT_FILE"
 echo "| **Total Violations** | $total_violations |" >> "$REPORT_FILE"
-echo "| **Contextual Violations** | $contextual_violations |" >> "$REPORT_FILE"
 echo "| **Internal Errors** | $internal_errors |" >> "$REPORT_FILE"
 echo "| **Clean Files** | $clean_files |" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 # Calculate percentages
 if [ $total_files -gt 0 ]; then
-    violation_rate=$(echo "scale=2; $total_violations * 100 / $total_files" | bc 2>/dev/null || echo "0")
-    clean_rate=$(echo "scale=2; $clean_files * 100 / $total_files" | bc 2>/dev/null || echo "0")
+    violation_rate=$(awk "BEGIN {printf \"%.2f\", $total_violations * 100 / $total_files}")
+    clean_rate=$(awk "BEGIN {printf \"%.2f\", $clean_files * 100 / $total_files}")
     
     echo "| **Violation Rate** | ${violation_rate}% |" >> "$REPORT_FILE"
     echo "| **Clean Rate** | ${clean_rate}% |" >> "$REPORT_FILE"
