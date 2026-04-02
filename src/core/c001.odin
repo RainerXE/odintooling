@@ -776,12 +776,31 @@ is_global_assignment :: proc(node: ^ASTNode) -> bool {
     return false
 }
 
-// uses_non_default_allocator checks if allocation uses non-default allocator
-uses_non_default_allocator :: proc(call_node: ^ASTNode, file_path: string) -> bool {
-    // Enhanced allocator detection: check ALL parameters, not just last one
-    // Handle slice allocations with allocator parameters
-    // Detect chan.create_buffered with allocator
+// has_allocator_arg checks if an allocation call has an allocator argument
+// Only checks within the call arguments, not the entire line
+// This prevents false positives from comments, variable names, etc.
+has_allocator_arg :: proc(line_content: string) -> bool {
+    // Find the opening paren of make( or new(
+    make_start := strings.index(line_content, "make(")
+    new_start  := strings.index(line_content, "new(")
+    call_start := -1
+    if make_start >= 0 do call_start = make_start + 4  // skip "make"
+    if new_start  >= 0 do call_start = new_start  + 3  // skip "new"
+    if call_start < 0 do return false
+
+    // Extract just the argument list (from "(" onward)
+    args := line_content[call_start:]
     
+    // Check for specific allocator patterns ONLY in arguments
+    // This avoids matching "allocator" in comments, variable names, etc.
+    return strings.contains(args, "temp_allocator") ||
+           strings.contains(args, ".allocator")     ||   // context.allocator, arena.allocator
+           strings.contains(args, "allocator)")          // named param at end: allocator)
+}
+
+// uses_non_default_allocator checks if allocation uses non-default allocator
+// Now uses precise argument detection instead of broad substring matching
+uses_non_default_allocator :: proc(call_node: ^ASTNode, file_path: string) -> bool {
     // Read source file to get actual text
     content, err := os.read_entire_file_from_path(file_path, context.allocator)
     if err != nil {
@@ -794,33 +813,14 @@ uses_non_default_allocator :: proc(call_node: ^ASTNode, file_path: string) -> bo
     if call_node.start_line - 1 < len(lines) {
         line_content := lines[call_node.start_line - 1]
         
-        // Check for allocator patterns in the entire line
-        // This catches allocator in any parameter position
-        if strings.contains(line_content, "temp_allocator") ||
-           strings.contains(line_content, "context.allocator") ||
-           strings.contains(line_content, "allocator") ||
-           strings.contains(line_content, "custom_allocator") {
+        // Check for allocator arguments using precise detection
+        if has_allocator_arg(line_content) {
             return true
         }
         
         // Special handling for chan.create_buffered with allocator
         if strings.contains(line_content, "chan.create_buffered") {
             return true
-        }
-        
-        // Handle slice allocations with allocator parameters
-        // Pattern: make([dynamic]Element, 1024, 1024, allocator)
-        if strings.contains(line_content, "make(") {
-            // Simple heuristic: if line contains "make(" and has multiple commas, likely has allocator
-            // Count commas in the entire line
-            comma_count := strings.count(line_content, ",")
-            // Also check for allocator keywords
-            has_allocator := strings.contains(line_content, "allocator")
-            
-            if comma_count >= 3 || has_allocator {
-                // Multiple parameters or explicit allocator - likely includes allocator
-                return true
-            }
         }
     }
     return false
