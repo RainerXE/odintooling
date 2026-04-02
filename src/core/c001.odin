@@ -147,7 +147,7 @@ c001Matcher :: proc(file_path: string, node: ^ASTNode) -> []Diagnostic {
     }
     
     // Debug: Print node types being processed
-    fmt.printf("DEBUG: Processing node type: '%s' at line %d\n", node.node_type, node.start_line)
+    // fmt.printf("DEBUG: Processing node type: '%s' at line %d\n", node.node_type, node.start_line)
     
     // Check if this is a block node (tree-sitter uses "block", not "block_statement")
     if node.node_type == "block" {
@@ -178,7 +178,11 @@ c001Matcher :: proc(file_path: string, node: ^ASTNode) -> []Diagnostic {
 
 // check_block_for_c001 checks a block for C001 violations
 check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic {
-    ctx := C001ScopeContext{}
+    ctx := C001ScopeContext{
+        returns_var = make(map[string]bool),
+        allocations = make([dynamic]AllocationInfo, 0, 8),
+        defers = make([dynamic]DeferInfo, 0, 8),
+    }
     
     // Check if this block is in performance-critical code
     ctx.is_performance_critical = is_performance_critical_block(block, file_path)
@@ -196,7 +200,7 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
     
     // Collect allocations and defers in this block
     for &child in block.children {
-        fmt.printf("DEBUG: Block child at line %d: type '%s'\n", child.start_line, child.node_type)
+        // fmt.printf("DEBUG: Block child at line %d: type '%s'\n", child.start_line, child.node_type)
         
         if is_allocation_assignment(&child, file_path) {
             var_name := extract_lhs_name(&child)
@@ -377,14 +381,14 @@ is_allocation_assignment :: proc(node: ^ASTNode, file_path: string) -> bool {
                                     return true
                                 }
                             } else {
-                                fmt.printf("DEBUG: Column %d out of bounds for line %d (len %d)\n", 
-                                          grandchild.start_column, grandchild.start_line, len(line_content))
+                                // fmt.printf("DEBUG: Column %d out of bounds for line %d (len %d)\n", 
+                                //           grandchild.start_column, grandchild.start_line, len(line_content))
                             }
                         } else {
-                            fmt.printf("DEBUG: Line %d out of bounds (max %d)\n", grandchild.start_line, len(lines))
+                            // fmt.printf("DEBUG: Line %d out of bounds (max %d)\n", grandchild.start_line, len(lines))
                         }
                     } else {
-                        fmt.printf("DEBUG: Error reading file: %v\n", err)
+                        // fmt.printf("DEBUG: Error reading file: %v\n", err)
                     }
                 }
             }
