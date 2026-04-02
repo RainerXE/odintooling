@@ -215,9 +215,10 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
                 }
                 
                 // Check if this is a slice allocation with defer delete
-                if has_defer_delete_for_slice(var_name, block) {
-                    continue  // Skip slice allocations with defer delete
-                }
+                // Note: This is now handled by the defer_frees map below
+                // if has_defer_delete_for_slice(var_name, block) {
+                //     continue  // Skip slice allocations with defer delete
+                // }
                 
                 append(&ctx.allocations, AllocationInfo{
                     var_name = var_name,
@@ -370,28 +371,8 @@ is_allocation_assignment :: proc(node: ^ASTNode, file_lines: []string) -> bool {
 }
 
 // has_defer_delete_for_slice checks if there's a defer delete for a slice allocation
-has_defer_delete_for_slice :: proc(var_name: string, block: ^ASTNode) -> bool {
-    // Look for defer delete(var_name) in the same block
-    for &child in block.children {
-        if child.node_type == "defer_statement" {
-            for &grandchild in child.children {
-                if grandchild.node_type == "call_expression" {
-                    for &greatgrandchild in grandchild.children {
-                        if greatgrandchild.node_type == "identifier" && greatgrandchild.text == "delete" {
-                            // Check if the argument is our variable
-                            for &arg in grandchild.children {
-                                if arg.node_type == "identifier" && arg.text == var_name {
-                                    return true
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return false
-}
+// REMOVED: This functionality is now handled by the defer_frees map in check_block_for_c001
+// The defer collection loop already captures all defer delete calls, making this function redundant.
 
 // is_performance_critical_block checks if a block is in performance-critical code
 is_performance_critical_block :: proc(block: ^ASTNode, file_lines: []string) -> bool {
@@ -542,13 +523,15 @@ is_return_statement :: proc(node: ^ASTNode) -> bool {
     return node.node_type == "return_statement"
 }
 
-// extract_returned_vars recursively finds all identifiers in a return statement
+// extract_returned_vars finds identifiers in a return statement
+// Only collects top-level identifiers to avoid over-collection
 extract_returned_vars :: proc(node: ^ASTNode, result: ^map[string]bool) {
-    // Recursively find all identifiers inside a return statement
     for &child in node.children {
         if child.node_type == "identifier" && child.text != "" {
             result[child.text] = true
+            continue  // Don't recurse into this identifier's children
         }
+        // Recurse into other node types (call_expression, etc.)
         extract_returned_vars(&child, result)
     }
 }
@@ -706,51 +689,14 @@ contains_identifier :: proc(node: ^ASTNode, target: string) -> bool {
 }
 
 // extract_returned_var_name extracts the variable name from return statement (legacy)
-extract_returned_var_name :: proc(node: ^ASTNode) -> string {
-    for &child in node.children {
-        if child.node_type == "identifier" {
-            return child.text
-        }
-    }
-    return ""
-}
+// extract_returned_var_name extracts the variable name from return statement (legacy)
+// REMOVED: Superseded by extract_returned_vars which handles all cases
+// This legacy function was never called and is no longer needed.
 
 // is_global_assignment detects global variable initializations
-is_global_assignment :: proc(node: ^ASTNode) -> bool {
-    // Global variables typically have simple LHS (just an identifier)
-    // and often have specific naming patterns
-    
-    lhs_complexity := 0
-    for &child in node.children {
-        if child.node_type == "selector_expression" || 
-           child.node_type == "index_expression" {
-            lhs_complexity += 1
-        }
-    }
-    
-    // If LHS is complex, it's not a simple global assignment
-    if lhs_complexity > 0 {
-        return false
-    }
-    
-    // Check for common global variable naming patterns
-    for &child in node.children {
-        if child.node_type == "identifier" {
-            // Check for stdio globals
-            if child.text == "stdin" || child.text == "stdout" || child.text == "stderr" {
-                return true
-            }
-            // Check for other common global patterns
-            if strings.has_prefix(child.text, "default_") ||
-               strings.has_prefix(child.text, "global_") ||
-               strings.has_suffix(child.text, "_global") {
-                return true
-            }
-        }
-    }
-    
-    return false
-}
+// REMOVED: Block-level analysis never sees global variable initializations
+// Global variables are handled at package scope, not within individual blocks
+// This function was never called and is no longer needed.
 
 // has_allocator_arg checks if an allocation call has an allocator argument
 // Only checks within the call arguments, not the entire line

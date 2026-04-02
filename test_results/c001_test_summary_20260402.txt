@@ -1,5 +1,5 @@
 === C001 Rule Test Summary ===
-Generated: Thu Apr  2 17:43:48 CEST 2026
+Generated: Thu Apr  2 17:48:18 CEST 2026
 Test directory: ./test/c001
 
 ./test/c001/test_c001.odin - No violations
