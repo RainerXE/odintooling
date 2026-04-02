@@ -163,47 +163,6 @@ c001Matcher :: proc(file_path: string, node: ^ASTNode) -> []Diagnostic {
         }
     }
     
-    // NEW: Also check if this node itself is an allocation assignment
-    // This handles cases where assignment_statement nodes are not direct children of blocks
-    if is_allocation_assignment(node, file_path) {
-        var_name := extract_lhs_name(node)
-        if var_name != "" {
-            // Apply the same checks as in check_block_for_c001
-            if !uses_non_default_allocator(node, file_path) && 
-               !is_global_assignment(node) && 
-               !has_manual_cleanup(node, node) && 
-               !has_defer_delete_for_slice(var_name, node) {
-                
-                // Collect suppression comments from the current block
-                // We need to find the containing block - for now, we'll scan a reasonable range
-                suppressions := collect_suppressions_for_node(node, file_path)
-                
-                // Check if this allocation is suppressed
-                is_suppressed := false
-                if rule, ok := suppressions[node.start_line]; ok && rule == "C001" {
-                    is_suppressed = true
-                }
-                if rule, ok := suppressions[node.start_line - 1]; ok && rule == "C001" {
-                    is_suppressed = true
-                }
-                
-                if !is_suppressed {
-                    append(&all_diagnostics, Diagnostic{
-                        file = file_path,
-                        line = node.start_line,
-                        column = node.start_column,
-                        rule_id = "C001",
-                        tier = "correctness",
-                        message = c001Message(),
-                        fix = c001FixHint(),
-                        has_fix = true,
-                        diag_type = DiagnosticType.VIOLATION,
-                    })
-                }
-            }
-        }
-    }
-    
     // Recursively check children for block nodes
     for &child in node.children {
         child_diagnostics := c001Matcher(file_path, &child)

@@ -54,12 +54,13 @@ while IFS= read -r file; do
     output=$($LINT_BINARY "$file" 2>&1)
     
     # Count violations
-    violation_count=$(echo "$output" | grep -c "C001" || echo "0")
+    violation_count=$(echo "$output" | grep -c "C001" | tr -d '\n' || echo "0")
+    violation_count=${violation_count:-0}
     total_violations=$((total_violations + violation_count))
     
     # Check for internal errors
     if echo "$output" | grep -q "INTERNAL ERROR"; then
-        ((internal_errors++))
+        internal_errors=$((internal_errors + 1))
         echo "  🟣 INTERNAL ERROR"
         echo "$file - INTERNAL ERROR" >> "$SUMMARY_FILE"
     fi
