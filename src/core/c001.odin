@@ -546,12 +546,27 @@ is_defer_free :: proc(node: ^ASTNode) -> bool {
 }
 
 // extract_freed_var_name extracts the variable name from defer free
+// Returns the actual variable being freed, not the function name (free/delete)
 extract_freed_var_name :: proc(node: ^ASTNode) -> string {
     for &child in node.children {
         if child.node_type == "call_expression" {
+            found_callee := false
             for &grandchild in child.children {
+                // Handle argument_list case (modern tree-sitter grammar)
+                if grandchild.node_type == "argument_list" {
+                    for &arg in grandchild.children {
+                        if arg.node_type == "identifier" {
+                            return arg.text  // First arg = variable being freed
+                        }
+                    }
+                }
+                // Fallback for direct identifiers (older grammar compatibility)
                 if grandchild.node_type == "identifier" {
-                    return grandchild.text
+                    if !found_callee {
+                        found_callee = true  // Skip "free"/"delete" function name
+                        continue
+                    }
+                    return grandchild.text  // Second identifier = variable being freed
                 }
             }
         }
