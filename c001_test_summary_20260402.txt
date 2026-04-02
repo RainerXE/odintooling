@@ -1,5 +1,5 @@
 === C001 Rule Test Summary ===
-Generated: Thu Apr  2 11:03:57 CEST 2026
+Generated: Thu Apr  2 11:07:11 CEST 2026
 Test directory: ./test/c001
 
 ./test/c001/test_c001.odin - 3 violations
@@ -602,7 +602,7 @@ Fix: Add defer free() immediately after allocation
 Checking stub rule for: ./test/c001/c001_suppression_test.odin
 Cleaning up tree-sitter
 
-./test/c001/c001_improvements_test.odin - 8 violations
+./test/c001/c001_improvements_test.odin - 7 violations
 
 === DETAILED OUTPUT FOR c001_improvements_test.odin ===
 Starting odin-lint
@@ -764,8 +764,6 @@ DEBUG: Processing node type: '::' at line 28
 DEBUG: Processing node type: 'struct' at line 28
 DEBUG: Processing node type: '{' at line 28
 DEBUG: Processing node type: '}' at line 28
-🔴 ./test/c001/c001_improvements_test.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
 🔴 ./test/c001/c001_improvements_test.odin:22:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add defer free() immediately after allocation
 Checking stub rule for: ./test/c001/c001_improvements_test.odin
@@ -1310,7 +1308,7 @@ Fix: Add defer free() immediately after allocation
 Checking stub rule for: ./test/c001/c001_comprehensive_exclusion_test.odin
 Cleaning up tree-sitter
 
-./test/c001/c001_allocator_test.odin - 2 violations
+./test/c001/c001_allocator_test.odin - 3 violations
 
 === DETAILED OUTPUT FOR c001_allocator_test.odin ===
 Starting odin-lint
@@ -1498,6 +1496,8 @@ DEBUG: Processing node type: '::' at line 29
 DEBUG: Processing node type: 'struct' at line 29
 DEBUG: Processing node type: '{' at line 29
 DEBUG: Processing node type: '}' at line 29
+🔴 ./test/c001/c001_allocator_test.odin:12:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add defer free() immediately after allocation
 🔴 ./test/c001/c001_allocator_test.odin:18:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add defer free() immediately after allocation
 Checking stub rule for: ./test/c001/c001_allocator_test.odin
@@ -1608,7 +1608,7 @@ Fix: Add defer free() immediately after allocation
 Checking stub rule for: ./test/c001/c001_simple_test.odin
 Cleaning up tree-sitter
 
-./test/c001/c001_clean_test.odin - 5 violations
+./test/c001/c001_clean_test.odin - 4 violations
 
 === DETAILED OUTPUT FOR c001_clean_test.odin ===
 Starting odin-lint
@@ -1751,8 +1751,6 @@ DEBUG: Processing node type: '::' at line 20
 DEBUG: Processing node type: 'struct' at line 20
 DEBUG: Processing node type: '{' at line 20
 DEBUG: Processing node type: '}' at line 20
-🔴 ./test/c001/c001_clean_test.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
 🔴 ./test/c001/c001_clean_test.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add defer free() immediately after allocation
 Checking stub rule for: ./test/c001/c001_clean_test.odin
@@ -2488,7 +2486,7 @@ Total test files: 15
 Files with violations: 14
 Files without violations: 1
 Internal errors: 0
-Total C001 violations found: 49
+Total C001 violations found: 48
 
 ✅ TESTING COMPLETE
 The C001 rule is working and finding potential memory issues
