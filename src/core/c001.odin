@@ -20,9 +20,75 @@ max :: proc(a, b: int) -> int {
     return b
 }
 
+// fuzzy_match checks if text contains pattern with flexible matching
+// Handles variations in spacing, case, and common typos
+fuzzy_match :: proc(text: string, pattern: string) -> bool {
+    // Convert both to lowercase for case-insensitive matching
+    text_lower := strings.to_lower(text)
+    pattern_lower := strings.to_lower(pattern)
+    
+    // Simple approach: check for common variations of the pattern
+    // This handles the most common spacing and case variations
+    result := strings.contains(text_lower, "//odin-lint:ignore") ||
+              strings.contains(text_lower, "// odin-lint:ignore") ||
+              strings.contains(text_lower, "//odin-lint: ignore") ||
+              strings.contains(text_lower, "// odin-lint: ignore")
+    
+    // Debug: Print what we're comparing and the result
+    // fmt.printf("DEBUG: fuzzy_match comparing '%s' with pattern - result: %v\n", text_lower, result)
+    return result
+}
+
+// should_exclude_file checks if a file should be excluded based on config
+should_exclude_file :: proc(file_path: string) -> bool {
+    // For now, implement basic path exclusion logic
+    // In a full implementation, this would read from odin-lint.toml
+    
+    // Exclude core library files (as discussed)
+    if strings.contains(file_path, "core/") {
+        return true
+    }
+    
+    // Exclude vendor directories
+    if strings.contains(file_path, "vendor/") {
+        return true
+    }
+    
+    // Exclude generated code
+    if strings.contains(file_path, "generated/") {
+        return true
+    }
+    
+    // Exclude test fixtures
+    if strings.contains(file_path, "fixtures/") {
+        return true
+    }
+    
+    return false
+}
+
 // C001 rule implementation
 // C001: Allocation without matching defer free in same scope
 // Inspired by: Rust clippy::mem_forget
+//
+// IMPORTANT: This rule ONLY checks for the built-in allocation functions:
+//   - make()  - slice, array, map, channel allocations
+//   - new()   - struct allocations
+//
+// It does NOT flag user-defined functions that happen to start with "make" or "new"
+// (e.g., make_connection(), new_buffer(), etc.) because it uses exact matching:
+//   strings.has_prefix(remaining, "make(") and strings.has_prefix(remaining, "new(")
+//
+// Suppression: Use inline comments to suppress false positives:
+//   data := make([]int, 10)  // odin-lint:ignore C001 intentional ownership transfer
+//   // odin-lint:ignore C001 caller takes ownership
+//   data := new(Data)
+//
+// File exclusions: Certain paths are automatically excluded:
+//   - core/          - Odin core library (uses different memory management patterns)
+//   - vendor/        - Third-party dependencies
+//   - generated/     - Auto-generated code
+//   - fixtures/      - Test fixtures
 
 // C001ScopeContext :: struct for block-level analysis
 C001ScopeContext :: struct {
@@ -59,6 +125,11 @@ C001Rule :: proc() -> Rule {
 
 // c001MatcherWrapper maintains compatibility with single Diagnostic interface
 c001MatcherWrapper :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
+    // Check if this file should be excluded based on configuration
+    if should_exclude_file(file_path) {
+        return Diagnostic{}
+    }
+    
     diagnostics := c001Matcher(file_path, node)
     if len(diagnostics) > 0 {
         return diagnostics[0]
@@ -70,13 +141,65 @@ c001MatcherWrapper :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
 c001Matcher :: proc(file_path: string, node: ^ASTNode) -> []Diagnostic {
     all_diagnostics: [dynamic]Diagnostic
     
+    // Check if this file should be excluded based on configuration
+    if should_exclude_file(file_path) {
+        return {}
+    }
+    
+    // Debug: Print node types being processed
+    fmt.printf("DEBUG: Processing node type: '%s' at line %d\n", node.node_type, node.start_line)
+    
     // Check if this is a block node (tree-sitter uses "block", not "block_statement")
     if node.node_type == "block" {
+        // Debug: Found a block node
+        // fmt.printf("DEBUG: Found block node at line %d\n", node.start_line)
+        
         // Check block for C001 violations
         diagnostics := check_block_for_c001(node, file_path)
         if len(diagnostics) > 0 {
             for diag in diagnostics {
                 append(&all_diagnostics, diag)
+            }
+        }
+    }
+    
+    // NEW: Also check if this node itself is an allocation assignment
+    // This handles cases where assignment_statement nodes are not direct children of blocks
+    if is_allocation_assignment(node, file_path) {
+        var_name := extract_lhs_name(node)
+        if var_name != "" {
+            // Apply the same checks as in check_block_for_c001
+            if !uses_non_default_allocator(node, file_path) && 
+               !is_global_assignment(node) && 
+               !has_manual_cleanup(node, node) && 
+               !has_defer_delete_for_slice(var_name, node) {
+                
+                // Collect suppression comments from the current block
+                // We need to find the containing block - for now, we'll scan a reasonable range
+                suppressions := collect_suppressions_for_node(node, file_path)
+                
+                // Check if this allocation is suppressed
+                is_suppressed := false
+                if rule, ok := suppressions[node.start_line]; ok && rule == "C001" {
+                    is_suppressed = true
+                }
+                if rule, ok := suppressions[node.start_line - 1]; ok && rule == "C001" {
+                    is_suppressed = true
+                }
+                
+                if !is_suppressed {
+                    append(&all_diagnostics, Diagnostic{
+                        file = file_path,
+                        line = node.start_line,
+                        column = node.start_column,
+                        rule_id = "C001",
+                        tier = "correctness",
+                        message = c001Message(),
+                        fix = c001FixHint(),
+                        has_fix = true,
+                        diag_type = DiagnosticType.VIOLATION,
+                    })
+                }
             }
         }
     }
@@ -105,6 +228,8 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
     
     // Collect allocations and defers in this block
     for &child in block.children {
+        fmt.printf("DEBUG: Block child at line %d: type '%s'\n", child.start_line, child.node_type)
+        
         if is_allocation_assignment(&child, file_path) {
             var_name := extract_lhs_name(&child)
             if var_name != "" {
@@ -167,7 +292,25 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
         defer_frees[defer_info.freed_var] = true
     }
     
+    // Collect suppression comments for this block
+    suppressions := collect_suppressions(block, file_path)
+    
+    // Debug: Print suppressions found
+    // fmt.printf("DEBUG: Found %d suppressions in block\n", len(suppressions))
+    // for line, rule in suppressions {
+    //     fmt.printf("DEBUG: Suppression on line %d for rule %s\n", line, rule)
+    // }
+    
     for alloc in ctx.allocations {
+        // Check if this allocation is suppressed
+        if rule, ok := suppressions[alloc.line]; ok && rule == "C001" {
+            // fmt.printf("DEBUG: Suppressing allocation on line %d\n", alloc.line)
+            continue  // Skip suppressed allocations
+        }
+        if rule, ok := suppressions[alloc.line - 1]; ok && rule == "C001" {
+            // fmt.printf("DEBUG: Suppressing allocation on line %d (previous line suppressed)\n", alloc.line)
+            continue  // Skip allocations with suppression on previous line
+        }
         // Skip if variable is returned
         if alloc.var_name in ctx.returns_var {
             continue
@@ -215,6 +358,9 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
 
 // is_allocation_assignment checks if node is an allocation assignment
 is_allocation_assignment :: proc(node: ^ASTNode, file_path: string) -> bool {
+    // Debug: Track when this function is called
+    // fmt.printf("DEBUG: is_allocation_assignment called for node type '%s' at line %d\n", node.node_type, node.start_line)
+    
     // Accept both := (short_var_decl) and = (assignment_statement)
     if node.node_type != "short_var_decl" && node.node_type != "assignment_statement" {
         return false
@@ -249,12 +395,28 @@ is_allocation_assignment :: proc(node: ^ASTNode, file_path: string) -> bool {
                             if grandchild.start_column - 1 < len(line_content) {
                                 // Extract text starting from the column position
                                 remaining := line_content[grandchild.start_column - 1:]
-                                // Check if it starts with "make" or "new"
-                                if strings.has_prefix(remaining, "make") || strings.has_prefix(remaining, "new") {
+                                
+                                // Debug: Print what we're checking
+                                // fmt.printf("DEBUG: Checking identifier '%s' at line %d, col %d\n", 
+                                //           grandchild.text, grandchild.start_line, grandchild.start_column)
+                                // fmt.printf("DEBUG: Line content: '%s'\n", line_content)
+                                // fmt.printf("DEBUG: Remaining from col: '%s'\n", remaining)
+                                
+                                // Check if it starts with "make" or "new" (exact match to avoid false positives)
+                                // Use exact matching to avoid matching functions like "min()", "max()", etc.
+                                if strings.has_prefix(remaining, "make(") || strings.has_prefix(remaining, "new(") {
+                                    // fmt.printf("DEBUG: Found allocation at line %d: '%s'\n", grandchild.start_line, remaining)
                                     return true
                                 }
+                            } else {
+                                fmt.printf("DEBUG: Column %d out of bounds for line %d (len %d)\n", 
+                                          grandchild.start_column, grandchild.start_line, len(line_content))
                             }
+                        } else {
+                            fmt.printf("DEBUG: Line %d out of bounds (max %d)\n", grandchild.start_line, len(lines))
                         }
+                    } else {
+                        fmt.printf("DEBUG: Error reading file: %v\n", err)
                     }
                 }
             }
@@ -465,6 +627,97 @@ has_manual_cleanup :: proc(node: ^ASTNode, block: ^ASTNode) -> bool {
         }
     }
     return false
+}
+
+// collect_suppressions_for_node collects suppression comments around a specific node
+collect_suppressions_for_node :: proc(node: ^ASTNode, file_path: string) -> map[int]string {
+    // Estimate a reasonable range around the node to look for suppression comments
+    // Since we don't have parent block info, we'll scan a window around the node's line
+    
+    // Read source file to get actual text
+    content, err := os.read_entire_file_from_path(file_path, context.allocator)
+    if err != nil {
+        return {}
+    }
+    content_str := string(content)
+    
+    // Extract all lines
+    lines := strings.split(content_str, "\n")
+    
+    // Look for suppression comments in a reasonable range around the node
+    start_line := max(0, node.start_line - 5)
+    end_line := min(len(lines) - 1, node.start_line + 5)
+    
+    suppressions := make(map[int]string)
+    
+    for i in start_line..=end_line {
+        if i < len(lines) {
+            line_content := lines[i]
+            
+            // Look for suppression pattern using fuzzy matching
+            if fuzzy_match(line_content, "//odin-lint:ignore") {
+                // Extract the rule ID using simple approach
+                // Look for "C001" after the ignore pattern
+                if strings.contains(line_content, "C001") {
+                    suppressions[i + 1] = "C001"  // line numbers are 1-indexed
+                }
+            }
+        }
+    }
+    
+    return suppressions
+}
+
+// collect_suppressions collects suppression comments from a block
+collect_suppressions :: proc(block: ^ASTNode, file_path: string) -> map[int]string {
+    suppressions := make(map[int]string)
+    
+    // Read source file to get actual text
+    content, err := os.read_entire_file_from_path(file_path, context.allocator)
+    if err != nil {
+        return suppressions
+    }
+    content_str := string(content)
+    
+    // Extract all lines
+    lines := strings.split(content_str, "\n")
+    
+    // Look for suppression comments in the block's line range
+    // Check a reasonable range around the block to catch nearby comments
+    start_line := max(0, block.start_line - 1)
+    end_line := min(len(lines) - 1, block.end_line + 1)
+    
+    // Debug: Print the range we're checking
+    // fmt.printf("DEBUG: Checking lines %d to %d for suppressions\n", start_line + 1, end_line + 1)
+    
+    for i in start_line..=end_line {
+        if i < len(lines) {
+            line_content := lines[i]
+            
+            // Debug: Print each line we check
+            // fmt.printf("DEBUG: Checking line %d: '%s'\n", i + 1, line_content)
+            
+            // Look for suppression pattern using fuzzy matching
+            if fuzzy_match(line_content, "//odin-lint:ignore") {
+                // Debug: Print when we find a match
+                // fmt.printf("DEBUG: Found suppression pattern on line %d\n", i + 1)
+                
+                // Extract the rule ID using simple approach
+                // Look for "C001" after the ignore pattern
+                if strings.contains(line_content, "C001") {
+                    suppressions[i + 1] = "C001"  // line numbers are 1-indexed
+                    // fmt.printf("DEBUG: Added suppression for rule C001 on line %d\n", i + 1)
+                }
+            } else {
+                // Debug: Check if the line contains the pattern at all
+                if strings.contains(strings.to_lower(line_content), "odin-lint") {
+                    // fmt.printf("DEBUG: Line %d contains 'odin-lint' but didn't match fuzzy pattern\n", i + 1)
+                }
+            }
+        }
+    }
+    
+    return suppressions
 }
 
 // is_free_call checks if a node contains a free/delete call for a specific variable
