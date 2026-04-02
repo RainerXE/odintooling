@@ -7,8 +7,12 @@ echo
 
 # Configuration
 LINT_BINARY="./artifacts/odin-lint"
-SUMMARY_FILE="c001_test_summary_$(date +%Y%m%d).txt"
+OUTPUT_DIR="test_results"
+SUMMARY_FILE="$OUTPUT_DIR/c001_test_summary_$(date +%Y%m%d).txt"
 TEST_DIR="./test/c001"
+
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
 
 # Initialize counters
 total_files=0
