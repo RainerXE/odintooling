@@ -185,6 +185,15 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
     // Debug: Print performance critical status
     // fmt.printf("Block at line %d: performance_critical = %v\n", block.start_line, ctx.is_performance_critical)
     
+    // PERFORMANCE OPTIMIZATION: Read file once and cache lines
+    // This avoids repeated file I/O for allocator detection
+    file_lines := []string{}
+    content, err := os.read_entire_file_from_path(file_path, context.allocator)
+    if err == nil {
+        content_str := string(content)
+        file_lines = strings.split(content_str, "\n")
+    }
+    
     // Collect allocations and defers in this block
     for &child in block.children {
         fmt.printf("DEBUG: Block child at line %d: type '%s'\n", child.start_line, child.node_type)
@@ -193,7 +202,7 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
             var_name := extract_lhs_name(&child)
             if var_name != "" {
                 // Check if allocation uses non-default allocator
-                if uses_non_default_allocator(&child, file_path) {
+                if uses_non_default_allocator(&child, file_lines) {
                     continue  // Skip allocations with custom allocators
                 }
                 
@@ -800,18 +809,11 @@ has_allocator_arg :: proc(line_content: string) -> bool {
 
 // uses_non_default_allocator checks if allocation uses non-default allocator
 // Now uses precise argument detection instead of broad substring matching
-uses_non_default_allocator :: proc(call_node: ^ASTNode, file_path: string) -> bool {
-    // Read source file to get actual text
-    content, err := os.read_entire_file_from_path(file_path, context.allocator)
-    if err != nil {
-        return false
-    }
-    content_str := string(content)
-    
-    // Extract the line containing the allocation
-    lines := strings.split(content_str, "\n")
-    if call_node.start_line - 1 < len(lines) {
-        line_content := lines[call_node.start_line - 1]
+// OPTIMIZED: Takes file_lines as parameter to avoid repeated file reading
+uses_non_default_allocator :: proc(call_node: ^ASTNode, file_lines: []string) -> bool {
+    // Extract the line containing the allocation (no file reading needed)
+    if call_node.start_line - 1 < len(file_lines) {
+        line_content := file_lines[call_node.start_line - 1]
         
         // Check for allocator arguments using precise detection
         if has_allocator_arg(line_content) {
