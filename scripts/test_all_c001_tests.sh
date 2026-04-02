@@ -53,9 +53,13 @@ while IFS= read -r file; do
     # Run the linter
     output=$($LINT_BINARY "$file" 2>&1)
     
-    # Count violations
-    violation_count=$(echo "$output" | grep -c "C001" | tr -d '\n' || echo "0")
+    # Count violations - only count actual violation lines (start with 🔴)
+    violation_count=$(echo "$output" | grep -c "^🔴.*C001" 2>/dev/null)
     violation_count=${violation_count:-0}
+    # Ensure violation_count is numeric
+    if [[ ! "$violation_count" =~ ^[0-9]+$ ]]; then
+        violation_count=0
+    fi
     total_violations=$((total_violations + violation_count))
     
     # Check for internal errors
@@ -67,11 +71,11 @@ while IFS= read -r file; do
     
     # Categorize result
     if [ "$violation_count" -gt 0 ]; then
-        ((files_with_violations++))
+        files_with_violations=$((files_with_violations + 1))
         echo "  🔴 Found $violation_count C001 violation(s)"
         echo "$file - $violation_count violations" >> "$SUMMARY_FILE"
     else
-        ((files_without_violations++))
+        files_without_violations=$((files_without_violations + 1))
         echo "  ✅ No violations found"
         echo "$file - No violations" >> "$SUMMARY_FILE"
     fi
