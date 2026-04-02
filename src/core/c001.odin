@@ -176,11 +176,6 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
         defers = make([dynamic]DeferInfo, 0, 8),
     }
     
-    // Check if this block is in performance-critical code
-    ctx.is_performance_critical = is_performance_critical_block(block, file_path)
-    // Debug: Print performance critical status
-    // fmt.printf("Block at line %d: performance_critical = %v\n", block.start_line, ctx.is_performance_critical)
-    
     // PERFORMANCE OPTIMIZATION: Read file once and cache lines
     // This avoids repeated file I/O for allocator detection
     file_lines := []string{}
@@ -191,11 +186,16 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
         defer delete(content)  // Add memory cleanup
     }
     
+    // Check if this block is in performance-critical code
+    ctx.is_performance_critical = is_performance_critical_block(block, file_lines)
+    // Debug: Print performance critical status
+    // fmt.printf("Block at line %d: performance_critical = %v\n", block.start_line, ctx.is_performance_critical)
+    
     // Collect allocations and defers in this block
     for &child in block.children {
         // fmt.printf("DEBUG: Block child at line %d: type '%s'\n", child.start_line, child.node_type)
         
-        if is_allocation_assignment(&child, file_path) {
+        if is_allocation_assignment(&child, file_lines) {
             var_name := extract_lhs_name(&child)
             if var_name != "" {
                 // Check if allocation uses non-default allocator
@@ -323,7 +323,7 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
 }
 
 // is_allocation_assignment checks if node is an allocation assignment
-is_allocation_assignment :: proc(node: ^ASTNode, file_path: string) -> bool {
+is_allocation_assignment :: proc(node: ^ASTNode, file_lines: []string) -> bool {
     // Accept both := (short_var_decl) and = (assignment_statement)
     if node.node_type != "short_var_decl" && node.node_type != "assignment_statement" {
         return false
@@ -344,28 +344,22 @@ is_allocation_assignment :: proc(node: ^ASTNode, file_path: string) -> bool {
     // Check if RHS is a call to make/new
     for &child in node.children {
         if child.node_type == "call_expression" {
-            for &grandchild in child.children {
-                if grandchild.node_type == "identifier" {
-                    // Read source file to get actual text (original approach)
-                    content, err := os.read_entire_file_from_path(file_path, context.allocator)
-                    if err == nil {
-                        content_str := string(content)
-                        // Calculate the actual byte position
-                        // For simplicity, let's find the line and then the column within that line
-                        lines := strings.split(content_str, "\n")
-                        if grandchild.start_line - 1 < len(lines) {
-                            line_content := lines[grandchild.start_line - 1]
-                            if grandchild.start_column - 1 < len(line_content) {
-                                // Extract text starting from the column position
-                                remaining := line_content[grandchild.start_column - 1:]
-                                
-                                // Check if it starts with "make" or "new" (exact match to avoid false positives)
-                                // Use exact matching to avoid matching functions like "min()", "max()", etc.
-                                if strings.has_prefix(remaining, "make(") || strings.has_prefix(remaining, "new(") {
-                                    return true
-                                }
-                            }
-                        }
+            // The callee is the first child - check it using cached source text
+            if len(child.children) == 0 {
+                continue
+            }
+            callee := &child.children[0]
+            
+            // Use cached file_lines - single read, already cached in caller
+            if callee.start_line > 0 && callee.start_line - 1 < len(file_lines) {
+                line := file_lines[callee.start_line - 1]
+                col := callee.start_column - 1
+                if col >= 0 && col < len(line) {
+                    rest := line[col:]
+                    // Check if it starts with "make" or "new" (exact match to avoid false positives)
+                    // Use exact matching to avoid matching functions like "min()", "max()", etc.
+                    if strings.has_prefix(rest, "make(") || strings.has_prefix(rest, "new(") {
+                        return true
                     }
                 }
             }
@@ -400,15 +394,9 @@ has_defer_delete_for_slice :: proc(var_name: string, block: ^ASTNode) -> bool {
 }
 
 // is_performance_critical_block checks if a block is in performance-critical code
-is_performance_critical_block :: proc(block: ^ASTNode, file_path: string) -> bool {
-    // Read source file to get actual text
-    content, err := os.read_entire_file_from_path(file_path, context.allocator)
-    if err != nil {
-        return false
-    }
-    defer delete(content)  // Add memory cleanup
-    content_str := string(content)
-    lines := strings.split(content_str, "\n")
+is_performance_critical_block :: proc(block: ^ASTNode, file_lines: []string) -> bool {
+    // Use cached file_lines instead of reading file again
+    lines := file_lines
     
     // Check for performance-critical comments in nearby lines
     start_line := max(0, block.start_line - 5)
@@ -685,14 +673,17 @@ is_free_call :: proc(node: ^ASTNode, var_name: string) -> bool {
         return false
     }
     
+    found_free_callee := false
     for &child in node.children {
         if child.node_type == "identifier" {
             if child.text == "free" || child.text == "delete" {
-                // Check if var_name is in the arguments
-                for &arg in node.children {
-                    if arg.node_type == "identifier" && arg.text == var_name {
-                        return true
-                    }
+                found_free_callee = true
+            }
+        }
+        if child.node_type == "argument_list" && found_free_callee {
+            for &arg in child.children {
+                if arg.node_type == "identifier" && arg.text == var_name {
+                    return true
                 }
             }
         }
