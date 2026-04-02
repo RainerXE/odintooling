@@ -3,7 +3,6 @@ package core
 import "core:fmt"
 import "core:os"
 import "core:strings"
-import "core:math"
 
 // Helper functions for min/max
 min :: proc(a, b: int) -> int {
@@ -20,23 +19,16 @@ max :: proc(a, b: int) -> int {
     return b
 }
 
-// fuzzy_match checks if text contains pattern with flexible matching
-// Handles variations in spacing, case, and common typos
-fuzzy_match :: proc(text: string, pattern: string) -> bool {
-    // Convert both to lowercase for case-insensitive matching
+// is_suppression_comment checks if text contains a suppression comment
+is_suppression_comment :: proc(text: string) -> bool {
+    // Convert to lowercase for case-insensitive matching
     text_lower := strings.to_lower(text)
-    pattern_lower := strings.to_lower(pattern)
     
-    // Simple approach: check for common variations of the pattern
-    // This handles the most common spacing and case variations
-    result := strings.contains(text_lower, "//odin-lint:ignore") ||
-              strings.contains(text_lower, "// odin-lint:ignore") ||
-              strings.contains(text_lower, "//odin-lint: ignore") ||
-              strings.contains(text_lower, "// odin-lint: ignore")
-    
-    // Debug: Print what we're comparing and the result
-    // fmt.printf("DEBUG: fuzzy_match comparing '%s' with pattern - result: %v\n", text_lower, result)
-    return result
+    // Check for common suppression comment patterns
+    return strings.contains(text_lower, "//odin-lint:ignore") ||
+           strings.contains(text_lower, "// odin-lint:ignore") ||
+           strings.contains(text_lower, "//odin-lint: ignore") ||
+           strings.contains(text_lower, "// odin-lint: ignore")
 }
 
 // should_exclude_file checks if a file should be excluded based on config
@@ -196,6 +188,7 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
     if err == nil {
         content_str := string(content)
         file_lines = strings.split(content_str, "\n")
+        defer delete(content)  // Add memory cleanup
     }
     
     // Collect allocations and defers in this block
@@ -211,9 +204,10 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
                 }
                 
                 // Check if this is a global variable assignment
-                if is_global_assignment(&child) {
-                    continue  // Skip global variable initializations
-                }
+                // Simplified: Block-level analysis never sees globals
+                // if is_global_assignment(&child) {
+                //     continue  // Skip global variable initializations
+                // }
                 
                 // Check if there's manual cleanup in the same block
                 if has_manual_cleanup(&child, block) {
@@ -265,7 +259,7 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
     }
     
     // Collect suppression comments for this block
-    suppressions := collect_suppressions(block, file_path)
+    suppressions := collect_suppressions(block, file_lines)
     
     // Debug: Print suppressions found
     // fmt.printf("DEBUG: Found %d suppressions in block\n", len(suppressions))
@@ -330,9 +324,6 @@ check_block_for_c001 :: proc(block: ^ASTNode, file_path: string) -> []Diagnostic
 
 // is_allocation_assignment checks if node is an allocation assignment
 is_allocation_assignment :: proc(node: ^ASTNode, file_path: string) -> bool {
-    // Debug: Track when this function is called
-    // fmt.printf("DEBUG: is_allocation_assignment called for node type '%s' at line %d\n", node.node_type, node.start_line)
-    
     // Accept both := (short_var_decl) and = (assignment_statement)
     if node.node_type != "short_var_decl" && node.node_type != "assignment_statement" {
         return false
@@ -355,7 +346,7 @@ is_allocation_assignment :: proc(node: ^ASTNode, file_path: string) -> bool {
         if child.node_type == "call_expression" {
             for &grandchild in child.children {
                 if grandchild.node_type == "identifier" {
-                    // Read source file to get actual text
+                    // Read source file to get actual text (original approach)
                     content, err := os.read_entire_file_from_path(file_path, context.allocator)
                     if err == nil {
                         content_str := string(content)
@@ -368,27 +359,13 @@ is_allocation_assignment :: proc(node: ^ASTNode, file_path: string) -> bool {
                                 // Extract text starting from the column position
                                 remaining := line_content[grandchild.start_column - 1:]
                                 
-                                // Debug: Print what we're checking
-                                // fmt.printf("DEBUG: Checking identifier '%s' at line %d, col %d\n", 
-                                //           grandchild.text, grandchild.start_line, grandchild.start_column)
-                                // fmt.printf("DEBUG: Line content: '%s'\n", line_content)
-                                // fmt.printf("DEBUG: Remaining from col: '%s'\n", remaining)
-                                
                                 // Check if it starts with "make" or "new" (exact match to avoid false positives)
                                 // Use exact matching to avoid matching functions like "min()", "max()", etc.
                                 if strings.has_prefix(remaining, "make(") || strings.has_prefix(remaining, "new(") {
-                                    // fmt.printf("DEBUG: Found allocation at line %d: '%s'\n", grandchild.start_line, remaining)
                                     return true
                                 }
-                            } else {
-                                // fmt.printf("DEBUG: Column %d out of bounds for line %d (len %d)\n", 
-                                //           grandchild.start_column, grandchild.start_line, len(line_content))
                             }
-                        } else {
-                            // fmt.printf("DEBUG: Line %d out of bounds (max %d)\n", grandchild.start_line, len(lines))
                         }
-                    } else {
-                        // fmt.printf("DEBUG: Error reading file: %v\n", err)
                     }
                 }
             }
@@ -429,6 +406,7 @@ is_performance_critical_block :: proc(block: ^ASTNode, file_path: string) -> boo
     if err != nil {
         return false
     }
+    defer delete(content)  // Add memory cleanup
     content_str := string(content)
     lines := strings.split(content_str, "\n")
     
@@ -626,6 +604,7 @@ collect_suppressions_for_node :: proc(node: ^ASTNode, file_path: string) -> map[
     if err != nil {
         return {}
     }
+    defer delete(content)  // Add memory cleanup
     content_str := string(content)
     
     // Extract all lines
@@ -641,8 +620,8 @@ collect_suppressions_for_node :: proc(node: ^ASTNode, file_path: string) -> map[
         if i < len(lines) {
             line_content := lines[i]
             
-            // Look for suppression pattern using fuzzy matching
-            if fuzzy_match(line_content, "//odin-lint:ignore") {
+            // Look for suppression pattern
+            if is_suppression_comment(line_content) {
                 // Extract the rule ID using simple approach
                 // Look for "C001" after the ignore pattern
                 if strings.contains(line_content, "C001") {
@@ -656,18 +635,11 @@ collect_suppressions_for_node :: proc(node: ^ASTNode, file_path: string) -> map[
 }
 
 // collect_suppressions collects suppression comments from a block
-collect_suppressions :: proc(block: ^ASTNode, file_path: string) -> map[int]string {
+collect_suppressions :: proc(block: ^ASTNode, file_lines: []string) -> map[int]string {
     suppressions := make(map[int]string)
     
-    // Read source file to get actual text
-    content, err := os.read_entire_file_from_path(file_path, context.allocator)
-    if err != nil {
-        return suppressions
-    }
-    content_str := string(content)
-    
-    // Extract all lines
-    lines := strings.split(content_str, "\n")
+    // Use cached file_lines instead of reading file again
+    lines := file_lines
     
     // Look for suppression comments in the block's line range
     // Check a reasonable range around the block to catch nearby comments
@@ -684,8 +656,8 @@ collect_suppressions :: proc(block: ^ASTNode, file_path: string) -> map[int]stri
             // Debug: Print each line we check
             // fmt.printf("DEBUG: Checking line %d: '%s'\n", i + 1, line_content)
             
-            // Look for suppression pattern using fuzzy matching
-            if fuzzy_match(line_content, "//odin-lint:ignore") {
+            // Look for suppression pattern
+            if is_suppression_comment(line_content) {
                 // Debug: Print when we find a match
                 // fmt.printf("DEBUG: Found suppression pattern on line %d\n", i + 1)
                 
