@@ -1,8 +1,8 @@
 === C001 Rule Test Summary ===
-Generated: Thu Apr  2 11:01:59 CEST 2026
+Generated: Thu Apr  2 11:03:57 CEST 2026
 Test directory: ./test/c001
 
-./test/c001/test_c001.odin - 4 violations
+./test/c001/test_c001.odin - 3 violations
 
 === DETAILED OUTPUT FOR test_c001.odin ===
 Starting odin-lint
@@ -66,7 +66,6 @@ DEBUG: Block child at line 7: type 'assignment_statement'
 DEBUG: Block child at line 9: type 'comment'
 DEBUG: Block child at line 10: type 'assignment_statement'
 DEBUG: Block child at line 11: type 'defer_statement'
-DEBUG: Found defer free for variable: 'buffer' at line 11
 DEBUG: Block child at line 13: type 'member_expression'
 DEBUG: Block child at line 14: type '}'
 DEBUG: Processing node type: '{' at line 5
@@ -121,324 +120,10 @@ DEBUG: Processing node type: ')' at line 13
 DEBUG: Processing node type: '}' at line 14
 🔴 ./test/c001/test_c001.odin:7:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add defer free() immediately after allocation
-🔴 ./test/c001/test_c001.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
 Checking stub rule for: ./test/c001/test_c001.odin
 Cleaning up tree-sitter
 
-./test/c001/c001_allocation_methods_test.odin - 3 violations
-
-=== DETAILED OUTPUT FOR c001_allocation_methods_test.odin ===
-Starting odin-lint
-Processing file: ./test/c001/c001_allocation_methods_test.odin
-=== DEBUG: Initializing tree-sitter ===
-DEBUG: Creating parser...
-✅ DEBUG: Parser created successfully
-DEBUG: Loading Odin language grammar...
-✅ DEBUG: Odin language loaded successfully
-DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
-DEBUG: Setting parser language...
-✅ DEBUG: Parser language set successfully
-=== DEBUG: Tree-sitter initialization complete ===
-Parsing file: ./test/c001/c001_allocation_methods_test.odin
-=== DEBUG: Parsing source code ===
-DEBUG: Source length: 1424
-DEBUG: Source content: package main
-
-import "core"
-import "core:fmt"
-
-main :: proc() {
-    // 1. Built-in allocation functions (should be flagged)
-    data1 := make([]int, 10)          // ❌ Should be flagged
-    data2 := make([dynamic]int)       // ❌ Should be flagged
-    data3 := make(map[string]int)      // ❌ Should be flagged
-    data4 := make(chan int)           // ❌ Should be flagged
-    data5 := new(Data)                // ❌ Should be flagged
-    
-    // 2. Slice literals (need to check if these allocate)
-    slice1 := []int{1, 2, 3}          // ❓ Does this allocate?
-    
-    // 3. Dynamic arrays (need to check)
-    dyn_array := [dynamic]int{1, 2, 3} // ❓ Does this allocate?
-    
-    // 4. Array literals (stack allocated - should NOT be flagged)
-    array1 := [...]int{1, 2, 3}        // ✅ Should NOT be flagged (stack)
-    
-    // 5. String conversions (need to check)
-    str1 := string([]byte{65, 66, 67}) // ❓ Does this allocate?
-    bytes1 := []byte("hello")         // ❓ Does this allocate?
-    
-    // 6. Type conversions (need to check)
-    conv1 := []int(array1)            // ❓ Does this allocate?
-    
-    // 7. Context allocator (should NOT be flagged - custom allocator)
-    // ctx := context.new()            // Would need context import
-    // buf := ctx.allocator.allocate(1024) // Custom allocator
-    
-    fmt.println("Allocation methods test completed")
-}
-
-Data :: struct {
-    value: int
-}
-DEBUG: Converting string to C string...
-DEBUG: Calling ts_parser_parse_string...
-✅ DEBUG: Parsing successful, tree created
-DEBUG: Checking tree language...
-✅ DEBUG: Tree language is valid
-=== DEBUG: Getting root node ===
-DEBUG: Tree is valid, calling ts_tree_root_node...
-✅ DEBUG: Root node obtained successfully
-DEBUG: Processing node type: 'source_file' at line 1
-DEBUG: Processing node type: 'package_declaration' at line 1
-DEBUG: Processing node type: 'package' at line 1
-DEBUG: Processing node type: 'identifier' at line 1
-DEBUG: Processing node type: 'import_declaration' at line 3
-DEBUG: Processing node type: 'import' at line 3
-DEBUG: Processing node type: 'string' at line 3
-DEBUG: Processing node type: '"' at line 3
-DEBUG: Processing node type: 'string_content' at line 3
-DEBUG: Processing node type: '"' at line 3
-DEBUG: Processing node type: 'import_declaration' at line 4
-DEBUG: Processing node type: 'import' at line 4
-DEBUG: Processing node type: 'string' at line 4
-DEBUG: Processing node type: '"' at line 4
-DEBUG: Processing node type: 'string_content' at line 4
-DEBUG: Processing node type: '"' at line 4
-DEBUG: Processing node type: 'procedure_declaration' at line 6
-DEBUG: Processing node type: 'identifier' at line 6
-DEBUG: Processing node type: '::' at line 6
-DEBUG: Processing node type: 'procedure' at line 6
-DEBUG: Processing node type: 'proc' at line 6
-DEBUG: Processing node type: 'parameters' at line 6
-DEBUG: Processing node type: '(' at line 6
-DEBUG: Processing node type: ')' at line 6
-DEBUG: Processing node type: 'ERROR' at line 6
-DEBUG: Processing node type: '{' at line 6
-DEBUG: Processing node type: 'comment' at line 7
-DEBUG: Processing node type: 'assignment_statement' at line 8
-DEBUG: Processing node type: 'identifier' at line 8
-DEBUG: Processing node type: ':=' at line 8
-DEBUG: Processing node type: 'call_expression' at line 8
-DEBUG: Processing node type: 'identifier' at line 8
-DEBUG: Processing node type: '(' at line 8
-DEBUG: Processing node type: 'array_type' at line 8
-DEBUG: Processing node type: '[' at line 8
-DEBUG: Processing node type: ']' at line 8
-DEBUG: Processing node type: 'type' at line 8
-DEBUG: Processing node type: 'identifier' at line 8
-DEBUG: Processing node type: ',' at line 8
-DEBUG: Processing node type: 'number' at line 8
-DEBUG: Processing node type: ')' at line 8
-DEBUG: Processing node type: 'comment' at line 8
-DEBUG: Processing node type: 'assignment_statement' at line 9
-DEBUG: Processing node type: 'identifier' at line 9
-DEBUG: Processing node type: ':=' at line 9
-DEBUG: Processing node type: 'call_expression' at line 9
-DEBUG: Processing node type: 'identifier' at line 9
-DEBUG: Processing node type: '(' at line 9
-DEBUG: Processing node type: 'array_type' at line 9
-DEBUG: Processing node type: '[' at line 9
-DEBUG: Processing node type: 'dynamic' at line 9
-DEBUG: Processing node type: ']' at line 9
-DEBUG: Processing node type: 'type' at line 9
-DEBUG: Processing node type: 'identifier' at line 9
-DEBUG: Processing node type: ')' at line 9
-DEBUG: Processing node type: 'comment' at line 9
-DEBUG: Processing node type: 'assignment_statement' at line 10
-DEBUG: Processing node type: 'identifier' at line 10
-DEBUG: Processing node type: ':=' at line 10
-DEBUG: Processing node type: 'call_expression' at line 10
-DEBUG: Processing node type: 'identifier' at line 10
-DEBUG: Processing node type: '(' at line 10
-DEBUG: Processing node type: 'map_type' at line 10
-DEBUG: Processing node type: 'map' at line 10
-DEBUG: Processing node type: '[' at line 10
-DEBUG: Processing node type: 'type' at line 10
-DEBUG: Processing node type: 'identifier' at line 10
-DEBUG: Processing node type: ']' at line 10
-DEBUG: Processing node type: 'type' at line 10
-DEBUG: Processing node type: 'identifier' at line 10
-DEBUG: Processing node type: ')' at line 10
-DEBUG: Processing node type: 'comment' at line 10
-DEBUG: Processing node type: 'assignment_statement' at line 11
-DEBUG: Processing node type: 'identifier' at line 11
-DEBUG: Processing node type: ':=' at line 11
-DEBUG: Processing node type: 'struct' at line 11
-DEBUG: Processing node type: 'identifier' at line 11
-DEBUG: Processing node type: '(' at line 11
-DEBUG: Processing node type: 'identifier' at line 11
-DEBUG: Processing node type: 'ERROR' at line 11
-DEBUG: Processing node type: 'identifier' at line 11
-DEBUG: Processing node type: ')' at line 11
-DEBUG: Processing node type: 'comment' at line 11
-DEBUG: Processing node type: 'identifier' at line 12
-DEBUG: Processing node type: ':=' at line 12
-DEBUG: Processing node type: 'identifier' at line 12
-DEBUG: Processing node type: '(' at line 12
-DEBUG: Processing node type: 'identifier' at line 12
-DEBUG: Processing node type: ')' at line 12
-DEBUG: Processing node type: 'comment' at line 12
-DEBUG: Processing node type: 'comment' at line 14
-DEBUG: Processing node type: 'ERROR' at line 15
-DEBUG: Processing node type: 'identifier' at line 15
-DEBUG: Processing node type: ':=' at line 15
-DEBUG: Processing node type: '[' at line 15
-DEBUG: Processing node type: ']' at line 15
-DEBUG: Processing node type: 'identifier' at line 15
-DEBUG: Processing node type: '{' at line 15
-DEBUG: Processing node type: 'struct_field' at line 15
-DEBUG: Processing node type: 'number' at line 15
-DEBUG: Processing node type: ',' at line 15
-DEBUG: Processing node type: 'struct_field' at line 15
-DEBUG: Processing node type: 'number' at line 15
-DEBUG: Processing node type: ',' at line 15
-DEBUG: Processing node type: 'struct_field' at line 15
-DEBUG: Processing node type: 'number' at line 15
-DEBUG: Processing node type: '}' at line 15
-DEBUG: Processing node type: 'comment' at line 15
-DEBUG: Processing node type: 'comment' at line 17
-DEBUG: Processing node type: 'assignment_statement' at line 18
-DEBUG: Processing node type: 'identifier' at line 18
-DEBUG: Processing node type: ':=' at line 18
-DEBUG: Processing node type: 'struct' at line 18
-DEBUG: Processing node type: '[' at line 18
-DEBUG: Processing node type: 'dynamic' at line 18
-DEBUG: Processing node type: ']' at line 18
-DEBUG: Processing node type: 'type' at line 18
-DEBUG: Processing node type: 'identifier' at line 18
-DEBUG: Processing node type: '{' at line 18
-DEBUG: Processing node type: 'struct_field' at line 18
-DEBUG: Processing node type: 'number' at line 18
-DEBUG: Processing node type: ',' at line 18
-DEBUG: Processing node type: 'struct_field' at line 18
-DEBUG: Processing node type: 'number' at line 18
-DEBUG: Processing node type: ',' at line 18
-DEBUG: Processing node type: 'struct_field' at line 18
-DEBUG: Processing node type: 'number' at line 18
-DEBUG: Processing node type: '}' at line 18
-DEBUG: Processing node type: 'comment' at line 18
-DEBUG: Processing node type: 'comment' at line 20
-DEBUG: Processing node type: 'assignment_statement' at line 21
-DEBUG: Processing node type: 'identifier' at line 21
-DEBUG: Processing node type: ':=' at line 21
-DEBUG: Processing node type: 'struct' at line 21
-DEBUG: Processing node type: '[' at line 21
-DEBUG: Processing node type: 'variadic_expression' at line 21
-DEBUG: Processing node type: '..' at line 21
-DEBUG: Processing node type: 'member_expression' at line 21
-DEBUG: Processing node type: '.' at line 21
-DEBUG: Processing node type: 'identifier' at line 21
-DEBUG: Processing node type: ']' at line 21
-DEBUG: Processing node type: 'type' at line 21
-DEBUG: Processing node type: 'identifier' at line 21
-DEBUG: Processing node type: '{' at line 21
-DEBUG: Processing node type: 'struct_field' at line 21
-DEBUG: Processing node type: 'number' at line 21
-DEBUG: Processing node type: ',' at line 21
-DEBUG: Processing node type: 'struct_field' at line 21
-DEBUG: Processing node type: 'number' at line 21
-DEBUG: Processing node type: ',' at line 21
-DEBUG: Processing node type: 'struct_field' at line 21
-DEBUG: Processing node type: 'number' at line 21
-DEBUG: Processing node type: '}' at line 21
-DEBUG: Processing node type: 'comment' at line 21
-DEBUG: Processing node type: 'comment' at line 23
-DEBUG: Processing node type: 'assignment_statement' at line 24
-DEBUG: Processing node type: 'identifier' at line 24
-DEBUG: Processing node type: ':=' at line 24
-DEBUG: Processing node type: 'call_expression' at line 24
-DEBUG: Processing node type: 'identifier' at line 24
-DEBUG: Processing node type: '(' at line 24
-DEBUG: Processing node type: 'struct' at line 24
-DEBUG: Processing node type: '[' at line 24
-DEBUG: Processing node type: ']' at line 24
-DEBUG: Processing node type: 'type' at line 24
-DEBUG: Processing node type: 'identifier' at line 24
-DEBUG: Processing node type: '{' at line 24
-DEBUG: Processing node type: 'struct_field' at line 24
-DEBUG: Processing node type: 'number' at line 24
-DEBUG: Processing node type: ',' at line 24
-DEBUG: Processing node type: 'struct_field' at line 24
-DEBUG: Processing node type: 'number' at line 24
-DEBUG: Processing node type: ',' at line 24
-DEBUG: Processing node type: 'struct_field' at line 24
-DEBUG: Processing node type: 'number' at line 24
-DEBUG: Processing node type: '}' at line 24
-DEBUG: Processing node type: ')' at line 24
-DEBUG: Processing node type: 'comment' at line 24
-DEBUG: Processing node type: 'identifier' at line 25
-DEBUG: Processing node type: ':=' at line 25
-DEBUG: Processing node type: '[' at line 25
-DEBUG: Processing node type: ']' at line 25
-DEBUG: Processing node type: 'ERROR' at line 25
-DEBUG: Processing node type: 'type' at line 25
-DEBUG: Processing node type: 'polymorphic_type' at line 25
-DEBUG: Processing node type: 'type' at line 25
-DEBUG: Processing node type: 'identifier' at line 25
-DEBUG: Processing node type: '(' at line 25
-DEBUG: Processing node type: 'string' at line 25
-DEBUG: Processing node type: '"' at line 25
-DEBUG: Processing node type: 'string_content' at line 25
-DEBUG: Processing node type: '"' at line 25
-DEBUG: Processing node type: ')' at line 25
-DEBUG: Processing node type: 'comment' at line 25
-DEBUG: Processing node type: 'comment' at line 27
-DEBUG: Processing node type: 'identifier' at line 28
-DEBUG: Processing node type: ':=' at line 28
-DEBUG: Processing node type: 'type' at line 28
-DEBUG: Processing node type: 'polymorphic_type' at line 28
-DEBUG: Processing node type: 'type' at line 28
-DEBUG: Processing node type: 'array_type' at line 28
-DEBUG: Processing node type: '[' at line 28
-DEBUG: Processing node type: ']' at line 28
-DEBUG: Processing node type: 'type' at line 28
-DEBUG: Processing node type: 'identifier' at line 28
-DEBUG: Processing node type: '(' at line 28
-DEBUG: Processing node type: 'type' at line 28
-DEBUG: Processing node type: 'identifier' at line 28
-DEBUG: Processing node type: ')' at line 28
-DEBUG: Processing node type: 'comment' at line 28
-DEBUG: Processing node type: 'comment' at line 30
-DEBUG: Processing node type: 'comment' at line 31
-DEBUG: Processing node type: 'comment' at line 32
-DEBUG: Processing node type: 'ERROR' at line 34
-DEBUG: Processing node type: 'type' at line 34
-DEBUG: Processing node type: 'polymorphic_type' at line 34
-DEBUG: Processing node type: 'type' at line 34
-DEBUG: Processing node type: 'field_type' at line 34
-DEBUG: Processing node type: 'identifier' at line 34
-DEBUG: Processing node type: '.' at line 34
-DEBUG: Processing node type: 'identifier' at line 34
-DEBUG: Processing node type: '(' at line 34
-DEBUG: Processing node type: 'string' at line 34
-DEBUG: Processing node type: '"' at line 34
-DEBUG: Processing node type: 'string_content' at line 34
-DEBUG: Processing node type: '"' at line 34
-DEBUG: Processing node type: ')' at line 34
-DEBUG: Processing node type: '}' at line 35
-DEBUG: Processing node type: 'identifier' at line 37
-DEBUG: Processing node type: '::' at line 37
-DEBUG: Processing node type: 'type' at line 37
-DEBUG: Processing node type: 'struct_type' at line 37
-DEBUG: Processing node type: 'struct' at line 37
-DEBUG: Processing node type: '{' at line 37
-DEBUG: Processing node type: 'struct_member' at line 38
-DEBUG: Processing node type: 'identifier' at line 38
-DEBUG: Processing node type: ':' at line 38
-DEBUG: Processing node type: 'type' at line 38
-DEBUG: Processing node type: 'identifier' at line 38
-DEBUG: Processing node type: '}' at line 39
-🔴 ./test/c001/c001_allocation_methods_test.odin:8:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
-🔴 ./test/c001/c001_allocation_methods_test.odin:9:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
-🔴 ./test/c001/c001_allocation_methods_test.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
-Checking stub rule for: ./test/c001/c001_allocation_methods_test.odin
-Cleaning up tree-sitter
-
+./test/c001/c001_allocation_methods_test.odin - No violations
 ./test/c001/c001_perf_test.odin - 2 violations
 
 === DETAILED OUTPUT FOR c001_perf_test.odin ===
@@ -563,7 +248,7 @@ Fix: Add defer free() immediately after allocation // Intentional? Performance m
 Checking stub rule for: ./test/c001/c001_perf_test.odin
 Cleaning up tree-sitter
 
-./test/c001/test_c001_complex.odin - 5 violations
+./test/c001/test_c001_complex.odin - 3 violations
 
 === DETAILED OUTPUT FOR test_c001_complex.odin ===
 Starting odin-lint
@@ -742,11 +427,7 @@ DEBUG: Processing node type: ')' at line 24
 DEBUG: Processing node type: '}' at line 25
 🔴 ./test/c001/test_c001_complex.odin:7:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add defer free() immediately after allocation
-🔴 ./test/c001/test_c001_complex.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
 🔴 ./test/c001/test_c001_complex.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
-🔴 ./test/c001/test_c001_complex.odin:17:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add defer free() immediately after allocation
 🔴 ./test/c001/test_c001_complex.odin:21:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add defer free() immediately after allocation
@@ -1008,7 +689,6 @@ DEBUG: Block child at line 11: type 'comment'
 DEBUG: Block child at line 13: type 'comment'
 DEBUG: Block child at line 14: type 'assignment_statement'
 DEBUG: Block child at line 15: type 'defer_statement'
-DEBUG: Found defer free for variable: 'color_map' at line 15
 DEBUG: Block child at line 17: type 'comment'
 DEBUG: Block child at line 18: type 'comment'
 DEBUG: Block child at line 19: type 'comment'
@@ -1084,9 +764,9 @@ DEBUG: Processing node type: '::' at line 28
 DEBUG: Processing node type: 'struct' at line 28
 DEBUG: Processing node type: '{' at line 28
 DEBUG: Processing node type: '}' at line 28
-🔴 ./test/c001/c001_improvements_test.odin:22:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
 🔴 ./test/c001/c001_improvements_test.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add defer free() immediately after allocation
+🔴 ./test/c001/c001_improvements_test.odin:22:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add defer free() immediately after allocation
 Checking stub rule for: ./test/c001/c001_improvements_test.odin
 Cleaning up tree-sitter
@@ -2004,7 +1684,6 @@ DEBUG: Block child at line 7: type 'member_expression'
 DEBUG: Block child at line 9: type 'comment'
 DEBUG: Block child at line 10: type 'assignment_statement'
 DEBUG: Block child at line 11: type 'defer_statement'
-DEBUG: Found defer free for variable: 'color_map' at line 11
 DEBUG: Block child at line 13: type 'comment'
 DEBUG: Block child at line 14: type 'assignment_statement'
 DEBUG: Block child at line 15: type 'comment'
@@ -2072,9 +1751,9 @@ DEBUG: Processing node type: '::' at line 20
 DEBUG: Processing node type: 'struct' at line 20
 DEBUG: Processing node type: '{' at line 20
 DEBUG: Processing node type: '}' at line 20
-🔴 ./test/c001/c001_clean_test.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add defer free() immediately after allocation
 🔴 ./test/c001/c001_clean_test.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add defer free() immediately after allocation
+🔴 ./test/c001/c001_clean_test.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add defer free() immediately after allocation
 Checking stub rule for: ./test/c001/c001_clean_test.odin
 Cleaning up tree-sitter
@@ -2806,10 +2485,10 @@ Cleaning up tree-sitter
 
 === SUMMARY ===
 Total test files: 15
-Files with violations: 15
-Files without violations: 0
+Files with violations: 14
+Files without violations: 1
 Internal errors: 0
-Total C001 violations found: 55
+Total C001 violations found: 49
 
 ✅ TESTING COMPLETE
 The C001 rule is working and finding potential memory issues
