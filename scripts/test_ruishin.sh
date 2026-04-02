@@ -42,9 +42,9 @@ while IFS= read -r file; do
     # Run linter
     output=$($LINT_BINARY "$file" 2>&1)
     
-    # Count violations
-    violation_count=$(echo "$output" | grep -c "C001" || true)
-    error_count=$(echo "$output" | grep -c "INTERNAL ERROR" || true)
+    # Count violations - only count actual violation lines (start with 🔴)
+    violation_count=$(echo "$output" | grep -c "^🔴.*C001" 2>/dev/null || echo "0")
+    error_count=$(echo "$output" | grep -c "INTERNAL ERROR" 2>/dev/null || echo "0")
     
     # Ensure numeric values
     violation_count=${violation_count:-0}
