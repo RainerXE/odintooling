@@ -1,36 +1,8 @@
 # Simple RuiShin Library Test Report
 
-**Generated**: Thu Apr  2 09:46:04 CEST 2026
+**Generated**: Thu Apr  2 11:33:06 CEST 2026
 **Linter**: odin-lint
 **RuiShin Directory**: /Users/rainer/Development/MyODIN/RuiShin/src
-
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/string_utils.odin
-
-```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/string_utils.odin:82:5: C001 [correctness] Allocation without matching defer free in same scope
-```
-
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/registry.odin
-
-```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/registry.odin:116:2: C001 [correctness] Allocation without matching defer free in same scope
-```
-
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/resolver.odin
-
-```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/resolver.odin:84:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/resolver.odin:167:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/resolver.odin:168:2: C001 [correctness] Allocation without matching defer free in same scope
-```
-
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/parser.odin
-
-```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/parser.odin:520:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/parser.odin:578:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/parser.odin:627:6: C001 [correctness] Allocation without matching defer free in same scope
-```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin
 
@@ -43,20 +15,11 @@
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:329:4: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:348:4: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:351:5: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:525:2: C001 [correctness] Allocation without matching defer free in same scope
-```
-
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/validator.odin
-
-```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/validator.odin:208:2: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/main.odin
 
 ```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/main.odin:332:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/main.odin:348:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/main.odin:718:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/main.odin:738:3: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/main.odin:793:3: C001 [correctness] Allocation without matching defer free in same scope
@@ -76,6 +39,14 @@
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/error_handling.odin:44:2: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
+### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin
+
+```
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:87:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:90:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:91:2: C001 [correctness] Allocation without matching defer free in same scope
+```
+
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin
 
 ```
@@ -85,35 +56,32 @@
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin:261:4: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_to_rsd.odin
+### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin
 
 ```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_to_rsd.odin:225:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_to_rsd.odin:273:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_to_rsd.odin:290:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_to_rsd.odin:1488:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin:102:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin:319:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin:556:2: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/animation.odin
 
 ```
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/animation.odin:105:5: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/animation.odin:269:5: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/animation.odin:295:5: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/animation.odin:428:5: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/animation.odin:442:5: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin
 
 ```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:3920:2: C001 [correctness] Allocation without matching defer free in same scope
-```
-
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_path.odin
-
-```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_path.odin:1022:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:1286:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:1348:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:4256:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:5840:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:5851:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:5887:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:6019:2: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/gpu_asset_manager.odin
@@ -122,10 +90,12 @@
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/gpu_asset_manager.odin:98:2: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_to_svg.odin
+### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin
 
 ```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_to_svg.odin:694:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin:124:3: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin:327:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin:382:4: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_render.odin
@@ -139,7 +109,10 @@
 ```
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:870:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1050:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1306:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1310:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1324:3: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1325:3: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1408:2: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
@@ -150,13 +123,14 @@
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:373:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:503:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:1375:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:1405:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:1550:2: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin
 
 ```
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:99:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:100:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:109:3: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:167:3: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
@@ -168,7 +142,6 @@
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:120:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:121:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:122:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:93:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:331:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:343:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:344:2: C001 [correctness] Allocation without matching defer free in same scope
@@ -178,13 +151,7 @@
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/itemize.odin
 
 ```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/itemize.odin:104:2: C001 [correctness] Allocation without matching defer free in same scope
-```
-
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/rich.odin
-
-```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/rich.odin:48:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/itemize.odin:20:3: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin
@@ -192,23 +159,19 @@
 ```
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:106:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:112:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:103:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:198:5: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:324:8: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:330:8: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:395:2: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:396:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:596:5: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin
 
 ```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:69:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:134:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:252:2: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:43:11: C001 [correctness] Allocation without matching defer free in same scope
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:45:11: C001 [correctness] Allocation without matching defer free in same scope
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:299:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:327:2: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
 ### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/assets/manager.odin
@@ -223,38 +186,25 @@
 🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/colors.odin:84:2: C001 [correctness] Allocation without matching defer free in same scope
 ```
 
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/engine/app.odin
-
-```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/engine/app.odin:82:2: C001 [correctness] Allocation without matching defer free in same scope
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/engine/app.odin:88:2: C001 [correctness] Allocation without matching defer free in same scope
-```
-
-### 🔴 Violations in: /Users/rainer/Development/MyODIN/RuiShin/src/engine/transformer.odin
-
-```
-🔴 /Users/rainer/Development/MyODIN/RuiShin/src/engine/transformer.odin:23:2: C001 [correctness] Allocation without matching defer free in same scope
-```
-
 
 ## 📊 Test Summary
 
 | Metric | Count |
 |--------|-------|
 | **Files Tested** | 100 |
-| **Total Violations** | 87 |
+| **Total Violations** | 77 |
 | **Internal Errors** | 0 |
-| **Clean Files** | 71 |
+| **Clean Files** | 79 |
 
-| **Violation Rate** | 87.00% |
-| **Clean Rate** | 71.00% |
+| **Violation Rate** | 77.00% |
+| **Clean Rate** | 79.00% |
 
 ## 🎯 Analysis
 
 ### 🔴 Violations Found
 
-The linter found 87 violations across 100 files.
-This represents a 87.00% violation rate.
+The linter found 77 violations across 100 files.
+This represents a 77.00% violation rate.
 
 ---
 Report generated by odin-lint RuiShin test
