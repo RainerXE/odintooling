@@ -1,4 +1,5 @@
 // Test case for C002: proper single free
+package main
 
 main :: proc() {
     data := make([]int, 100)

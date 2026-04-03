@@ -1,4 +1,5 @@
 // Test case for C001: proper allocation with defer free
+package main
 
 main :: proc() {
     // This should pass C001
