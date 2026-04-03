@@ -21,15 +21,19 @@
 - [x] Review clippy repository and document findings (COMPLETED)
 - [x] Create `plans/clippy-lessons.md` with key takeaways (COMPLETED)
 - [x] Update `odin-lint.toml` with Clippy-inspired configuration (COMPLETED)
-- [ ] Implement rule categorization system
-- [ ] Add inline suppression comments support
+- [x] Implement rule categorization system (COMPLETED - RuleCategory enum with 6 categories)
+- [x] Add inline suppression comments support (COMPLETED - Centralized suppression system)
 - [ ] Create rule documentation template
 
 **Sub-Gate 3.1**: Clippy best practices integrated
 - [x] Analysis completed and documented
 - [x] Configuration file enhanced
-- [ ] Rule categorization implemented
-- [ ] Inline suppression working
+- [x] Rule categorization implemented (✅ COMPLETED)
+- [x] Rule file naming convention improved (✅ COMPLETED)
+- [x] Test system reorganized with descriptive naming (✅ COMPLETED)
+- [x] Fixture tests consolidated into Cnnn folders (✅ COMPLETED)
+- [x] C001 defer delete issue resolved and verified (✅ COMPLETED)
+- [x] Inline suppression working (✅ COMPLETED - Centralized suppression system)
 - [ ] Documentation template created
 
 ---
