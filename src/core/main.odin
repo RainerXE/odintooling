@@ -224,14 +224,15 @@ main :: proc() {
     registry := initRuleRegistry()
     
     // Register rules with Clippy-inspired categorization
-    registerRule(&registry, C001Rule())  // CORRECTNESS category
-    registerRule(&registry, C002Rule())  // CORRECTNESS category
-    registerRule(&registry, C003Rule())  // STYLE category
-    registerRule(&registry, C004Rule())  // STYLE category
-    registerRule(&registry, C005Rule())  // STYLE category
-    registerRule(&registry, C006Rule())  // STYLE category
-    registerRule(&registry, C007Rule())  // STYLE category
-    registerRule(&registry, C008Rule())  // STYLE category
+    // Rule files now use descriptive naming: Cnnn-CAT-Description.odin
+    registerRule(&registry, C001Rule())  // CORRECTNESS category (c001-COR-Memory.odin)
+    registerRule(&registry, C002Rule())  // CORRECTNESS category (c002-COR-Pointer.odin)
+    registerRule(&registry, C003Rule())  // STYLE category (c003-STY-Naming.odin)
+    registerRule(&registry, C004Rule())  // STYLE category (c004-STY-Private.odin)
+    registerRule(&registry, C005Rule())  // STYLE category (c005-STY-Internal.odin)
+    registerRule(&registry, C006Rule())  // STYLE category (c006-STY-Public.odin)
+    registerRule(&registry, C007Rule())  // STYLE category (c007-STY-Types.odin)
+    registerRule(&registry, C008Rule())  // STYLE category (c008-STY-Acronyms.odin)
     
     // Apply all rules
     diagnostics_found := false
