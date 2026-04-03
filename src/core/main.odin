@@ -15,6 +15,16 @@ DiagnosticType :: enum {
     INFO,           // Informational message
 }
 
+// RuleCategory represents the category of a linting rule (Clippy-inspired)
+RuleCategory :: enum {
+    CORRECTNESS,   // Bug prevention and memory safety
+    STYLE,         // Code style and idiomatic Odin
+    COMPLEXITY,    // Code complexity metrics
+    PERFORMANCE,   // Performance-related issues
+    PEDANTIC,      // Strict/nitpicky checks
+    SUSPICIOUS,    // Potentially problematic patterns
+}
+
 // Diagnostic represents a linting diagnostic
 Diagnostic :: struct {
     file:    string,
@@ -32,6 +42,7 @@ Diagnostic :: struct {
 Rule :: struct {
     id: string,
     tier: string,
+    category: RuleCategory,  // Clippy-inspired categorization
     matcher: proc(file_path: string, node: ^ASTNode) -> Diagnostic,
     message: proc() -> string,
     fix_hint: proc() -> string,
@@ -212,9 +223,15 @@ main :: proc() {
     // Initialize rule registry
     registry := initRuleRegistry()
     
-    // Register rules
-    registerRule(&registry, C001Rule())
-    registerRule(&registry, C002Rule())
+    // Register rules with Clippy-inspired categorization
+    registerRule(&registry, C001Rule())  // CORRECTNESS category
+    registerRule(&registry, C002Rule())  // CORRECTNESS category
+    registerRule(&registry, C003Rule())  // STYLE category
+    registerRule(&registry, C004Rule())  // STYLE category
+    registerRule(&registry, C005Rule())  // STYLE category
+    registerRule(&registry, C006Rule())  // STYLE category
+    registerRule(&registry, C007Rule())  // STYLE category
+    registerRule(&registry, C008Rule())  // STYLE category
     
     // Apply all rules
     diagnostics_found := false
