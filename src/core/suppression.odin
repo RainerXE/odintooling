@@ -1,6 +1,7 @@
 package core
 
 import "core:fmt"
+import "core:os"
 import "core:strings"
 
 // =============================================================================
@@ -113,6 +114,7 @@ extract_suppressed_rules :: proc(line: string) -> []string {
 // suppression comment found within the given line range.
 // Returns a map where each key is a 1-indexed line number and the value is
 // a slice of rule IDs suppressed on that line.
+// Can optionally use custom prefixes from configuration.
 collect_suppressions :: proc(
     start_line: int,
     end_line: int,

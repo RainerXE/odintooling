@@ -1,0 +1,390 @@
+=== Analysis for: ./vendor/ols/src/main.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/types.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/inlay_hints.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/log.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/workspace_symbols.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/symbol.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/diagnostics.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/document_links.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/clone.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/plugin.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/memory_index.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/action_invert_if_statements.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/workspace.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/file_resolve.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/snippets.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/references.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/position_context.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/action.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/type_definition.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/marshal.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/document_symbols.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/rename.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/response.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/imports.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/indexer.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/builtins.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/when.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/format.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/analysis.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/generics.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/ast.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/completion.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/signature.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/definition.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/build.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/documentation.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/lens.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/hover.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/action_populate_switch_cases.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/reader.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/check.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/methods.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/unmarshal.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/locals.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/semantic_tokens.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/collector.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/caches.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/documents.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/requests.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/server/writer.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/common/types.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/common/util_windows.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/common/config.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/testing/testing.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/common/position.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/common/uri.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/common/util_linux.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/common/util.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/common/fuzzy.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/odin/printer/printer.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/odin/format/format.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/session/capture.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/odin/printer/document.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/session/replay.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+
+=== Analysis for: ./vendor/ols/src/odin/printer/visit.odin ===
+Violations: 0
+Errors: 0
+
+--------------------------------------------------
+

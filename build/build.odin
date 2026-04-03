@@ -2,6 +2,7 @@ package build
 
 import "core:fmt"
 import "core:os"
+import "core:strings"
 import "core:c/libc"
 
 // Directory constants (relative to project root)
@@ -25,7 +26,7 @@ main :: proc() {
     fmt.println("🔨 Executing:", build_cmd)
     
     // Execute the build
-    exit_code := libc.system(strings.clone_to_cstring(build_cmd))
+    exit_code := libc.system(strings.to_cstring(build_cmd))
     
     if exit_code == 0 {
         fmt.println("✅ Build successful!")
@@ -42,5 +43,5 @@ main :: proc() {
         fmt.println("   odin run build -define:NO_TREE_SITTER=true")
     }
     
-    os.exit(exit_code)
+    os.exit(int(exit_code))
 }
