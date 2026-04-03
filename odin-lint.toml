@@ -1,9 +1,17 @@
 # odin-lint configuration file
+# Clippy-inspired configuration with enhanced flexibility
 # This file controls which rules run on which paths
 
 [rules]
-# Global rule configuration
-C001.severity = "error"  # Can be: error, warn, info, off
+# Global rule configuration with categories (Clippy-inspired)
+C001 = { level = "error", category = "correctness" }
+C002 = { level = "error", category = "correctness" }
+C003 = { level = "warn", category = "style" }
+C004 = { level = "warn", category = "style" }
+C005 = { level = "warn", category = "style" }
+C006 = { level = "warn", category = "style" }
+C007 = { level = "warn", category = "style" }
+C008 = { level = "warn", category = "style" }
 
 [ignore]
 # Paths to completely exclude from linting
@@ -12,24 +20,46 @@ paths = [
     "vendor/**",      # Exclude vendor directories
     "core/**",        # Exclude core library (as discussed)
     "generated/**",   # Exclude generated code
-    "test/fixtures/**" # Exclude test fixtures
+    "test/fixtures/**", # Exclude test fixtures
+    "examples/**"     # Exclude example code
 ]
 
-# Per-rule path exclusions
+# Clippy-inspired: Per-file suppression comments
+[suppression]
+enable_inline_comments = true
+comment_prefix = "odin-lint: ignore="
+
+# Performance thresholds (Clippy-inspired)
+[performance]
+complexity_threshold = 15      # Cyclomatic complexity
+param_count_threshold = 5      # Max parameters
+nested_depth_threshold = 4     # Max nested blocks
+
+# CI/CD integration settings (Clippy-inspired)
+[ci]
+fail_on_warnings = true       # Fail build on warnings
+strict_mode = false           # Enable all rules
+report_format = "text"        # or "json", "sarif"
+
+# Rule-specific enhancements
 [rules.C001]
-# Additional paths to exclude specifically for C001
-exclude_paths = [
-    "examples/**",    # Example code might have intentional leaks
-    "benchmarks/**"   # Performance-critical code
-]
+exclude_paths = ["benchmarks/**", "performance/**"]
+config = {
+    alloc_functions = ["make", "new", "alloc"],
+    ignore_contexts = ["performance_critical", "test_code"],
+    # Clippy-inspired: Allow list for known safe patterns
+    safe_patterns = [
+        "context.allocator",
+        "temporary_allocator"
+    ]
+}
 
-# Rule-specific configuration
-[rules.C001.config]
-# Only check these specific allocation functions
-alloc_functions = ["make", "new"]  # Exact match only
-
-# Ignore allocations in these contexts
-ignore_contexts = [
-    "performance_critical",
-    "test_code"
-]
+[rules.C003]
+config = {
+    # Naming convention patterns
+    variable_pattern = "^[a-z][a-z0-9_]*$",
+    type_pattern = "^[A-Z][a-zA-Z0-9]*$",
+    procedure_pattern = "^[a-z][a-z0-9_]*$",
+    # Allow common acronyms
+    allowed_acronyms = ["HTTP", "URL", "JSON", "XML"]
+}
