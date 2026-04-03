@@ -1,0 +1,87 @@
+Starting odin-lint
+Processing file: tests/C002_COR_POINTER/c002_edge_case_conditional.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: tests/C002_COR_POINTER/c002_edge_case_conditional.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 1292
+DEBUG: Source content: // C002 Edge Case: Conditional free patterns
+// Tests defer free in conditional branches and complex control flow
+
+package main
+
+import "core:fmt"
+
+main :: proc() {
+    // Case 1: Conditional allocation with unconditional free
+    data := make([]int, 50)
+    
+    if true {
+        data = make([]int, 100)  // Conditional reassignment
+    }
+    
+    defer free(data)  // Should this trigger C002? Depends on path taken
+    
+    // Case 2: Different allocations in different branches
+    result := make([]int, 10)
+    
+    if true {
+        result = make([]int, 20)
+    } else {
+        result = make([]int, 30)
+    }
+    
+    defer free(result)  // Which allocation gets freed?
+    
+    // Case 3: Early return with defer
+    test_early_return()
+}
+
+proc test_early_return() {
+    ptr := make([]int, 15)
+    
+    if true {
+        defer free(ptr)
+        return
+    }
+    
+    // This code is unreachable, but shows the pattern
+    ptr = make([]int, 25)
+    defer free(ptr)  // Should this be flagged?
+}
+
+// Case 4: Complex boolean conditions
+proc test_complex_conditions() {
+    a := make([]int, 10)
+    b := make([]int, 20)
+    
+    target := a
+    if true && false || true {
+        target = b
+    }
+    
+    defer free(target)  // Complex control flow - hard to determine correct pointer
+}
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 tests/C002_COR_POINTER/c002_edge_case_conditional.odin:13:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 tests/C002_COR_POINTER/c002_edge_case_conditional.odin:22:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 tests/C002_COR_POINTER/c002_edge_case_conditional.odin:24:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: tests/C002_COR_POINTER/c002_edge_case_conditional.odin
+Cleaning up tree-sitter

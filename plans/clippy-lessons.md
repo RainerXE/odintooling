@@ -191,7 +191,8 @@ strict_mode = false       # Enable gradually
 
 ### Immediate (Milestone 3)
 - [x] Update configuration file (DONE)
-- [ ] Implement rule categorization
+- [x] Implement rule categorization (DONE)
+- [x] Improve rule file naming convention (DONE)
 - [ ] Create rule documentation template
 - [ ] Add inline suppression comments
 - [ ] Implement C002-C008 rules
