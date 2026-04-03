@@ -28,6 +28,12 @@ import "core:fmt"
 // c001_proper_defer.odin - Proper allocations with defer free (should pass)
 // c001_missing_defer.odin - Allocations missing defer free (should fail)
 
+// Fixture Tests (Traditional pass/fail validation)
+// -----------------------------------------------
+// c001_fixture_pass.odin - Should pass (0 violations)
+// c001_fixture_fail.odin - Should trigger C001 violation
+// c001_fixture_simple_fail.odin - Simple fail case from fixtures
+
 // Edge Cases and Special Patterns
 // -------------------------------
 // c001_edge_cases.odin - Edge cases and boundary conditions
@@ -62,6 +68,10 @@ import "core:fmt"
 // - Files with "proper" or "correct" in name should pass (0 violations)
 // - Files with "missing", "violation", or test-specific patterns should fail
 // - Suppression tests should show 0 violations when properly suppressed
+// - Fixture tests maintain traditional pass/fail expectations:
+//   * c001_fixture_pass.odin: 0 violations (pass)
+//   * c001_fixture_fail.odin: 1+ violations (fail)
+//   * c001_fixture_simple_fail.odin: 1+ violations (fail)
 
 main :: proc() {
     fmt.println("C001 Test Suite")
