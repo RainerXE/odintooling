@@ -1,5 +1,6 @@
 package core
 
+import "core:fmt"
 import "core:os"
 import "core:strings"
 
@@ -195,13 +196,17 @@ check_block :: proc(
     defer_frees := make(map[string]bool)
     for d in ctx.defers do defer_frees[d.freed_var] = true
 
-    suppressions := collect_suppressions(block, file_lines)
+    // Use centralized suppression system
+    suppressions := collect_suppressions(block.start_line, block.end_line, file_lines)
+    
+    // Debug: Print suppression summary
+    // summary := suppression_summary(suppressions)
+    // fmt.println("DEBUG C001 Suppressions:", summary)
 
     diags: [dynamic]Diagnostic
     for alloc in ctx.allocations {
         // Suppression: comment on the same line or the line immediately before.
-        if s, ok := suppressions[alloc.line];     ok && s == "C001" do continue
-        if s, ok := suppressions[alloc.line - 1]; ok && s == "C001" do continue
+        if is_suppressed("C001", alloc.line, suppressions) do continue
 
         if alloc.var_name in ctx.returns_var do continue
         if alloc.var_name in defer_frees     do continue
@@ -462,36 +467,9 @@ extract_returned_vars :: proc(node: ^ASTNode, result: ^map[string]bool) {
 // Suppression comment handling
 // ---------------------------------------------------------------------------
 
-// is_suppression_comment returns true when the line contains an
-// odin-lint:ignore suppression marker in any of the accepted forms.
-// No heap allocation — all comparisons are against fixed literals.
-is_suppression_comment :: proc(text: string) -> bool {
-    return strings.contains(text, "//odin-lint:ignore")   ||
-           strings.contains(text, "// odin-lint:ignore")  ||
-           strings.contains(text, "//odin-lint: ignore")  ||
-           strings.contains(text, "// odin-lint: ignore") ||
-           // tolerate common capitalisation variants
-           strings.contains(text, "//Odin-Lint:Ignore")   ||
-           strings.contains(text, "// Odin-Lint:Ignore")
-}
-
-// collect_suppressions builds a map of { line_number -> rule_id } for every
-// suppression comment found within the block's line range.
-collect_suppressions :: proc(block: ^ASTNode, file_lines: []string) -> map[int]string {
-    result := make(map[int]string)
-    start  := max(0, block.start_line - 1)
-    end    := min(len(file_lines) - 1, block.end_line + 1)
-
-    for i in start..=end {
-        if i >= len(file_lines) do continue
-        line := file_lines[i]
-        if !is_suppression_comment(line) do continue
-        if strings.contains(line, "C001") {
-            result[i + 1] = "C001"  // store as 1-indexed to match ASTNode lines
-        }
-    }
-    return result
-}
+// Note: Suppression functions have been moved to centralized suppression.odin module
+// for reuse across all rules. The C001-specific suppression logic remains here
+// for backward compatibility during the transition.
 
 // ---------------------------------------------------------------------------
 // Performance-critical block detection
