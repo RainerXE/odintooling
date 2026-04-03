@@ -1,0 +1,2275 @@
+=== FILE: vendor/ols/src/main.odin ===
+Starting odin-lint
+Processing file: vendor/ols/src/main.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: vendor/ols/src/main.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 2898
+DEBUG: Source content: package main
+
+import "base:intrinsics"
+
+import "core:fmt"
+import "core:log"
+import "core:mem"
+import "core:os"
+import "core:thread"
+
+import "src:common"
+import "src:server"
+
+VERSION := #config(VERSION, "dev")
+
+os_read :: proc(handle: rawptr, data: []byte) -> (int, int) {
+	ptr := cast(^os.File)handle
+	a, b := os.read(ptr, data)
+	return a, cast(int)(b != nil)
+}
+
+os_write :: proc(handle: rawptr, data: []byte) -> (int, int) {
+	ptr := cast(^os.File)handle
+	a, b := os.write(ptr, data)
+	return a, cast(int)(b != nil)
+}
+
+//Note(Daniel, Should look into handling errors without crashing from parsing)
+
+request_thread: ^thread.Thread
+
+logger: ^log.Logger
+
+
+run :: proc(reader: ^server.Reader, writer: ^server.Writer) {
+	common.config.collections = make(map[string]string)
+	common.config.running = true
+
+	logger = new(log.Logger)
+
+	request_thread_data := server.RequestThreadData {
+		reader = reader,
+		writer = writer,
+		logger = logger,
+	}
+
+	/*
+	tracking_allocator: mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracking_allocator, context.allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
+	*/
+
+	server.requests = make([dynamic]server.Request, context.allocator)
+	server.deletings = make([dynamic]server.Request, context.allocator)
+
+	request_thread = thread.create_and_start_with_data(cast(rawptr)&request_thread_data, server.thread_request_main)
+
+	logger^ = server.create_lsp_logger(writer, log.Level.Error)
+
+	{
+		context.logger = logger^
+		log.error("Starting Odin Language Server", VERSION)
+	}
+
+	context.logger = logger^
+	server.create_and_start_check_worker(writer)
+	defer server.stop_check_worker()
+
+
+	for common.config.running {
+		if common.config.verbose {
+			//Currently letting verbose use error, since some ast prints causes crashes - most likely a bug in core:fmt.
+			logger^ = server.create_lsp_logger(writer, log.Level.Info)
+		} else {
+			logger^ = server.create_lsp_logger(writer, log.Level.Info)
+		}
+
+		context.logger = logger^
+
+		server.consume_requests(&common.config, writer)
+	}
+
+	for k, v in common.config.collections {
+		delete(k)
+		delete(v)
+	}
+
+	delete(common.config.collections)
+	delete(common.config.workspace_folders)
+
+	server.document_storage_shutdown()
+
+	server.free_index()
+
+	/*
+    for key, value in tracking_allocator.allocation_map {
+        log.errorf("%v: Leaked %v bytes\n", value.location, value.size)
+    }	
+	*/
+}
+
+end :: proc() {
+}
+
+main :: proc() {
+	if len(os.args) > 1 && os.args[1] == "version" {
+		fmt.println("ols version", VERSION)
+		os.exit(0)
+	}
+	reader := server.make_reader(os_read, cast(rawptr)os.stdin)
+	writer := server.make_writer(os_write, cast(rawptr)os.stdout)
+
+	/*
+	fh, err := os.open("log.txt", os.O_RDWR|os.O_CREATE) 
+	
+	if err != os.ERROR_NONE {
+		return
+	}
+	
+	context.logger = log.create_file_logger(fh, log.Level.Info)
+	*/
+
+	init_global_temporary_allocator(mem.Megabyte * 100)
+
+	run(&reader, &writer)
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 vendor/ols/src/main.odin:39:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: vendor/ols/src/main.odin
+Cleaning up tree-sitter
+
+=== FILE: vendor/ols/src/server/references.odin ===
+Starting odin-lint
+Processing file: vendor/ols/src/server/references.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: vendor/ols/src/server/references.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 12395
+DEBUG: Source content: package server
+
+import "base:runtime"
+
+import "core:log"
+import "core:mem"
+import "core:odin/ast"
+import "core:odin/parser"
+import "core:os"
+import "core:path/filepath"
+import path "core:path/slashpath"
+import "core:slice"
+import "core:strings"
+
+import "src:common"
+
+prepare_references :: proc(
+	document: ^Document,
+	ast_context: ^AstContext,
+	position_context: ^DocumentPositionContext,
+) -> (
+	symbol: Symbol,
+	resolve_flag: ResolveReferenceFlag,
+	ok: bool,
+) {
+	ok = false
+	pkg := ""
+
+	if position_context.enum_type != nil {
+		found := false
+		done_enum: for field in position_context.enum_type.fields {
+			if ident, ok := field.derived.(^ast.Ident); ok {
+				if position_in_node(ident, position_context.position) {
+					symbol = Symbol {
+						pkg   = ast_context.current_package,
+						range = common.get_token_range(ident, ast_context.file.src),
+					}
+					found = true
+					resolve_flag = .Field
+					break done_enum
+				}
+			} else if value, ok := field.derived.(^ast.Field_Value); ok {
+				if position_in_node(value.field, position_context.position) {
+					symbol = Symbol {
+						range = common.get_token_range(value.field, ast_context.file.src),
+						pkg   = ast_context.current_package,
+					}
+					found = true
+					resolve_flag = .Field
+					break done_enum
+				} else if position_in_node(value.value, position_context.position) {
+					if ident, ok := value.value.derived.(^ast.Ident); ok {
+						symbol, ok = resolve_location_identifier(ast_context, ident^)
+						if !ok {
+							return
+						}
+
+						found = true
+						resolve_flag = .Identifier
+						break done_enum
+					}
+				}
+			}
+		}
+		if !found {
+			return
+		}
+	} else if position_context.bitset_type != nil {
+		if position_in_node(position_context.bitset_type.elem, position_context.position) {
+			symbol, ok = resolve_location_type_expression(ast_context, position_context.bitset_type.elem)
+			if !ok {
+				return
+			}
+			resolve_flag = .Identifier
+		}
+		return
+	} else if position_context.union_type != nil {
+		found := false
+		for variant in position_context.union_type.variants {
+			if position_in_node(variant, position_context.position) {
+				if ident, _, ok := unwrap_pointer_ident(variant); ok {
+					symbol, ok = resolve_location_identifier(ast_context, ident)
+					resolve_flag = .Identifier
+
+					if !ok {
+						return
+					}
+
+					found = true
+
+					break
+				} else {
+					return
+				}
+			}
+		}
+		if !found {
+			return
+		}
+
+	} else if position_context.field_value != nil &&
+	   !is_expr_basic_lit(position_context.field_value.field) &&
+	   position_in_node(position_context.field_value.field, position_context.position) {
+		if position_context.comp_lit != nil {
+			symbol, ok = resolve_location_comp_lit_field(ast_context, position_context)
+			if !ok {
+				return
+			}
+		} else if position_context.call != nil {
+			symbol, ok = resolve_location_proc_param_name(ast_context, position_context)
+			if !ok {
+				return
+			}
+		}
+
+		resolve_flag = .Field
+	} else if position_context.selector_expr != nil {
+		if position_in_node(position_context.selector, position_context.position) &&
+		   position_context.identifier != nil {
+			ident := position_context.identifier.derived.(^ast.Ident)
+
+			symbol, ok = resolve_location_identifier(ast_context, ident^)
+
+			if !ok {
+				return
+			}
+
+			resolve_flag = .Identifier
+		} else {
+			symbol, ok = resolve_location_selector(ast_context, position_context.selector_expr)
+			symbol.flags -= {.Local}
+
+			resolve_flag = .Field
+		}
+	} else if position_context.implicit {
+		resolve_flag = .Field
+
+		symbol, ok = resolve_location_implicit_selector(
+			ast_context,
+			position_context,
+			position_context.implicit_selector_expr,
+		)
+		symbol.flags -= {.Local}
+
+		if !ok {
+			return
+		}
+	} else {
+		// The order of these is important as a lot of the above can be defined within a struct so we
+		// need to make sure we resolve that last
+		if position_context.bit_field_type != nil {
+			for field in position_context.bit_field_type.fields {
+				if position_in_node(field.name, position_context.position) {
+					symbol = Symbol {
+						range = common.get_token_range(field.name, ast_context.file.src),
+						pkg   = ast_context.current_package,
+						uri   = document.uri.uri,
+					}
+					return symbol, .Field, true
+				}
+				if position_in_node(field.type, position_context.position) {
+					node := get_desired_expr(field.type, position_context.position)
+					if symbol, ok = resolve_location_type_expression(ast_context, node); ok {
+						return symbol, .Identifier, true
+					}
+				}
+			}
+		}
+
+		if position_context.struct_type != nil {
+			for field in position_context.struct_type.fields.list {
+				for name in field.names {
+					if position_in_node(name, position_context.position) {
+						symbol = Symbol {
+							range = common.get_token_range(name, ast_context.file.src),
+							pkg   = ast_context.current_package,
+							uri   = document.uri.uri,
+						}
+						return symbol, .Field, true
+					}
+				}
+				if position_in_node(field.type, position_context.position) {
+					node := get_desired_expr(field.type, position_context.position)
+					if symbol, ok = resolve_location_type_expression(ast_context, node); ok {
+						return symbol, .Identifier, true
+					}
+				}
+			}
+		}
+
+		if position_context.identifier != nil {
+			ident := position_context.identifier.derived.(^ast.Ident)
+			symbol, ok = resolve_location_identifier(ast_context, ident^)
+
+			resolve_flag = .Identifier
+
+			if !ok {
+				return
+			}
+		} else {
+			return
+		}
+	}
+	if symbol.uri == "" {
+		symbol.uri = document.uri.uri
+	}
+
+	return symbol, resolve_flag, true
+}
+
+get_target_name :: proc(position_context: ^DocumentPositionContext, resolve_flag: ResolveReferenceFlag) -> string {
+	if resolve_flag == .Field {
+		if position_context.field != nil {
+			if ident, ok := position_context.field.derived.(^ast.Ident); ok {
+				return ident.name
+			}
+		}
+
+		if position_context.implicit_selector_expr != nil {
+			return position_context.implicit_selector_expr.field.name
+		}
+	}
+
+	if position_context.identifier != nil {
+		if ident, ok := position_context.identifier.derived.(^ast.Ident); ok {
+			return ident.name
+		}
+	}
+
+	return ""
+}
+
+resolve_references :: proc(
+	document: ^Document,
+	ast_context: ^AstContext,
+	position_context: ^DocumentPositionContext,
+	current_file_only := false,
+	include_declaration := true,
+) -> (
+	[]common.Location,
+	bool,
+) {
+	locations := make([dynamic]common.Location, 0, ast_context.allocator)
+	fullpaths := make([dynamic]string, 0, ast_context.allocator)
+
+	symbol, resolve_flag, ok := prepare_references(document, ast_context, position_context)
+	if !ok {
+		return {}, true
+	}
+
+	target_name := get_target_name(position_context, resolve_flag)
+	symbols_and_nodes := resolve_entire_file(document, resolve_flag, ast_context.allocator, target_name)
+
+	for k, v in symbols_and_nodes {
+		if strings.equal_fold(v.symbol.uri, symbol.uri) && v.symbol.range == symbol.range {
+			node_uri := common.create_uri(v.node.pos.file, ast_context.allocator)
+			range := common.get_token_range(v.node^, ast_context.file.src)
+
+			if !include_declaration && v.symbol.range == range && strings.equal_fold(node_uri.uri, symbol.uri) {
+				// This is the declaration and so we skip it
+				continue
+			}
+
+			//We don't have to have the `.` with, otherwise it renames the dot.
+			if _, ok := v.node.derived.(^ast.Implicit_Selector_Expr); ok {
+				range.start.character += 1
+			}
+
+			location := common.Location {
+				range = range,
+				uri   = strings.clone(node_uri.uri, ast_context.allocator),
+			}
+
+			append(&locations, location)
+		}
+	}
+
+	if .Local in symbol.flags || current_file_only {
+		return locations[:], true
+	}
+
+	when !ODIN_TEST {
+		for workspace in common.config.workspace_folders {
+			uri, _ := common.parse_uri(workspace.uri, context.temp_allocator)
+			w := os.walker_create(uri.path)
+			defer os.walker_destroy(&w)
+			for info in os.walker_walk(&w) {
+				if info.type == .Directory {
+					continue
+				}
+
+				if info.fullpath == "" {
+					continue
+				}
+
+				if strings.has_suffix(info.name, ".odin") {
+					slash_path, _ := filepath.replace_path_separators(info.fullpath, '/', context.temp_allocator)
+					if !strings.equal_fold(slash_path, document.fullpath) {
+						append(&fullpaths, strings.clone(info.fullpath, context.temp_allocator))
+					}
+				}
+			}
+		}
+	}
+
+	reset_ast_context(ast_context)
+
+
+	arena: runtime.Arena
+
+	_ = runtime.arena_init(&arena, mem.Megabyte * 40, runtime.default_allocator())
+
+	defer runtime.arena_destroy(&arena)
+
+	context.allocator = runtime.arena_allocator(&arena)
+
+	paths := slice.unique(fullpaths[:])
+
+	for fullpath in paths {
+		defer free_all(context.allocator)
+
+		fullpath := fullpath
+		when ODIN_OS == .Windows {
+			path := common.get_case_sensitive_path(fullpath, context.temp_allocator)
+			fullpath, _ = filepath.replace_path_separators(path, '/', context.allocator)
+		}
+		dir := filepath.dir(fullpath)
+		base := filepath.base(dir)
+
+		data, err := os.read_entire_file(fullpath, context.allocator)
+
+		if err != nil {
+			log.errorf("failed to read entire file for indexing %v: %v", fullpath, err)
+			continue
+		}
+
+		if target_name != "" && !strings.contains(string(data), target_name) {
+			continue
+		}
+
+		p := parser.Parser {
+			flags = {.Optional_Semicolons},
+		}
+		if !is_ols_builtin_file(fullpath) {
+			p.err = log_error_handler
+			p.warn = log_warning_handler
+		}
+
+		pkg := new(ast.Package)
+		pkg.kind = .Normal
+		pkg.fullpath = fullpath
+		pkg.name = base
+
+		if base == "runtime" {
+			pkg.kind = .Runtime
+		}
+
+		file := ast.File {
+			fullpath = fullpath,
+			src      = string(data),
+			pkg      = pkg,
+		}
+
+		ok := parser.parse_file(&p, &file)
+
+		if !ok {
+			if !is_ols_builtin_file(fullpath) {
+				log.errorf("error in parse file for indexing %v", fullpath)
+			}
+			continue
+		}
+
+		uri := common.create_uri(fullpath, context.allocator)
+
+		document := Document {
+			ast = file,
+		}
+
+		document.uri = uri
+		document.text = transmute([]u8)file.src
+		document.used_text = len(file.src)
+
+		document_setup(&document)
+
+		parse_imports(&document, &common.config)
+
+		in_pkg := false
+
+		for pkg in document.imports {
+			if pkg.name == symbol.pkg {
+				in_pkg = true
+				continue
+			}
+		}
+
+		if in_pkg || symbol.pkg == document.package_name {
+			symbols_and_nodes := resolve_entire_file(&document, resolve_flag, context.allocator, target_name)
+			for k, v in symbols_and_nodes {
+				if strings.equal_fold(v.symbol.uri, symbol.uri) && v.symbol.range == symbol.range {
+					node_uri := common.create_uri(v.node.pos.file, ast_context.allocator)
+					range := common.get_token_range(v.node^, string(document.text))
+
+					if !include_declaration &&
+					   v.symbol.range == range &&
+					   strings.equal_fold(node_uri.uri, symbol.uri) {
+						// This is the declaration and so we skip it
+						continue
+					}
+					//We don't have to have the `.` with, otherwise it renames the dot.
+					if _, ok := v.node.derived.(^ast.Implicit_Selector_Expr); ok {
+						range.start.character += 1
+					}
+					location := common.Location {
+						range = range,
+						uri   = strings.clone(node_uri.uri, ast_context.allocator),
+					}
+					append(&locations, location)
+				}
+			}
+		}
+	}
+
+	return locations[:], true
+}
+
+get_references :: proc(
+	document: ^Document,
+	position: common.Position,
+	current_file_only := false,
+	include_declaration := true,
+) -> (
+	[]common.Location,
+	bool,
+) {
+	ast_context := make_ast_context(
+		document.ast,
+		document.imports,
+		document.package_name,
+		document.uri.uri,
+		document.fullpath,
+		context.temp_allocator,
+	)
+
+	position_context, ok := get_document_position_context(document, position, .Hover)
+	if !ok {
+		log.warn("Failed to get position context")
+		return {}, false
+	}
+
+	ast_context.position_hint = position_context.hint
+
+	get_globals(document.ast, &ast_context)
+
+	ast_context.current_package = ast_context.document_package
+
+	if position_context.function != nil {
+		get_locals(document.ast, position_context.function, &ast_context, &position_context)
+	}
+
+	locations, ok2 := resolve_references(
+		document,
+		&ast_context,
+		&position_context,
+		current_file_only,
+		include_declaration = include_declaration,
+	)
+
+	temp_locations := make([dynamic]common.Location, 0, context.temp_allocator)
+
+	for location in locations {
+		temp_location := common.Location {
+			range = location.range,
+			uri   = strings.clone(location.uri, context.temp_allocator),
+		}
+		append(&temp_locations, temp_location)
+	}
+
+	return temp_locations[:], ok2
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 vendor/ols/src/server/references.odin:349:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: vendor/ols/src/server/references.odin
+Cleaning up tree-sitter
+
+=== FILE: vendor/ols/src/server/document_symbols.odin ===
+Starting odin-lint
+Processing file: vendor/ols/src/server/document_symbols.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: vendor/ols/src/server/document_symbols.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 4348
+DEBUG: Source content: package server
+
+import "core:odin/ast"
+
+import "src:common"
+
+get_document_symbols :: proc(document: ^Document) -> []DocumentSymbol {
+	ast_context := make_ast_context(
+		document.ast,
+		document.imports,
+		document.package_name,
+		document.uri.uri,
+		document.fullpath,
+	)
+
+	get_globals(document.ast, &ast_context)
+
+	symbols := make([dynamic]DocumentSymbol, context.temp_allocator)
+
+	package_symbol: DocumentSymbol
+
+	if len(document.ast.decls) == 0 {
+		return {}
+	}
+
+	for k, global in ast_context.globals {
+		symbol: DocumentSymbol
+		symbol.selectionRange = common.get_token_range(global.name_expr, ast_context.file.src)
+		symbol.range = common.get_token_range(global.expr, ast_context.file.src)
+		ensure_selection_range_contained(&symbol.range, symbol.selectionRange)
+		symbol.name = k
+
+		#partial switch v in global.expr.derived {
+		case ^ast.Struct_Type, ^ast.Bit_Field_Type:
+			// TODO: this only does the top level fields, we may want to travers all the way down in the future
+			if s, ok := resolve_type_expression(&ast_context, global.expr); ok {
+				#partial switch v in s.value {
+				case SymbolStructValue:
+					children := make([dynamic]DocumentSymbol, context.temp_allocator)
+					for name, i in v.names {
+						if name == "" {
+							continue
+						}
+						child: DocumentSymbol
+						child.range = v.ranges[i]
+						child.selectionRange = v.ranges[i]
+						child.name = name
+						child.kind = .Field
+						append(&children, child)
+					}
+					symbol.children = children[:]
+				case SymbolBitFieldValue:
+					children := make([dynamic]DocumentSymbol, context.temp_allocator)
+					for name, i in v.names {
+						if name == "" {
+							continue
+						}
+						child: DocumentSymbol
+						child.range = v.ranges[i]
+						child.selectionRange = v.ranges[i]
+						child.name = name
+						child.kind = .Field
+						append(&children, child)
+					}
+					symbol.children = children[:]
+				}
+			}
+			symbol.kind = .Struct
+		case ^ast.Proc_Lit, ^ast.Proc_Group:
+			symbol.kind = .Function
+		case ^ast.Enum_Type, ^ast.Union_Type:
+			symbol.kind = .Enum
+		case ^ast.Comp_Lit:
+			if s, ok := resolve_type_expression(&ast_context, v); ok {
+				ranges :: struct {
+					range: common.Range,
+					selection_range: common.Range,
+				}
+				name_map := make(map[string]ranges)
+				for elem in v.elems {
+					if field_value, ok := elem.derived.(^ast.Field_Value); ok {
+						if name, ok := field_value.field.derived.(^ast.Ident); ok {
+							selection_range := common.get_token_range(name, ast_context.file.src)
+							range := common.get_token_range(field_value, ast_context.file.src)
+							ensure_selection_range_contained(&range, selection_range)
+							name_map[name.name] = {
+								range = range,
+								selection_range = selection_range,
+							}
+						}
+					}
+				}
+				#partial switch v in s.value {
+				case SymbolStructValue:
+					children := make([dynamic]DocumentSymbol, context.temp_allocator)
+					for name, i in v.names {
+						child: DocumentSymbol
+						if range, ok := name_map[name]; ok {
+							child.range = range.range
+							child.selectionRange = range.selection_range
+							child.name = name
+							child.kind = .Field
+							append(&children, child)
+						}
+					}
+					symbol.children = children[:]
+				case SymbolBitFieldValue:
+					children := make([dynamic]DocumentSymbol, context.temp_allocator)
+					for name, i in v.names {
+						child: DocumentSymbol
+						if range, ok := name_map[name]; ok {
+							child.range = range.range
+							child.selectionRange = range.selection_range
+							child.name = name
+							child.kind = .Field
+							append(&children, child)
+						}
+					}
+					symbol.children = children[:]
+				}
+			}
+		case:
+			symbol.kind = .Variable
+		}
+
+		append(&symbols, symbol)
+	}
+
+
+	return symbols[:]
+}
+
+@(private="file")
+ensure_selection_range_contained :: proc(range: ^common.Range, selection_range: common.Range) {
+	// selection range must be contained with range, so we set the range start to be the selection range start
+	range.start = selection_range.start
+
+	// if the range end is somehow before the selection_range end, we set it to the end of the selection range
+	if range.end.line < selection_range.end.line {
+		range.end = selection_range.end
+	} else if range.end.line == selection_range.end.line && range.end.character < selection_range.end.character {
+		range.end = selection_range.end
+	}
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 vendor/ols/src/server/document_symbols.odin:79:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: vendor/ols/src/server/document_symbols.odin
+Cleaning up tree-sitter
+
+=== FILE: vendor/ols/src/server/build.odin ===
+Starting odin-lint
+Processing file: vendor/ols/src/server/build.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: vendor/ols/src/server/build.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 9195
+DEBUG: Source content: #+feature dynamic-literals
+package server
+
+import "base:runtime"
+import "core:slice"
+
+import "core:fmt"
+import "core:log"
+import "core:mem"
+import "core:odin/ast"
+import "core:odin/parser"
+import "core:odin/tokenizer"
+import "core:os"
+import "core:path/filepath"
+import path "core:path/slashpath"
+import "core:strings"
+import "core:time"
+
+import "src:common"
+
+platform_os: map[string]struct{} = {
+	"windows" = {},
+	"linux"   = {},
+	"essence" = {},
+	"js"      = {},
+	"freebsd" = {},
+	"darwin"  = {},
+	"wasm32"  = {},
+	"openbsd" = {},
+	"wasi"    = {},
+	"wasm"    = {},
+	"haiku"   = {},
+	"netbsd"  = {},
+	"freebsd" = {},
+}
+
+
+os_enum_to_string: [runtime.Odin_OS_Type]string = {
+	.Windows      = "windows",
+	.Darwin       = "darwin",
+	.Linux        = "linux",
+	.Essence      = "essence",
+	.FreeBSD      = "freebsd",
+	.WASI         = "wasi",
+	.JS           = "js",
+	.Freestanding = "freestanding",
+	.Haiku        = "haiku",
+	.OpenBSD      = "openbsd",
+	.NetBSD       = "netbsd",
+	.Orca         = "orca",
+	.Unknown      = "unknown",
+}
+
+os_string_to_enum: map[string]runtime.Odin_OS_Type = {
+	"Windows"      = .Windows,
+	"windows"      = .Windows,
+	"Darwin"       = .Darwin,
+	"darwin"       = .Darwin,
+	"Linux"        = .Linux,
+	"linux"        = .Linux,
+	"Essence"      = .Essence,
+	"essence"      = .Essence,
+	"Freebsd"      = .FreeBSD,
+	"freebsd"      = .FreeBSD,
+	"FreeBSD"      = .FreeBSD,
+	"Wasi"         = .WASI,
+	"wasi"         = .WASI,
+	"WASI"         = .WASI,
+	"Js"           = .JS,
+	"js"           = .JS,
+	"JS"           = .JS,
+	"Freestanding" = .Freestanding,
+	"freestanding" = .Freestanding,
+	"Wasm"         = .JS,
+	"wasm"         = .JS,
+	"Haiku"        = .Haiku,
+	"haiku"        = .Haiku,
+	"Openbsd"      = .OpenBSD,
+	"openbsd"      = .OpenBSD,
+	"OpenBSD"      = .OpenBSD,
+	"Netbsd"       = .NetBSD,
+	"netbsd"       = .NetBSD,
+	"NetBSD"       = .NetBSD,
+	"Orca"         = .Orca,
+	"orca"         = .Orca,
+	"Unknown"      = .Unknown,
+	"unknown"      = .Unknown,
+}
+
+@(private = "file")
+is_bsd_variant :: proc(name: string) -> bool {
+	return(
+		common.config.profile.os == os_enum_to_string[.FreeBSD] ||
+		common.config.profile.os == os_enum_to_string[.OpenBSD] ||
+		common.config.profile.os == os_enum_to_string[.NetBSD] \
+	)
+}
+
+@(private = "file")
+is_unix_variant :: proc(name: string) -> bool {
+	return(
+		common.config.profile.os == os_enum_to_string[.Linux] ||
+		common.config.profile.os == os_enum_to_string[.Darwin] \
+	)
+}
+
+skip_file :: proc(filename: string) -> bool {
+	last_underscore_index := strings.last_index(filename, "_")
+	last_dot_index := strings.last_index(filename, ".")
+
+	if last_underscore_index + 1 < last_dot_index {
+		name_between := filename[last_underscore_index + 1:last_dot_index]
+
+		if name_between == "unix" {
+			return !is_unix_variant(name_between)
+		}
+
+		if name_between == "bsd" {
+			return !is_bsd_variant(name_between)
+		}
+
+		if _, ok := platform_os[name_between]; ok {
+			return name_between != common.config.profile.os
+		}
+	}
+
+	return false
+}
+
+// Finds all packages under the provided path by walking the file system
+// and appends them to the provided dynamic array
+append_packages :: proc(path: string, pkgs: ^[dynamic]string, skip: map[string]struct{}, allocator := context.temp_allocator) {
+	w := os.walker_create(path)
+	defer os.walker_destroy(&w)
+	for info in os.walker_walk(&w) {
+		if info.type != .Directory && filepath.ext(info.name) == ".odin" {
+			dir := filepath.dir(info.fullpath, allocator)
+			if dir in skip {
+				os.walker_skip_dir(&w)
+				continue
+			}
+			if !slice.contains(pkgs[:], dir) {
+				append(pkgs, dir)
+			}
+		}
+	}
+}
+
+should_collect_file :: proc(file_tags: parser.File_Tags) -> bool {
+	if file_tags.ignore {
+		return false
+	}
+
+	if len(file_tags.build) > 0 {
+		when_expr_map := make(map[string]When_Expr, context.temp_allocator)
+
+		for key, value in common.config.profile.defines {
+			when_expr_map[key] = resolve_when_ident(when_expr_map, value) or_continue
+		}
+
+		if when_expr, ok := resolve_when_ident(when_expr_map, "ODIN_OS"); ok {
+			if s, ok := when_expr.(string); ok {
+				if used_os, ok := os_string_to_enum[when_expr.(string)]; ok {
+					found := false
+					for tag in file_tags.build {
+						if used_os in tag.os {
+							found = true
+							break
+						}
+					}
+					if !found {
+						return false
+					}
+				}
+			}
+		}
+	}
+	return true
+}
+
+try_build_package :: proc(pkg_name: string) {
+	if pkg, ok := build_cache.loaded_pkgs[pkg_name]; ok {
+		return
+	}
+
+	matches, err := filepath.glob(fmt.tprintf("%v/*.odin", pkg_name), context.temp_allocator)
+
+	if err != nil && err != .Not_Exist {
+		log.errorf("Failed to glob %v for indexing package: %v", pkg_name, err)
+		return
+	}
+
+	arena: runtime.Arena
+	result := runtime.arena_init(&arena, mem.Megabyte * 40, runtime.default_allocator())
+	defer runtime.arena_destroy(&arena)
+
+	{
+		context.allocator = runtime.arena_allocator(&arena)
+
+		for fullpath in matches {
+			if skip_file(filepath.base(fullpath)) {
+				continue
+			}
+
+			data, err := os.read_entire_file(fullpath, context.allocator)
+
+			if err != nil {
+				log.errorf("failed to read entire file for indexing %v: %v", fullpath, err)
+				continue
+			}
+
+			p := parser.Parser {
+				flags = {.Optional_Semicolons},
+			}
+			if !is_ols_builtin_file(fullpath) {
+				p.err = log_error_handler
+				p.warn = log_warning_handler
+			}
+
+			dir := filepath.base(filepath.dir(fullpath, context.allocator))
+
+			pkg := new(ast.Package)
+			pkg.kind = .Normal
+			pkg.fullpath = fullpath
+			pkg.name = dir
+
+			if dir == "runtime" {
+				pkg.kind = .Runtime
+			}
+
+			file := ast.File {
+				fullpath = fullpath,
+				src      = string(data),
+				pkg      = pkg,
+			}
+
+			ok := parser.parse_file(&p, &file)
+
+			if !ok {
+				if !is_ols_builtin_file(fullpath) {
+					log.errorf("error in parse file for indexing %v", fullpath)
+				}
+				continue
+			}
+
+			uri := common.create_uri(fullpath, context.allocator)
+
+			collect_symbols(&indexer.index.collection, file, uri.uri)
+
+			runtime.arena_free_all(&arena)
+		}
+	}
+
+	build_cache.loaded_pkgs[strings.clone(pkg_name, indexer.index.collection.allocator)] = PackageCacheInfo {
+		timestamp = time.now(),
+	}
+}
+
+
+remove_index_file :: proc(uri: common.Uri) -> common.Error {
+	ok: bool
+
+	fullpath := uri.path
+
+	when ODIN_OS == .Windows {
+		fullpath, _ = filepath.replace_path_separators(fullpath, '/', context.temp_allocator)
+	}
+
+	corrected_uri := common.create_uri(fullpath, context.temp_allocator)
+
+	for k, &v in indexer.index.collection.packages {
+		for k2, v2 in v.symbols {
+			if strings.equal_fold(corrected_uri.uri, v2.uri) {
+				free_symbol(v2, indexer.index.collection.allocator)
+				delete_key(&v.symbols, k2)
+			}
+		}
+
+		for method, &symbols in v.methods {
+			for i := len(symbols) - 1; i >= 0; i -= 1 {
+				#no_bounds_check symbol := symbols[i]
+				if strings.equal_fold(corrected_uri.uri, symbol.uri) {
+					unordered_remove(&symbols, i)
+				}
+			}
+		}
+	}
+
+	return .None
+}
+
+index_file :: proc(uri: common.Uri, text: string) -> common.Error {
+	ok: bool
+
+	fullpath := uri.path
+
+	p := parser.Parser {
+		flags = {.Optional_Semicolons},
+	}
+	if !is_ols_builtin_file(fullpath) {
+		p.err = log_error_handler
+		p.warn = log_warning_handler
+	}
+
+	when ODIN_OS == .Windows {
+		correct := common.get_case_sensitive_path(fullpath, context.temp_allocator)
+		fullpath, _ = filepath.replace_path_separators(correct, '/', context.temp_allocator)
+	}
+
+	dir := filepath.base(filepath.dir(fullpath, context.temp_allocator))
+
+	pkg := new(ast.Package)
+	pkg.kind = .Normal
+	pkg.fullpath = fullpath
+	pkg.name = dir
+
+	if dir == "runtime" {
+		pkg.kind = .Runtime
+	}
+
+	file := ast.File {
+		fullpath = fullpath,
+		src      = text,
+		pkg      = pkg,
+	}
+
+	{
+		allocator := context.allocator
+		context.allocator = context.temp_allocator
+		defer context.allocator = allocator
+
+		ok = parser.parse_file(&p, &file)
+
+		if !ok {
+			if !is_ols_builtin_file(fullpath) {
+				log.errorf("error in parse file for indexing %v", fullpath)
+			}
+		}
+	}
+
+	corrected_uri := common.create_uri(fullpath, context.temp_allocator)
+
+	for k, &v in indexer.index.collection.packages {
+		for k2, v2 in v.symbols {
+			if corrected_uri.uri == v2.uri {
+				free_symbol(v2, indexer.index.collection.allocator)
+				delete_key(&v.symbols, k2)
+			}
+		}
+
+		for method, &symbols in v.methods {
+			for i := len(symbols) - 1; i >= 0; i -= 1 {
+				#no_bounds_check symbol := symbols[i]
+				if corrected_uri.uri == symbol.uri {
+					unordered_remove(&symbols, i)
+				}
+			}
+		}
+	}
+
+	if ret := collect_symbols(&indexer.index.collection, file, corrected_uri.uri); ret != .None {
+		log.errorf("failed to collect symbols on save %v", ret)
+	}
+
+	return .None
+}
+
+
+setup_index :: proc(builtin_path: string) {
+	build_cache.loaded_pkgs = make(map[string]PackageCacheInfo, 50, context.allocator)
+	symbol_collection := make_symbol_collection(context.allocator, &common.config)
+	indexer.index = make_memory_index(symbol_collection)
+
+	try_build_package(builtin_path)
+}
+
+free_index :: proc() {
+	delete_symbol_collection(indexer.index.collection)
+}
+
+log_error_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
+	log.warnf("%v %v %v", pos, msg, args)
+}
+
+log_warning_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
+	log.warnf("%v %v %v", pos, msg, args)
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 vendor/ols/src/server/build.odin:222:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/build.odin:312:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: vendor/ols/src/server/build.odin
+Cleaning up tree-sitter
+
+=== FILE: vendor/ols/src/server/check.odin ===
+Starting odin-lint
+Processing file: vendor/ols/src/server/check.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: vendor/ols/src/server/check.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 9845
+DEBUG: Source content: package server
+
+import "base:runtime"
+import "core:encoding/json"
+import "core:fmt"
+import "core:log"
+import "core:mem"
+import "core:os"
+import "core:path/filepath"
+import path "core:path/slashpath"
+import "core:strings"
+import "core:sync/chan"
+import "core:thread"
+import "core:time"
+
+import "src:common"
+
+Json_Error :: struct {
+	type: string,
+	pos:  Json_Type_Error,
+	msgs: []string,
+}
+
+Json_Type_Error :: struct {
+	file:       string,
+	offset:     int,
+	line:       int,
+	column:     int,
+	end_column: int,
+}
+
+Json_Errors :: struct {
+	error_count: int,
+	errors:      []Json_Error,
+}
+
+Check_Mode :: enum {
+	Saved,
+	Workspace,
+}
+
+Check_Request :: struct {
+	check_mode: Check_Mode,
+	path:       string,
+	config:     ^common.Config,
+}
+
+Checker :: struct {
+	allocator: mem.Allocator,
+	send:      chan.Chan(Check_Request, .Send),
+}
+
+@(private = "file")
+checker: Checker
+
+// Global plugin manager (minimal plugin system)
+plugin_manager: PluginManager
+
+queue_check_request :: proc(mode: Check_Mode, path: string, config: ^common.Config) {
+	path := strings.clone(path, checker.allocator)
+	ok := chan.send(checker.send, Check_Request{check_mode = mode, path = path, config = config})
+	if !ok {
+		log.errorf("Failed to queue check request for path %q", path)
+	}
+}
+
+stop_check_worker :: proc() {
+	chan.close(checker.send)
+}
+
+create_and_start_check_worker :: proc(writer: ^Writer) {
+	allocator := runtime.heap_allocator()
+	check_chan, _ := chan.create(chan.Chan(Check_Request), 8, context.allocator)
+	check_send := chan.as_send(check_chan)
+	checker = Checker {
+		allocator = runtime.heap_allocator(),
+		send      = check_send,
+	}
+	check_recv := chan.as_recv(check_chan)
+	
+	// Initialize plugin manager (minimal)
+	plugin_manager = create_plugin_manager(context.allocator)
+	thread.create_and_start_with_poly_data(
+		Consumer{logger = context.logger, ch = check_recv, w = writer},
+		run_check_consumer,
+	)
+}
+
+Consumer :: struct {
+	logger: log.Logger,
+	ch:     chan.Chan(Check_Request, .Recv),
+	w:      ^Writer,
+}
+
+run_check_consumer :: proc(c: Consumer) {
+	context.logger = c.logger
+	for {
+		request, ok := chan.recv(c.ch)
+		if !ok {
+			break
+		}
+		paths := make([dynamic]string, allocator = context.temp_allocator)
+		append(&paths, request.path)
+		for request in chan.try_recv(c.ch) {
+			append(&paths, request.path)
+		}
+		check(request.check_mode, paths[:], request.config)
+		push_diagnostics(c.w)
+		free_all(context.temp_allocator)
+		for path in paths {
+			delete(path, checker.allocator)
+		}
+	}
+	free_all(context.temp_allocator)
+}
+
+//If the user does not specify where to call odin check, it'll just find all directory with odin, and call them seperately.
+fallback_find_odin_directories :: proc(config: ^common.Config) -> []string {
+	data := make([dynamic]string, context.temp_allocator)
+
+	for workspace in config.workspace_folders {
+		if uri, ok := common.parse_uri(workspace.uri, context.temp_allocator); ok {
+			append_packages(uri.path, &data, config.checker_skip_packages, context.temp_allocator)
+		}
+	}
+
+	return data[:]
+}
+
+check_unused_imports :: proc(document: ^Document, config: ^common.Config) {
+	if !config.enable_unused_imports_reporting {
+		return
+	}
+
+	unused_imports := find_unused_imports(document, context.temp_allocator)
+
+	path := document.uri.path
+
+	when ODIN_OS == .Windows {
+		path = common.get_case_sensitive_path(path, context.temp_allocator)
+	}
+
+	uri := common.create_uri(path, context.temp_allocator)
+
+	remove_diagnostics(.Unused, uri.uri)
+
+	for imp in unused_imports {
+		add_diagnostics(
+			.Unused,
+			uri.uri,
+			Diagnostic {
+				range = common.get_token_range(imp.import_decl, document.ast.src),
+				severity = DiagnosticSeverity.Hint,
+				code = "Unused",
+				message = "unused import",
+				tags = {.Unnecessary},
+			},
+		)
+	}
+}
+
+resolve_check_paths :: proc(mode: Check_Mode, paths: []string, config: ^common.Config) -> []string {
+	if len(config.profile.checker_path) > 0 {
+		return config.profile.checker_path[:]
+	}
+
+	if mode == .Saved || config.enable_checker_only_saved {
+		results := make([dynamic]string, context.temp_allocator)
+		for p in paths {
+			if p == "" {
+				continue
+			}
+			dir := path.dir(p, context.temp_allocator)
+			if dir not_in config.checker_skip_packages {
+				append(&results, dir)
+			}
+		}
+		return results[:]
+	}
+
+	if mode == .Workspace && config.enable_checker_workspace_diagnostics {
+		return fallback_find_odin_directories(config)
+	}
+
+	return {}
+}
+
+CheckProcess :: struct {
+	process:  os.Process,
+	reader:   ^os.File,
+	finished: bool,
+	buffer:   [dynamic]u8,
+}
+
+check :: proc(mode: Check_Mode, check_paths: []string, config: ^common.Config) {
+	paths := resolve_check_paths(mode, check_paths, config)
+
+	if len(paths) == 0 {
+		return
+	}
+
+	clear_diagnostics(.Check)
+
+	collections := make([dynamic]string, context.temp_allocator)
+
+	for k, v in common.config.collections {
+		if k == "" || k == "core" || k == "vendor" || k == "base" {
+			continue
+		}
+		append(&collections, fmt.aprintf("-collection:%v=%v", k, v))
+	}
+
+	max_concurrent_checks := max(1, os.get_processor_core_count())
+	processes := make([dynamic]CheckProcess, 0, len(paths))
+
+	errors := make([dynamic]Json_Errors, 0, len(paths), context.temp_allocator)
+
+	next_index := 0
+	running_count := 0
+	start := time.now()
+
+	for running_count > 0 || next_index < len(paths) {
+		for running_count < max_concurrent_checks && next_index < len(paths) {
+			p, ok := start_check_process(paths[next_index], collections[:], config)
+			next_index += 1
+			if !ok {
+				continue
+			}
+			append(&processes, p)
+			running_count += 1
+		}
+
+		if time.since(start) > 20 * time.Second {
+			log.error("`odin check` timed out")
+			for &p in processes {
+				if !p.finished {
+					if err := os.process_kill(p.process); err != nil {
+						log.error("Failed to kill `odin check` process: %v", err)
+					}
+				}
+			}
+			break
+		}
+
+		for &p in processes {
+			if p.finished {
+				continue
+			}
+
+			buf: [1024]u8
+			n, _ := os.read(p.reader, buf[:])
+			if n > 0 {
+				_, _ = append(&p.buffer, ..buf[:n])
+			}
+
+			state, err := os.process_wait(p.process, 0)
+			if err != nil {
+				continue
+			}
+
+			if !state.exited {
+				continue
+			}
+
+			p.finished = true
+			running_count -= 1
+
+			for {
+				n, read_err := os.read(p.reader, buf[:])
+				if n > 0 {
+					_, _ = append(&p.buffer, ..buf[:n])
+				}
+				if read_err != nil {
+					break
+				}
+			}
+
+			os.close(p.reader)
+			p.reader = nil
+
+			if len(p.buffer) > 0 {
+				json_errors: Json_Errors
+				if res := json.unmarshal(
+					p.buffer[:],
+					&json_errors,
+					json.DEFAULT_SPECIFICATION,
+					context.temp_allocator,
+				); res != nil {
+					log.errorf("Failed to unmarshal check results: %v, %v", res, string(p.buffer[:]))
+					continue
+				}
+				append(&errors, json_errors)
+			}
+		}
+
+		if running_count > 0 || next_index < len(paths) {
+			time.sleep(1 * time.Millisecond)
+		}
+	}
+
+	for p in processes {
+		os.close(p.reader)
+	}
+
+	DiagnosticKey :: struct {
+		path:    string,
+		message: string,
+		line:    int,
+		column:  int,
+	}
+
+	diagnostics := make(map[DiagnosticKey]struct{}, context.temp_allocator)
+	for e in errors {
+		for error in e.errors {
+			if len(error.msgs) == 0 {
+				continue
+			}
+
+			message := strings.join(error.msgs, "\n", context.temp_allocator)
+
+			if strings.contains(message, "Redeclaration of 'main' in this scope") {
+				continue
+			}
+
+			path := error.pos.file
+
+			when ODIN_OS == .Windows {
+				path = common.get_case_sensitive_path(path, context.temp_allocator)
+				path, _ = filepath.replace_path_separators(path, '/', context.temp_allocator)
+			}
+
+			key := DiagnosticKey {
+				path    = path,
+				message = message,
+				line    = error.pos.line,
+				column  = error.pos.column,
+			}
+			if key in diagnostics {
+				continue
+			}
+
+			diagnostics[key] = {}
+
+			if is_ols_builtin_file(path) {
+				continue
+			}
+
+			uri := common.create_uri(path, context.temp_allocator)
+
+			add_diagnostics(
+				.Check,
+				uri.uri,
+				Diagnostic {
+					code = "checker",
+					severity = map_diagnostic_severity(error.type),
+					range = {
+						// odin will sometimes report errors on column 0, so we ensure we don't provide a negative column/line to the client
+						start = {character = max(error.pos.column - 1, 0), line = max(error.pos.line - 1, 0)},
+						end = {character = max(error.pos.end_column - 1, 0), line = max(error.pos.line - 1, 0)},
+					},
+					message = message,
+				},
+			)
+		}
+
+	}
+
+}
+@(private = "file")
+start_check_process :: proc(
+	check_path: string,
+	collections: []string,
+	config: ^common.Config,
+) -> (
+	CheckProcess,
+	bool,
+) {
+	command: string
+
+	if config.odin_command != "" {
+		command = config.odin_command
+	} else {
+		command = "odin"
+	}
+
+	entry_point_opt := filepath.ext(check_path) == ".odin" ? "-file" : "-no-entry-point"
+	cmd := make([dynamic]string, context.temp_allocator)
+	append(&cmd, command, "check", check_path)
+	for c in collections {
+		append(&cmd, c)
+	}
+	for k, v in config.profile.defines {
+		append(&cmd, fmt.tprintf("-define:%s=%s", k, v))
+	}
+	append(&cmd, entry_point_opt, "-json-errors")
+	args, _ := strings.split(config.checker_args, " ", context.temp_allocator)
+	for arg in args {
+		if arg != "" {
+			append(&cmd, arg)
+		}
+	}
+
+	r, w, err := os.pipe()
+	if err != nil {
+		log.errorf("failed to create pipe for `odin check`: %v\n", err)
+		return CheckProcess{}, false
+	}
+	defer os.close(w)
+
+	desc := os.Process_Desc {
+		command = cmd[:],
+		stdout  = w,
+		stderr  = w,
+	}
+
+	p, perr := os.process_start(desc)
+	if perr != nil {
+		os.close(r)
+		log.errorf("failed to start process for `odin check`: %v\n", perr)
+		return CheckProcess{}, false
+	}
+
+	buffer := make([dynamic]u8, 0, mem.Kilobyte * 200, context.temp_allocator)
+	return CheckProcess{process = p, reader = r, buffer = buffer}, true
+}
+
+@(private = "file")
+map_diagnostic_severity :: proc(type: string) -> DiagnosticSeverity {
+	if strings.equal_fold(type, "warning") {
+		return .Warning
+	}
+
+	return .Error
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 vendor/ols/src/server/check.odin:214:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: vendor/ols/src/server/check.odin
+Cleaning up tree-sitter
+
+=== FILE: vendor/ols/src/server/documents.odin ===
+Starting odin-lint
+Processing file: vendor/ols/src/server/documents.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: vendor/ols/src/server/documents.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 13272
+DEBUG: Source content: package server
+
+import "base:intrinsics"
+import "core:os"
+
+import "core:fmt"
+import "core:log"
+import "core:mem/virtual"
+import "core:odin/ast"
+import "core:odin/parser"
+import "core:odin/tokenizer"
+import "core:path/filepath"
+import path "core:path/slashpath"
+import "core:strings"
+
+import "src:common"
+
+ParserError :: struct {
+	message: string,
+	line:    int,
+	column:  int,
+	file:    string,
+	offset:  int,
+}
+
+Package :: struct {
+	name:          string, //the entire absolute path to the directory
+	base:          string,
+	base_original: string,
+	original:      string,
+	range:         common.Range,
+	import_decl:   ^ast.Import_Decl,
+}
+
+Document :: struct {
+	uri:              common.Uri,
+	fullpath:         string,
+	text:             []u8,
+	used_text:        int, //allow for the text to be reallocated with more data than needed
+	client_owned:     bool,
+	diagnosed_errors: bool,
+	ast:              ast.File,
+	imports:          []Package,
+	package_name:     string,
+	allocator:        ^virtual.Arena, //because parser does not support freeing I use arena allocators for each document
+	operating_on:     int, //atomic
+	version:          Maybe(int),
+}
+
+
+DocumentStorage :: struct {
+	documents:       map[string]Document,
+	free_allocators: [dynamic]^virtual.Arena,
+}
+
+document_storage: DocumentStorage
+
+document_storage_shutdown :: proc() {
+	for k, v in document_storage.documents {
+		virtual.arena_destroy(v.allocator)
+		free(v.allocator)
+		delete(k)
+	}
+
+	for alloc in document_storage.free_allocators {
+		virtual.arena_destroy(alloc)
+		free(alloc)
+	}
+
+	delete(document_storage.free_allocators)
+	delete(document_storage.documents)
+}
+
+document_get_allocator :: proc() -> ^virtual.Arena {
+	if len(document_storage.free_allocators) > 0 {
+		return pop(&document_storage.free_allocators)
+	} else {
+		allocator := new(virtual.Arena)
+		_ = virtual.arena_init_growing(allocator)
+		return allocator
+	}
+}
+
+document_free_allocator :: proc(allocator: ^virtual.Arena) {
+	free_all(virtual.arena_allocator(allocator))
+	append(&document_storage.free_allocators, allocator)
+}
+
+document_get :: proc(uri_string: string) -> ^Document {
+	uri, parsed_ok := common.parse_uri(uri_string, context.temp_allocator)
+
+	if !parsed_ok {
+		return nil
+	}
+
+	document := &document_storage.documents[uri.path]
+
+	if document == nil {
+		log.errorf("Failed to get document %v", uri.path)
+		return nil
+	}
+
+	intrinsics.atomic_add(&document.operating_on, 1)
+
+	return document
+}
+
+document_release :: proc(document: ^Document) {
+	if document != nil {
+		intrinsics.atomic_sub(&document.operating_on, 1)
+	}
+}
+
+/*
+	Client opens a document with transferred text
+*/
+
+document_open :: proc(uri_string: string, text: string, config: ^common.Config, writer: ^Writer) -> common.Error {
+	uri, parsed_ok := common.parse_uri(uri_string, context.allocator)
+
+	if !parsed_ok {
+		log.error("Failed to parse uri")
+		return .ParseError
+	}
+
+	if document := &document_storage.documents[uri.path]; document != nil {
+		if document.client_owned {
+			log.errorf("Client called open on an already open document: %v ", document.uri.path)
+			return .InvalidRequest
+		}
+
+		document.uri = uri
+		document.client_owned = true
+		document.text = transmute([]u8)text
+		document.used_text = len(document.text)
+		document.allocator = document_get_allocator()
+
+		document_setup(document)
+
+		if err := document_refresh(document, config, writer); err != .None {
+			return err
+		}
+	} else {
+		document := Document {
+			uri          = uri,
+			text         = transmute([]u8)text,
+			client_owned = true,
+			used_text    = len(text),
+			allocator    = document_get_allocator(),
+		}
+
+		document_setup(&document)
+
+		if err := document_refresh(&document, config, writer); err != .None {
+			return err
+		}
+
+		document_storage.documents[strings.clone(uri.path)] = document
+	}
+
+	return .None
+}
+
+document_setup :: proc(document: ^Document) {
+	//Right now not all clients return the case correct windows path, and that causes issues with indexing, so we ensure that it's case correct.
+	when ODIN_OS == .Windows {
+		package_name := path.dir(document.uri.path, context.temp_allocator)
+		forward, _ := filepath.replace_path_separators(
+			common.get_case_sensitive_path(package_name),
+			'/',
+			context.temp_allocator,
+		)
+		if forward == "" {
+			document.package_name = package_name
+		} else {
+			document.package_name = strings.clone(forward, context.allocator)
+		}
+	} else {
+		document.package_name = path.dir(document.uri.path, context.allocator)
+	}
+
+	when ODIN_OS == .Windows {
+		correct := common.get_case_sensitive_path(document.uri.path)
+		fullpath: string
+		if correct == "" {
+			//This is basically here to handle the tests where the physical file doesn't actual exist.
+			document.fullpath, _ = filepath.replace_path_separators(document.uri.path, '/', context.allocator)
+		} else {
+			document.fullpath, _ = filepath.replace_path_separators(correct, '/', context.allocator)
+		}
+	} else {
+		document.fullpath = document.uri.path
+	}
+}
+
+/*
+	Function that applies changes to the given document through incremental syncronization
+*/
+document_apply_changes :: proc(
+	uri_string: string,
+	changes: [dynamic]TextDocumentContentChangeEvent,
+	version: Maybe(int),
+	config: ^common.Config,
+	writer: ^Writer,
+) -> common.Error {
+	uri, parsed_ok := common.parse_uri(uri_string, context.temp_allocator)
+
+	if !parsed_ok {
+		return .ParseError
+	}
+
+	document := &document_storage.documents[uri.path]
+
+	document.version = version
+
+	if !document.client_owned {
+		log.errorf("Client called change on an document not opened: %v ", document.uri.path)
+		return .InvalidRequest
+	}
+
+	for change in changes {
+		//for some reason sublime doesn't seem to care even if i tell it to do incremental sync
+		if range, ok := change.range.(common.Range); ok {
+			absolute_range, ok := common.get_absolute_range(range, document.text[:document.used_text])
+
+			if !ok {
+				return .ParseError
+			}
+
+			//lower bound is before the change
+			lower := document.text[:absolute_range.start]
+
+			//new change between lower and upper
+			middle := change.text
+
+			//upper bound is after the change
+			upper := document.text[absolute_range.end:document.used_text]
+
+			//total new size needed
+			document.used_text = len(lower) + len(change.text) + len(upper)
+
+			//Reduce the amount of allocation by allocating more memory than needed
+			if document.used_text > len(document.text) {
+				new_text := make([]u8, document.used_text * 2)
+
+				//join the 3 splices into the text
+				copy(new_text, lower)
+				copy(new_text[len(lower):], middle)
+				copy(new_text[len(lower) + len(middle):], upper)
+
+				delete(document.text)
+
+				document.text = new_text
+			} else {
+				//order matters here, we need to make sure we swap the data already in the text before the middle
+				copy(document.text, lower)
+				copy(document.text[len(lower) + len(middle):], upper)
+				copy(document.text[len(lower):], middle)
+			}
+		} else {
+			document.used_text = len(change.text)
+
+			if document.used_text > len(document.text) {
+				new_text := make([]u8, document.used_text * 2)
+				copy(new_text, change.text)
+				delete(document.text)
+				document.text = new_text
+			} else {
+				copy(document.text, change.text)
+			}
+		}
+	}
+
+	return document_refresh(document, config, writer)
+}
+
+document_close :: proc(uri_string: string) -> common.Error {
+	log.infof("document_close: %v", uri_string)
+
+	uri, parsed_ok := common.parse_uri(uri_string, context.temp_allocator)
+
+	if !parsed_ok {
+		return .ParseError
+	}
+
+	document := &document_storage.documents[uri.path]
+
+	if document == nil || !document.client_owned {
+		log.errorf("Client called close on a document that was never opened: %v ", uri.path)
+		return .InvalidRequest
+	}
+
+	if document.uri.uri in file_resolve_cache.files {
+		delete_key(&file_resolve_cache.files, document.uri.uri)
+	}
+
+	document_free_allocator(document.allocator)
+
+	document.allocator = nil
+	document.client_owned = false
+
+	common.delete_uri(document.uri)
+
+	delete(document.text)
+	delete(document.package_name)
+
+	document.used_text = 0
+
+	return .None
+}
+
+document_refresh :: proc(document: ^Document, config: ^common.Config, writer: ^Writer) -> common.Error {
+	errors, ok := parse_document(document, config)
+
+	if !ok {
+		return .ParseError
+	}
+
+	if is_ols_builtin_file(document.uri.uri) {
+		return .None
+	}
+
+	path := document.uri.path
+
+	when ODIN_OS == .Windows {
+		path = common.get_case_sensitive_path(path, context.temp_allocator)
+	}
+
+	uri := common.create_uri(path, context.temp_allocator)
+
+	remove_diagnostics(.Syntax, uri.uri)
+	check_unused_imports(document, config)
+
+	// Plugin analysis (minimal)
+	if plugin_manager.initialized {
+		plugin_diagnostics := analyze_with_plugins(&plugin_manager, cast(rawptr)document, &document.ast)
+		for diag in plugin_diagnostics {
+			add_diagnostics(.Syntax, uri.uri, diag)
+		}
+	}
+
+	if writer != nil && !config.disable_parser_errors {
+		document.diagnosed_errors = true
+
+		for error, i in errors {
+			add_diagnostics(
+				.Syntax,
+				uri.uri,
+				Diagnostic {
+					range = common.Range {
+						start = common.Position{line = error.line - 1, character = 0},
+						end = common.Position{line = error.line, character = 0},
+					},
+					severity = DiagnosticSeverity.Error,
+					code = "Syntax",
+					message = error.message,
+				},
+			)
+		}
+
+		push_diagnostics(writer)
+	}
+
+	return .None
+}
+
+current_errors: [dynamic]ParserError
+
+parser_error_handler :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
+	error := ParserError {
+		line    = pos.line,
+		column  = pos.column,
+		file    = pos.file,
+		offset  = pos.offset,
+		message = fmt.tprintf(msg, ..args),
+	}
+	append(&current_errors, error)
+}
+
+parse_document :: proc(document: ^Document, config: ^common.Config) -> ([]ParserError, bool) {
+	p := parser.Parser {
+		err   = parser_error_handler,
+		warn  = common.parser_warning_handler,
+		flags = {.Optional_Semicolons},
+	}
+
+	current_errors = make([dynamic]ParserError, context.temp_allocator)
+
+	if document.uri.uri in file_resolve_cache.files {
+		delete_key(&file_resolve_cache.files, document.uri.uri)
+	}
+
+	free_all(virtual.arena_allocator(document.allocator))
+
+	context.allocator = virtual.arena_allocator(document.allocator)
+
+	pkg := new(ast.Package)
+	pkg.kind = .Normal
+	pkg.fullpath = document.fullpath
+
+	if strings.contains(document.fullpath, "base/runtime") {
+		pkg.kind = .Runtime
+	}
+
+	document.ast = ast.File {
+		fullpath = document.fullpath,
+		src      = string(document.text[:document.used_text]),
+		pkg      = pkg,
+	}
+
+	parser.parse_file(&p, &document.ast)
+
+	parse_imports(document, config)
+
+	folder := filepath.dir(document.fullpath, context.temp_allocator)
+	if strings.equal_fold(folder, config.builtin_path) {
+		return nil, true
+	}
+
+	return current_errors[:], true
+}
+
+parse_imports :: proc(document: ^Document, config: ^common.Config) {
+	imports := make([dynamic]Package)
+
+	for imp, index in document.ast.imports {
+		if i := strings.index(imp.fullpath, "\""); i == -1 {
+			continue
+		}
+		// TODO: Breakdown this range like with semantic tokens
+		range := get_import_range(imp, string(document.text))
+
+		//collection specified
+		if i := strings.index(imp.fullpath, ":"); i != -1 && i > 1 && i < len(imp.fullpath) - 1 {
+			if len(imp.fullpath) < 2 {
+				continue
+			}
+
+			collection := imp.fullpath[1:i]
+			p := imp.fullpath[i + 1:len(imp.fullpath) - 1]
+
+			dir, ok := config.collections[collection]
+
+			if !ok {
+				continue
+			}
+
+			import_: Package
+			import_.original = imp.fullpath
+			import_.name = strings.clone(path.join(elems = {dir, p}, allocator = context.temp_allocator))
+			import_.range = range
+			import_.import_decl = imp
+
+			if imp.name.text != "" {
+				import_.base = imp.name.text
+				import_.base_original = path.base(import_.name, false)
+			} else {
+				import_.base = path.base(import_.name, false)
+			}
+
+			append(&imports, import_)
+		} else {
+			//relative
+			if len(imp.fullpath) < 2 {
+				continue
+			}
+
+			import_: Package
+			import_.original = imp.fullpath
+			import_.name = path.join(
+				elems = {document.package_name, imp.fullpath[1:len(imp.fullpath) - 1]},
+				allocator = context.temp_allocator,
+			)
+			import_.name = path.clean(import_.name)
+			import_.range = range
+			import_.import_decl = imp
+
+			if imp.name.text != "" {
+				import_.base = imp.name.text
+				import_.base_original = path.base(import_.name, false)
+			} else {
+				import_.base = path.base(import_.name, false)
+			}
+
+			append(&imports, import_)
+		}
+	}
+
+	for imp in imports {
+		try_build_package(imp.name)
+	}
+
+	try_build_package(document.package_name)
+
+	document.imports = imports[:]
+}
+
+get_import_range :: proc(imp: ^ast.Import_Decl, src: string) -> common.Range {
+	if imp.name.text != "" {
+		start := common.token_pos_to_position(imp.name.pos, src)
+		end := start
+		end.character += len(imp.name.text)
+		return {start = start, end = end}
+	}
+
+	start := common.token_pos_to_position(imp.relpath.pos, src)
+	end := start
+	text_len := len(imp.relpath.text)
+	end.character += text_len
+	return {start = start, end = end}
+}
+
+is_ols_builtin_file :: proc(path: string) -> bool {
+	p := path
+	when ODIN_OS == .Windows {
+		p, _ = os.replace_path_separators(p, '/', context.temp_allocator)
+	}
+	return(
+		strings.has_suffix(p, "/builtin/builtin.odin") ||
+		strings.has_suffix(p, "/builtin/intrinsics.odin") ||
+		strings.has_suffix(p, "/intrinsics/intrinsics.odin") \
+	)
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 vendor/ols/src/server/documents.odin:244:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/documents.odin:264:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/documents.odin:397:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/documents.odin:424:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: vendor/ols/src/server/documents.odin
+Cleaning up tree-sitter
+

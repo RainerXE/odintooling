@@ -1,0 +1,37 @@
+Starting odin-lint
+Processing file: tests/C002_COR_POINTER/c002_fixture_pass.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: tests/C002_COR_POINTER/c002_fixture_pass.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 236
+DEBUG: Source content: // Test case for C002: proper single free
+package main
+
+main :: proc() {
+    data := make([]int, 100)
+    defer free(data)  // Single free - proper
+    
+    // Process data...
+    for i in 0..<len(data) {
+        data[i] = i * 2
+    }
+}
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+Checking stub rule for: tests/C002_COR_POINTER/c002_fixture_pass.odin
+Cleaning up tree-sitter
+No diagnostics found
