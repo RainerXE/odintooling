@@ -1,0 +1,216 @@
+=== Testing: tests/C001_COR_MEMORY/c001_all.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_all.odin
+Parsing file: tests/C001_COR_MEMORY/c001_all.odin
+DEBUG: Source content: // C001 All Tests - Comprehensive test suite for memory allocation rule
+// This file documents all C001 test cases and their expected behavior
+// C001 Test Suite Organization
+// Each file tests specific aspects of the C001 memory allocation rule
+// c001_fixture_fail.odin - Should trigger C001 violation
+// To run all C001 tests:
+//   ./odin-lint tests/C001_COR_MEMORY/*.odin
+    fmt.println("C001 Test Suite")
+    fmt.println("Run individual tests with: ./odin-lint tests/C001_COR_MEMORY/c001_*.odin")
+Checking stub rule for: tests/C001_COR_MEMORY/c001_all.odin
+No diagnostics found
+=== Testing: tests/C001_COR_MEMORY/c001_allocation_methods.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_allocation_methods.odin
+Parsing file: tests/C001_COR_MEMORY/c001_allocation_methods.odin
+Checking stub rule for: tests/C001_COR_MEMORY/c001_allocation_methods.odin
+No diagnostics found
+=== Testing: tests/C001_COR_MEMORY/c001_allocator_detection.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_allocator_detection.odin
+Parsing file: tests/C001_COR_MEMORY/c001_allocator_detection.odin
+// Test case 1: Should NOT trigger C001 - has allocator argument
+// Test case 2: Should NOT trigger C001 - has temp_allocator
+// Test case 3: SHOULD trigger C001 - no allocator argument
+    data := make([]int, 10)  // SHOULD trigger C001 - default allocator, no defer
+// Test case 4: Should NOT trigger C001 - comment mentions allocator
+// Test case 5: Should NOT trigger C001 - variable named allocator
+// Test case 6: SHOULD trigger C001 - slice with capacity but no allocator
+🔴 tests/C001_COR_MEMORY/c001_allocator_detection.odin:23:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_allocator_detection.odin:45:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_allocator_detection.odin
+=== Testing: tests/C001_COR_MEMORY/c001_allocator.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_allocator.odin
+Parsing file: tests/C001_COR_MEMORY/c001_allocator.odin
+    fmt.println("Testing allocator detection...")
+    // Test case 3: Regular make without allocator (should trigger C001)
+🔴 tests/C001_COR_MEMORY/c001_allocator.odin:12:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_allocator.odin:18:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_allocator.odin
+=== Testing: tests/C001_COR_MEMORY/c001_basic.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_basic.odin
+Parsing file: tests/C001_COR_MEMORY/c001_basic.odin
+    // This should trigger C001 - allocation without defer free
+    // This should NOT trigger C001 - has defer free
+🔴 tests/C001_COR_MEMORY/c001_basic.odin:7:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_basic.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_basic.odin
+=== Testing: tests/C001_COR_MEMORY/c001_complex.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_complex.odin
+Parsing file: tests/C001_COR_MEMORY/c001_complex.odin
+🔴 tests/C001_COR_MEMORY/c001_complex.odin:7:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_complex.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_complex.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_complex.odin:17:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_complex.odin:21:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_complex.odin
+=== Testing: tests/C001_COR_MEMORY/c001_defer_delete_recognition.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_defer_delete_recognition.odin
+Parsing file: tests/C001_COR_MEMORY/c001_defer_delete_recognition.odin
+🔴 tests/C001_COR_MEMORY/c001_defer_delete_recognition.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_defer_delete_recognition.odin
+=== Testing: tests/C001_COR_MEMORY/c001_defer_extraction.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_defer_extraction.odin
+Parsing file: tests/C001_COR_MEMORY/c001_defer_extraction.odin
+Checking stub rule for: tests/C001_COR_MEMORY/c001_defer_extraction.odin
+No diagnostics found
+=== Testing: tests/C001_COR_MEMORY/c001_edge_cases.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_edge_cases.odin
+Parsing file: tests/C001_COR_MEMORY/c001_edge_cases.odin
+🔴 tests/C001_COR_MEMORY/c001_edge_cases.odin:13:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_edge_cases.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_edge_cases.odin
+=== Testing: tests/C001_COR_MEMORY/c001_exclusion.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_exclusion.odin
+Parsing file: tests/C001_COR_MEMORY/c001_exclusion.odin
+// Custom functions that should not trigger C001
+🔴 tests/C001_COR_MEMORY/c001_exclusion.odin:20:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_exclusion.odin:21:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_exclusion.odin:22:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_exclusion.odin:23:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_exclusion.odin
+=== Testing: tests/C001_COR_MEMORY/c001_fixture_fail.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_fixture_fail.odin
+Parsing file: tests/C001_COR_MEMORY/c001_fixture_fail.odin
+DEBUG: Source content: // Test case for C001: Allocation without matching defer free
+// This should trigger C001 diagnostic
+    data := make([]int, 100)  // C001 should trigger here
+    buf := new(int)  // C001 should trigger here too
+Checking stub rule for: tests/C001_COR_MEMORY/c001_fixture_fail.odin
+No diagnostics found
+=== Testing: tests/C001_COR_MEMORY/c001_fixture_pass.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_fixture_pass.odin
+Parsing file: tests/C001_COR_MEMORY/c001_fixture_pass.odin
+DEBUG: Source content: // Test case for C001: proper allocation with defer free
+    // This should pass C001
+🔴 tests/C001_COR_MEMORY/c001_fixture_pass.odin:6:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_fixture_pass.odin
+=== Testing: tests/C001_COR_MEMORY/c001_fixture_simple_fail.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_fixture_simple_fail.odin
+Parsing file: tests/C001_COR_MEMORY/c001_fixture_simple_fail.odin
+DEBUG: Source content: // Test case for C001: allocation without defer free
+    // This should trigger C001 when implemented
+🔴 tests/C001_COR_MEMORY/c001_fixture_simple_fail.odin:6:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_fixture_simple_fail.odin
+=== Testing: tests/C001_COR_MEMORY/c001_improvements.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_improvements.odin
+Parsing file: tests/C001_COR_MEMORY/c001_improvements.odin
+// Test cases for C001 improvements
+    fmt.println("Testing C001 improvements...")
+    // Test case 1: Allocator in middle parameters (should NOT trigger C001)
+    // Test case 2: Slice allocation with defer delete (should NOT trigger C001)
+    // Test case 3: Performance-critical code (should NOT trigger C001)
+    // Test case 4: Regular allocation without defer (SHOULD trigger C001)
+🔴 tests/C001_COR_MEMORY/c001_improvements.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_improvements.odin:22:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_improvements.odin
+=== Testing: tests/C001_COR_MEMORY/c001_make_slice.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_make_slice.odin
+Parsing file: tests/C001_COR_MEMORY/c001_make_slice.odin
+DEBUG: Source content: // C001 Make Slice Test - Tests make([]T) allocations without defer free
+// Expected: Should trigger C001 violation
+    slice := make([]int, 10)  // C001 should flag this
+    buffer := make([]byte, 1024)  // C001 should flag this
+🔴 tests/C001_COR_MEMORY/c001_make_slice.odin:8:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_make_slice.odin:11:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_make_slice.odin
+=== Testing: tests/C001_COR_MEMORY/c001_min_function.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_min_function.odin
+Parsing file: tests/C001_COR_MEMORY/c001_min_function.odin
+    // This should NOT trigger C001 - min() is not an allocation
+    // This SHOULD trigger C001 - make() is an allocation
+🔴 tests/C001_COR_MEMORY/c001_min_function.odin:12:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_min_function.odin
+=== Testing: tests/C001_COR_MEMORY/c001_mixed_cases.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_mixed_cases.odin
+Parsing file: tests/C001_COR_MEMORY/c001_mixed_cases.odin
+    fmt.println("Testing C001 improvements...")
+    // Test case 1: Slice allocation with defer delete (should NOT trigger C001)
+    // Test case 2: Regular allocation without defer (SHOULD trigger C001)
+🔴 tests/C001_COR_MEMORY/c001_mixed_cases.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_mixed_cases.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_mixed_cases.odin
+=== Testing: tests/C001_COR_MEMORY/c001_new_allocation.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_new_allocation.odin
+Parsing file: tests/C001_COR_MEMORY/c001_new_allocation.odin
+    // This should trigger C001 - new allocation without defer free
+🔴 tests/C001_COR_MEMORY/c001_new_allocation.odin:8:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_new_allocation.odin
+=== Testing: tests/C001_COR_MEMORY/c001_original_issue_test.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_original_issue_test.odin
+Parsing file: tests/C001_COR_MEMORY/c001_original_issue_test.odin
+    // Original problematic case - this should PASS (no C001 violation)
+Checking stub rule for: tests/C001_COR_MEMORY/c001_original_issue_test.odin
+No diagnostics found
+=== Testing: tests/C001_COR_MEMORY/c001_perf_separate.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_perf_separate.odin
+Parsing file: tests/C001_COR_MEMORY/c001_perf_separate.odin
+🟡 tests/C001_COR_MEMORY/c001_perf_separate.odin:8:5: C001 [correctness] [C001] Allocation in performance-critical block — verify this is intentional
+🔴 tests/C001_COR_MEMORY/c001_perf_separate.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_perf_separate.odin
+=== Testing: tests/C001_COR_MEMORY/c001_perf.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_perf.odin
+Parsing file: tests/C001_COR_MEMORY/c001_perf.odin
+🟡 tests/C001_COR_MEMORY/c001_perf.odin:8:5: C001 [correctness] [C001] Allocation in performance-critical block — verify this is intentional
+🟡 tests/C001_COR_MEMORY/c001_perf.odin:12:5: C001 [correctness] [C001] Allocation in performance-critical block — verify this is intentional
+Checking stub rule for: tests/C001_COR_MEMORY/c001_perf.odin
+=== Testing: tests/C001_COR_MEMORY/c001_performance.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_performance.odin
+Parsing file: tests/C001_COR_MEMORY/c001_performance.odin
+    fmt.println("Testing performance-critical detection...")
+    // No defer free - but should NOT trigger C001 due to PERF comment
+    // Test case 2: Regular code (should trigger C001)
+🔴 tests/C001_COR_MEMORY/c001_performance.odin:12:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_performance.odin:16:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_performance.odin
+=== Testing: tests/C001_COR_MEMORY/c001_problematic_case.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_problematic_case.odin
+Parsing file: tests/C001_COR_MEMORY/c001_problematic_case.odin
+Checking stub rule for: tests/C001_COR_MEMORY/c001_problematic_case.odin
+No diagnostics found
+=== Testing: tests/C001_COR_MEMORY/c001_proper_defer.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_proper_defer.odin
+Parsing file: tests/C001_COR_MEMORY/c001_proper_defer.odin
+DEBUG: Source content: // Test case for C001: Proper allocation with defer free
+// This should NOT trigger C001 diagnostic
+Checking stub rule for: tests/C001_COR_MEMORY/c001_proper_defer.odin
+No diagnostics found
+=== Testing: tests/C001_COR_MEMORY/c001_simple_allocation.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_simple_allocation.odin
+Parsing file: tests/C001_COR_MEMORY/c001_simple_allocation.odin
+    // This should trigger C001 - allocation without defer free
+🔴 tests/C001_COR_MEMORY/c001_simple_allocation.odin:8:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_simple_allocation.odin
+=== Testing: tests/C001_COR_MEMORY/c001_suppression.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_suppression.odin
+Parsing file: tests/C001_COR_MEMORY/c001_suppression.odin
+    // This SHOULD trigger C001 - allocation without defer free
+    data2 := make([]int, 10)  // odin-lint:ignore C001 intentional ownership transfer
+    // odin-lint:ignore C001 caller takes ownership
+    // This SHOULD trigger C001 - no suppression comment
+🔴 tests/C001_COR_MEMORY/c001_suppression.odin:8:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_suppression.odin:18:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_suppression.odin
+=== Testing: tests/C001_COR_MEMORY/c001_test_allocation_detection.odin ===
+Processing file: tests/C001_COR_MEMORY/c001_test_allocation_detection.odin
+Parsing file: tests/C001_COR_MEMORY/c001_test_allocation_detection.odin
+    // Test 1: make() allocation - should trigger C001
+    // Test 2: new() allocation - should trigger C001  
+    fmt.println("Testing allocation detection")
+// Test with proper cleanup - should NOT trigger C001
+    // Should trigger C001 for data3
+🔴 tests/C001_COR_MEMORY/c001_test_allocation_detection.odin:8:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_test_allocation_detection.odin:12:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 tests/C001_COR_MEMORY/c001_test_allocation_detection.odin:31:5: C001 [correctness] Allocation without matching defer free in same scope
+Checking stub rule for: tests/C001_COR_MEMORY/c001_test_allocation_detection.odin
