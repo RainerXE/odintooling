@@ -137,7 +137,7 @@ createInternalError :: proc(file_path: string, line: int, column: int, error_msg
 }
 
 // stubRule is a stub rule for pipeline validation
-stubRule :: proc(file_path: string) -> ( Diagnostic, bool) {
+stubRule :: proc(file_path: string) -> (Diagnostic, bool) {
     // Check if file contains "TODO_FIXME" pattern
     // This is a placeholder - actual implementation will use tree-sitter
     
@@ -145,8 +145,8 @@ stubRule :: proc(file_path: string) -> ( Diagnostic, bool) {
     
     // Simple file content check for now
     content, ok := os.read_entire_file_from_path(file_path, context.allocator)
-    if !ok {
-        return  Diagnostic{}, false
+    if not ok {
+        return Diagnostic{}, false
     }
     defer delete(content)
     
