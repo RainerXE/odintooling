@@ -20,18 +20,31 @@ C002AllocationInfo :: struct {
     reassignment_line: int,  // Line where reassignment occurred
 }
 
-// Global map to track allocations and frees
-c002_allocations_map: map[string][]C002AllocationInfo
-c002_current_scope: int = 0  // Track current scope level
-c002_reassignments: map[string]bool  // Track reassigned variables
+// C002AnalysisContext holds analysis state for a single file
+C002AnalysisContext :: struct {
+    allocations_map: map[string][dynamic]C002AllocationInfo,
+    current_scope: int,
+    reassignments: map[string]bool,
+}
+
+// create_c002_context creates a new analysis context
+create_c002_context :: proc() -> C002AnalysisContext {
+    return C002AnalysisContext{
+        allocations_map = {},
+        current_scope = 0,
+        reassignments = {},
+    }
+}
 
 // C002Rule creates the C002 rule
+// Note: c002Matcher is not stored in the Rule struct due to signature mismatch
+// It's called directly from main.odin with the required context parameter
 C002Rule :: proc() -> Rule {
     return Rule{
         id = "C002",
         tier = "correctness",
         category = .CORRECTNESS,  // Clippy-inspired categorization
-        matcher = c002Matcher,
+        matcher = nil,  // c002Matcher has different signature, called directly
         message = c002Message,
         fix_hint = c002FixHint,
     }
@@ -43,13 +56,22 @@ is_cleanup_function :: proc(text: string) -> bool {
 }
 
 // c002Matcher checks for defer free on wrong pointer
-c002Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
+c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext) -> []Diagnostic {
+    diagnostics: [dynamic]Diagnostic
     // Track scope boundaries
     if is_scope_boundary(node) {
         if is_entering_scope(node) {
-            c002_current_scope += 1
+            ctx.current_scope += 1
         } else {
-            c002_current_scope -= 1
+            ctx.current_scope -= 1
+        }
+    }
+    
+    // Check for pointer allocations (make, new, etc.)
+    if is_pointer_allocation(node) {
+        var_name := extract_var_name_from_allocation(node)
+        if var_name != "" {
+            c002_markAsAllocated(var_name, node.start_line, node.start_column, ctx.current_scope, ctx)
         }
     }
     
@@ -57,15 +79,15 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
     if is_pointer_reassignment(node) {
         var_name := extract_var_name_from_assignment(node)
         if var_name != "" {
-            c002_reassignments[var_name] = true
+            ctx.reassignments[var_name] = true
             // Mark as reassigned in tracking map
-            if len(c002_allocations_map[var_name]) > 0 {
-                existing := c002_allocations_map[var_name]
+            if len(ctx.allocations_map[var_name]) > 0 {
+                existing := ctx.allocations_map[var_name]
                 for i in 0..<len(existing) {
                     existing[i].is_reassigned = true
                     existing[i].reassignment_line = node.start_line
                 }
-                c002_allocations_map[var_name] = existing
+                ctx.allocations_map[var_name] = existing
             }
         }
     }
@@ -77,7 +99,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
         if var_name != "" {
             // Check if this defer free references a different variable than the allocation
             if is_suspicious_pointer_usage(node) {
-                return Diagnostic{
+                diagnostics = append(diagnostics, Diagnostic{
                     file = file_path,
                     line = node.start_line,
                     column = node.start_column,
@@ -86,47 +108,70 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
                     message = "Defer free on wrong pointer - does not match allocation",
                     fix = "Ensure defer free uses the same pointer as the allocation",
                     has_fix = true,
-                }
+                })
             }
             
             // Check if pointer was reassigned before free
-            if c002_reassignments[var_name] {
-                return Diagnostic{
+            if ctx.reassignments[var_name] {
+                diagnostics = append(diagnostics, Diagnostic{
                     file = file_path,
                     line = node.start_line,
                     column = node.start_column,
                     rule_id = "C002",
                     tier = "correctness",
                     message = "C002 [correctness] Freeing reassigned pointer",
-                    fix: "Pointer was reassigned before free - this may free wrong memory",
-                    has_fix: true,
-                    diag_type: .VIOLATION,
-                }
+                    fix = "Pointer was reassigned before free - this may free wrong memory",
+                    has_fix = true,
+                    diag_type = .VIOLATION,
+                })
             }
             
             // Track the free operation with current scope
-            diag := c002_markAsFreed(var_name, node.start_line, node.start_column, c002_current_scope)
+            diag := c002_markAsFreed(var_name, node.start_line, node.start_column, ctx.current_scope, file_path, ctx)
             if diag.message != "" {
-                return diag
+                diagnostics = append(diagnostics, diag)
             }
         }
     }
     
     // Check children recursively
     for &child in node.children {
-        diag := c002Matcher(file_path, &child)
-        if diag.message != "" {
-            return diag
+        child_diagnostics := c002Matcher(file_path, &child, ctx)
+        for child_diag in child_diagnostics {
+            if child_diag.message != "" {
+                diagnostics = append(diagnostics, child_diag)
+            }
         }
     }
     
-    return Diagnostic{}
+    return diagnostics[:]  // Convert dynamic array to slice for return
+}
+
+// c002_markAsAllocated tracks a new pointer allocation
+c002_markAsAllocated :: proc(var_name: string, line: int, col: int, scope_level: int, ctx: ^C002AnalysisContext) {
+    allocation := C002AllocationInfo{
+        var_name = var_name,
+        line = line,
+        col = col,
+        is_freed = false,
+        free_count = 0,
+        scope_level = scope_level,
+        is_reassigned = false,
+        reassignment_line = 0,
+    }
+    // Initialize dynamic array if key doesn't exist
+    existing := ctx.allocations_map[var_name]
+    if len(existing) == 0 {
+        existing = make([dynamic]C002AllocationInfo)
+    }
+    existing = append(existing, allocation)
+    ctx.allocations_map[var_name] = existing
 }
 
 // c002_markAsFreed marks a variable as freed and detects double frees
-c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int) -> Diagnostic {
-    if len(c002_allocations_map[var_name]) > 0 {
-        existing := c002_allocations_map[var_name]
+c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int, file_path: string, ctx: ^C002AnalysisContext) -> Diagnostic {
+    if len(ctx.allocations_map[var_name]) > 0 {
+        existing := ctx.allocations_map[var_name]
         for i in 0..<len(existing) {
             // Only process allocations in the same scope
             if existing[i].scope_level == scope_level {
@@ -135,21 +180,21 @@ c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int
                 // Detect and report double free
                 if existing[i].free_count > 1 {
                     return Diagnostic{
-                        file = "",
-                        line: line,
-                        column: col,
-                        rule_id: "C002",
-                        tier: "correctness",
-                        message: "C002 [correctness] Multiple defer frees on same allocation",
-                        fix: fmt.tprintf("Allocation at line %d,%d freed %d times",
+                        file = file_path,  // Use passed file path
+                        line = line,
+                        column = col,
+                        rule_id = "C002",
+                        tier = "correctness",
+                        message = "C002 [correctness] Multiple defer frees on same allocation",
+                        fix = fmt.tprintf("Allocation at line %d,%d freed %d times",
                                         existing[i].line, existing[i].col, existing[i].free_count),
-                        has_fix: true,
-                        diag_type: .VIOLATION,
+                        has_fix = true,
+                        diag_type = .VIOLATION,
                     }
                 }
             }
         }
-        c002_allocations_map[var_name] = existing
+        ctx.allocations_map[var_name] = existing
     }
     return Diagnostic{}
 }
@@ -161,12 +206,59 @@ extract_var_name_from_free :: proc(node: ^ASTNode) -> string {
     
     // Pattern: defer free(variable)
     if strings.contains(text, "free(") {
-        start_idx := strings.index_of(text, "free(") + 5
-        end_idx := strings.index_of(text, ")", start_idx)
-        if start_idx >= 0 && end_idx > start_idx {
-            var_name := strings.trim(text[start_idx..end_idx])
-            // Remove any trailing commas or whitespace
-            var_name = strings.trim(var_name, " ,")
+        start_idx := strings.index(text, "free(") + 5
+        // Find closing parenthesis after start_idx
+        rest := text[start_idx:]
+        rel_idx := strings.index(rest, ")")
+        if rel_idx >= 0 {
+            end_idx := start_idx + rel_idx
+            if start_idx >= 0 && end_idx > start_idx {
+                var_name := strings.trim(text[start_idx:end_idx], " \t")
+                // Remove any trailing commas or whitespace
+                var_name = strings.trim(var_name, " ,")
+                return var_name
+            }
+        }
+    }
+    
+    return ""
+}
+
+// is_pointer_allocation checks if node is a pointer allocation (make, new, etc.)
+is_pointer_allocation :: proc(node: ^ASTNode) -> bool {
+    return strings.contains(node.node_type, "call_expression") &&
+           (strings.contains(node.text, "make(") || 
+            strings.contains(node.text, "new(") ||
+            strings.contains(node.text, "alloc(") ||
+            strings.contains(node.text, "malloc("))
+}
+
+// extract_var_name_from_allocation extracts variable name from allocation
+extract_var_name_from_allocation :: proc(node: ^ASTNode) -> string {
+    text := node.text
+    
+    // Pattern: variable := make(...) or variable = make(...)
+    // Look for assignment before the allocation call
+    if strings.contains(text, ":=") {
+        parts := strings.split(text, ":=")
+        if len(parts) >= 1 {
+            var_name := strings.trim(parts[0], " \t")
+            // Remove any type annotations
+            if strings.contains(var_name, ":") {
+                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
+            }
+            return var_name
+        }
+    } else if strings.contains(text, "=") {
+        // Handle variable = make(...) pattern
+        // Look for the assignment target before the =
+        parts := strings.split(text, "=")
+        if len(parts) >= 1 {
+            var_name := strings.trim(parts[0], " \t")
+            // Remove any type annotations
+            if strings.contains(var_name, ":") {
+                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
+            }
             return var_name
         }
     }
@@ -176,36 +268,22 @@ extract_var_name_from_free :: proc(node: ^ASTNode) -> string {
 
 // is_scope_boundary checks if node represents a scope boundary
 is_scope_boundary :: proc(node: ^ASTNode) -> bool {
-    return strings.contains(node.node_type, "block") ||
-           strings.contains(node.node_type, "proc") ||
-           strings.contains(node.node_type, "for") ||
-           strings.contains(node.node_type, "if") ||
-           strings.contains(node.node_type, "case")
+    // Only track actual scope containers (blocks) to avoid double-counting
+    return strings.contains(node.node_type, "block")
 }
 
 // is_entering_scope checks if we're entering a new scope
 is_entering_scope :: proc(node: ^ASTNode) -> bool {
     // For blocks, we're entering when we see the opening brace
-    if strings.contains(node.node_type, "block") {
-        return strings.contains(node.text, "{")
-    }
-    // For control structures, we're entering at the start
-    return strings.contains(node.node_type, "proc") ||
-           strings.contains(node.node_type, "for") ||
-           strings.contains(node.node_type, "if") ||
-           strings.contains(node.node_type, "case")
+    return strings.contains(node.node_type, "block") && 
+           strings.contains(node.text, "{")
 }
 
 // is_pointer_reassignment checks if node is a pointer reassignment
 is_pointer_reassignment :: proc(node: ^ASTNode) -> bool {
-    // Look for assignment patterns with pointer variables
-    return strings.contains(node.node_type, "assignment") &&
-           (strings.contains(node.text, ":=") || strings.contains(node.text, "=")) &&
-           (strings.contains(node.text, "ptr") || 
-            strings.contains(node.text, "buffer") ||
-            strings.contains(node.text, "data") ||
-            strings.contains(node.text, "mem") ||
-            strings.contains(node.text, "alloc"))
+    // Rely on node type alone since we're already checking for "assignment"
+    // This avoids false positives from != and == operators
+    return strings.contains(node.node_type, "assignment")
 }
 
 // extract_var_name_from_assignment extracts variable name from assignment
@@ -216,17 +294,17 @@ extract_var_name_from_assignment :: proc(node: ^ASTNode) -> string {
     if strings.contains(text, ":=") {
         parts := strings.split(text, ":=")
         if len(parts) >= 1 {
-            var_name := strings.trim(parts[0])
+            var_name := strings.trim(parts[0], " \t")
             // Remove any type annotations
             if strings.contains(var_name, ":") {
-                var_name = strings.trim(strings.split(var_name, ":")[0])
+                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
             }
             return var_name
         }
     } else if strings.contains(text, "=") {
         parts := strings.split(text, "=")
         if len(parts) >= 1 {
-            var_name := strings.trim(parts[0])
+            var_name := strings.trim(parts[0], " \t")
             return var_name
         }
     }
@@ -245,31 +323,21 @@ is_defer_cleanup :: proc(node: ^ASTNode) -> bool {
 }
 
 // is_suspicious_pointer_usage checks for potential wrong pointer patterns
+// Uses structural analysis instead of name blocklisting
 is_suspicious_pointer_usage :: proc(node: ^ASTNode) -> bool {
-    // Pattern 1: Reassignment before free (common mistake)
-    if strings.contains(node.text, "=") && strings.contains(node.text, "free") {
-        return true
-    }
-    
-    // Pattern 2: Using different variable names
-    if (strings.contains(node.text, "ptr2") || strings.contains(node.text, "temp") || 
-        strings.contains(node.text, "copy") || strings.contains(node.text, "backup") ||
-        strings.contains(node.text, "old") || strings.contains(node.text, "other") ||
-        strings.contains(node.text, "different") || strings.contains(node.text, "wrong") ||
-        strings.contains(node.text, "mistake") || strings.contains(node.text, "alternative") ||
-        strings.contains(node.text, "second")) && strings.contains(node.text, "free") {
-        return true
-    }
-    
-    // Pattern 3: Complex expressions in free (often wrong)
+    // Pattern 1: Complex expressions in free (often wrong)
     if strings.contains(node.text, "+)") || strings.contains(node.text, "-)") {
         return true
     }
     
-    // Pattern 4: Freeing after type conversion (often problematic)
+    // Pattern 2: Freeing after type conversion (often problematic)
     if strings.contains(node.text, "cast") && strings.contains(node.text, "free") {
         return true
     }
+    
+    // Note: Removed Pattern 3 (reassignment detection) since it's redundant
+    // with the ctx.reassignments check. Also removed name-based blocklisting
+    // (ptr2, temp, copy, etc.) to avoid false positives.
     
     return false
 }

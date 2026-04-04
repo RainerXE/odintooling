@@ -144,8 +144,8 @@ stubRule :: proc(file_path: string) -> ( Diagnostic, bool) {
     fmt.println("Checking stub rule for:", file_path)
     
     // Simple file content check for now
-    content, err := os.read_entire_file_from_path(file_path, context.allocator)
-    if err != nil {
+    content, ok := os.read_entire_file_from_path(file_path, context.allocator)
+    if !ok {
         return  Diagnostic{}, false
     }
     defer delete(content)
@@ -260,12 +260,19 @@ main :: proc() {
         }
     }
     
-    // Apply C002 rule with parsed AST
-    c002_rule := C002Rule()
-    diag2 := c002_rule.matcher(file_path, &ast_root)
-    if diag2.message != "" {
-        emitDiagnostic(diag2)
-        diagnostics_found = true
+    // Apply C002 rule with parsed AST and fresh context
+    // Note: c002Matcher is called directly due to signature mismatch with Rule.matcher
+    c002_ctx := create_c002_context()
+    c002_diagnostics := c002Matcher(file_path, &ast_root, &c002_ctx)
+    
+    // Remove duplicates before emitting
+    unique_c002_diagnostics := dedupDiagnostics(c002_diagnostics)
+    
+    for diag2 in unique_c002_diagnostics {
+        if diag2.message != "" {
+            emitDiagnostic(diag2)
+            diagnostics_found = true
+        }
     }
     
     // Also run stub rule for now
