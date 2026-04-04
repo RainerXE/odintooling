@@ -253,10 +253,13 @@ main :: proc() {
             }
         }
     } else {
-        diag := c001_rule.matcher(file_path, &ast_root)
-        if diag.message != "" {
-            emitDiagnostic(diag)
-            diagnostics_found = true
+        // Add nil guard for rules that don't use Rule.matcher (like C002)
+        if c001_rule.matcher != nil {
+            diag := c001_rule.matcher(file_path, &ast_root)
+            if diag.message != "" {
+                emitDiagnostic(diag)
+                diagnostics_found = true
+            }
         }
     }
     
