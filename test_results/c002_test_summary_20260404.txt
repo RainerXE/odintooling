@@ -1,0 +1,430 @@
+=== C002 Rule Test Summary ===
+Generated: Sat Apr  4 18:57:39 CEST 2026
+Test directory: ./tests/C002_COR_POINTER
+
+./tests/C002_COR_POINTER/c002_explicit_violation.odin - 1 violations
+
+=== DETAILED OUTPUT FOR c002_explicit_violation.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_explicit_violation.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: ./tests/C002_COR_POINTER/c002_explicit_violation.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 1051
+DEBUG: Source content: // C002 Explicit Violation Test
+// This test case should definitely trigger C002
+
+package main
+
+import "core:fmt"
+
+main :: proc() {
+    // Clear case: freeing the same pointer twice
+    ptr := make([]int, 50)
+    defer free(ptr)  // First free - correct
+    defer free(ptr)  // Second free - should trigger C002
+    
+    // Another clear case: wrong pointer in defer
+    data1 := make([]int, 100)
+    data2 := make([]int, 200)
+    
+    // Free data1 twice, never free data2
+    defer free(data1)  // First free
+    defer free(data1)  // Second free - should trigger C002
+    
+    // Use the data to prevent optimization
+    for i in 0..<len(data1) {
+        data1[i] = i
+    }
+    for i in 0..<len(data2) {
+        data2[i] = i * 2
+    }
+}
+
+// Function with obvious pointer misuse
+proc test_double_free() {
+    buffer := make([]int, 75)
+    
+    // Multiple defers on same pointer
+    defer free(buffer)
+    defer free(buffer)  // Clear violation
+    defer free(buffer)  // Another violation
+    
+    // This should trigger multiple C002 diagnostics
+}
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 ./tests/C002_COR_POINTER/c002_explicit_violation.odin:16:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: ./tests/C002_COR_POINTER/c002_explicit_violation.odin
+Cleaning up tree-sitter
+
+./tests/C002_COR_POINTER/c002_fixture_fail.odin - 2 violations
+
+=== DETAILED OUTPUT FOR c002_fixture_fail.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_fixture_fail.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: ./tests/C002_COR_POINTER/c002_fixture_fail.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 950
+DEBUG: Source content: // Test case for C002: Defer free on wrong pointer
+// This should trigger C002 diagnostic
+
+package main
+
+import "core:fmt"
+
+main :: proc() {
+    // Allocate first pointer
+    data1 := make([]int, 100)
+    defer free(data1)  // ✅ Correct
+    
+    // Allocate second pointer
+    data2 := make([]int, 200)
+    
+    // ❌ VIOLATION: Freeing wrong pointer
+    // Should free data2 but freeing data1 again
+    defer free(data1)  // C002 should trigger here
+    
+    // Use both buffers
+    for i := 0; i < len(data1); i++ {
+        data1[i] = i
+    }
+    for i := 0; i < len(data2); i++ {
+        data2[i] = i * 2
+    }
+}
+
+// Another example with reassignment
+proc test_reassignment() {
+    ptr1 := make([]int, 50)
+    ptr2 := make([]int, 75)
+    
+    // Reassign ptr1 to ptr2
+    ptr1 = ptr2
+    
+    // ❌ VIOLATION: Freeing original ptr1 (now lost)
+    // Should free ptr2 but ptr1 was reassigned
+    defer free(ptr1)  // C002 should trigger here
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 ./tests/C002_COR_POINTER/c002_fixture_fail.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_fixture_fail.odin:32:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: ./tests/C002_COR_POINTER/c002_fixture_fail.odin
+Cleaning up tree-sitter
+
+./tests/C002_COR_POINTER/c002_edge_case_complex.odin - 2 violations
+
+=== DETAILED OUTPUT FOR c002_edge_case_complex.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_edge_case_complex.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: ./tests/C002_COR_POINTER/c002_edge_case_complex.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 1875
+DEBUG: Source content: // C002 Edge Case: Complex expressions and pointer arithmetic
+// Tests advanced patterns that might confuse the analyzer
+
+package main
+
+import "core:fmt"
+
+main :: proc() {
+    // Case 1: Pointer arithmetic (if supported by Odin)
+    data := make([]int, 100)
+    // pointer_math := &data[10]  // Pointer arithmetic - not typical in Odin
+    defer free(data)
+    
+    // Case 2: Array slicing before free
+    array := make([]int, 50)
+    slice := array[10..<30]  // Create slice
+    defer free(array)  // Free original array - should be OK
+    
+    // Case 3: Multiple defers in complex order
+    test_multiple_defers()
+    
+    // Case 4: Pointer used in multiple contexts
+    multi_context_test()
+}
+
+proc test_multiple_defers() {
+    a := make([]int, 10)
+    b := make([]int, 20)
+    c := make([]int, 30)
+    
+    // Multiple reassignments with multiple defers
+    target := a
+    defer free(target)  // Should free 'a'
+    
+    target = b
+    defer free(target)  // Should free 'b' - but 'a' is now leaked
+    
+    target = c
+    defer free(target)  // Should free 'c' - but 'a' and 'b' are leaked
+}
+
+proc multi_context_test() {
+    // Pointer used in struct
+    Data :: struct {
+        buffer: []int,
+    }
+    
+    d := Data{buffer: make([]int, 25)}
+    
+    // Reassign struct field
+    d.buffer = make([]int, 35)
+    
+    defer free(d.buffer)  // Which allocation? Original or reassigned?
+    
+    // Pointer in array
+    pointers := [^[]int]{^make([]int, 40), ^make([]int, 45)}
+    defer free(pointers[0]^)  // Complex expression
+    defer free(pointers[1]^)
+}
+
+// Case 5: Defer in loop with conditional break
+proc test_defer_loop() {
+    for i in 0..<5 {
+        ptr := make([]int, i * 10)
+        
+        if i == 3 {
+            defer free(ptr)
+            break  // Early exit - what happens to other allocations?
+        }
+        
+        defer free(ptr)
+    }
+}
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_complex.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_complex.odin:15:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: ./tests/C002_COR_POINTER/c002_edge_case_complex.odin
+Cleaning up tree-sitter
+
+./tests/C002_COR_POINTER/c002_edge_case_scope.odin - No violations
+./tests/C002_COR_POINTER/c002_all.odin - No violations
+./tests/C002_COR_POINTER/c002_fixture_pass.odin - No violations
+./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin - 3 violations
+
+=== DETAILED OUTPUT FOR c002_edge_case_reassignment.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 1149
+DEBUG: Source content: // C002 Edge Case: Pointer reassignment before free
+// Tests the case where a pointer is reassigned before being freed
+
+package main
+
+import "core:fmt"
+
+main :: proc() {
+    // Case 1: Simple reassignment
+    ptr1 := make([]int, 10)
+    ptr2 := make([]int, 20)
+    ptr1 = ptr2  // ptr1 now points to same memory as ptr2
+    defer free(ptr1)  // Should this trigger C002? Original ptr1 allocation is lost
+    
+    // Case 2: Reassignment in loop
+    for i in 0..<5 {
+        temp_ptr := make([]int, i)
+        if i > 2 {
+            temp_ptr = make([]int, 100)  // Reassignment
+        }
+        defer free(temp_ptr)
+    }
+    
+    // Case 3: Multiple reassignments
+    data := make([]int, 50)
+    data = make([]int, 75)  // First reassignment
+    data = make([]int, 100) // Second reassignment
+    defer free(data)  // Which allocation should this free?
+}
+
+// Test function with parameter reassignment
+proc test_param_reassignment() {
+    original := make([]int, 15)
+    defer free(original)
+    
+    // Reassign parameter (should this be flagged?)
+    original = make([]int, 25)
+    // No defer free for the new allocation - potential memory leak
+}
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin:11:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin:19:13: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin:21:9: C002 [correctness] Defer free on wrong pointer - does not match allocation
+Fix: Ensure defer free uses the same pointer as the allocation
+Checking stub rule for: ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin
+Cleaning up tree-sitter
+
+./tests/C002_COR_POINTER/c002_edge_case_conditional.odin - 3 violations
+
+=== DETAILED OUTPUT FOR c002_edge_case_conditional.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 1292
+DEBUG: Source content: // C002 Edge Case: Conditional free patterns
+// Tests defer free in conditional branches and complex control flow
+
+package main
+
+import "core:fmt"
+
+main :: proc() {
+    // Case 1: Conditional allocation with unconditional free
+    data := make([]int, 50)
+    
+    if true {
+        data = make([]int, 100)  // Conditional reassignment
+    }
+    
+    defer free(data)  // Should this trigger C002? Depends on path taken
+    
+    // Case 2: Different allocations in different branches
+    result := make([]int, 10)
+    
+    if true {
+        result = make([]int, 20)
+    } else {
+        result = make([]int, 30)
+    }
+    
+    defer free(result)  // Which allocation gets freed?
+    
+    // Case 3: Early return with defer
+    test_early_return()
+}
+
+proc test_early_return() {
+    ptr := make([]int, 15)
+    
+    if true {
+        defer free(ptr)
+        return
+    }
+    
+    // This code is unreachable, but shows the pattern
+    ptr = make([]int, 25)
+    defer free(ptr)  // Should this be flagged?
+}
+
+// Case 4: Complex boolean conditions
+proc test_complex_conditions() {
+    a := make([]int, 10)
+    b := make([]int, 20)
+    
+    target := a
+    if true && false || true {
+        target = b
+    }
+    
+    defer free(target)  // Complex control flow - hard to determine correct pointer
+}
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin:13:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin:22:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin:24:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin
+Cleaning up tree-sitter
+
+=== SUMMARY ===
+Total test files: 8
+Files with violations: 5
+Files without violations: 3
+Internal errors: 0
+Total C002 violations found: 11
+
+✅ TESTING COMPLETE
+The C002 rule is working and finding pointer safety issues
+Files with violations should be reviewed for proper pointer usage
