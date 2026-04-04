@@ -144,8 +144,8 @@ stubRule :: proc(file_path: string) -> (Diagnostic, bool) {
     fmt.println("Checking stub rule for:", file_path)
     
     // Simple file content check for now
-    content, ok := os.read_entire_file_from_path(file_path, context.allocator)
-    if not ok {
+    content, err := os.read_entire_file_from_path(file_path, context.allocator)
+    if err != nil {
         return Diagnostic{}, false
     }
     defer delete(content)
