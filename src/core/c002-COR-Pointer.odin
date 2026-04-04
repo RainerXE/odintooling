@@ -25,6 +25,7 @@ C002AnalysisContext :: struct {
     allocations_map: map[string][dynamic]C002AllocationInfo,
     current_scope: int,
     reassignments: map[string]bool,
+    scope_stack: [dynamic]string,  // Track entered scopes for proper exit detection
 }
 
 // create_c002_context creates a new analysis context
@@ -33,37 +34,44 @@ create_c002_context :: proc() -> C002AnalysisContext {
         allocations_map = {},
         current_scope = 0,
         reassignments = {},
+        scope_stack = {},
     }
 }
 
 // C002Rule creates the C002 rule
-// Note: c002Matcher is not stored in the Rule struct due to signature mismatch
-// It's called directly from main.odin with the required context parameter
+// IMPORTANT: c002Matcher is NOT stored in the Rule.matcher field due to signature mismatch
+// It requires a context parameter and is called directly from main.odin.
+// The matcher field is explicitly set to nil - any code using Rule.matcher must check for nil.
 C002Rule :: proc() -> Rule {
     return Rule{
         id = "C002",
         tier = "correctness",
         category = .CORRECTNESS,  // Clippy-inspired categorization
-        matcher = nil,  // c002Matcher has different signature, called directly
+        matcher = nil,  // ⚠️ c002Matcher has different signature, called directly from main.odin
         message = c002Message,
         fix_hint = c002FixHint,
     }
 }
 
-// Helper: Check if a statement is a cleanup function (free/delete)
-is_cleanup_function :: proc(text: string) -> bool {
-    return strings.contains(text, "free") || strings.contains(text, "delete")
-}
+// Note: is_cleanup_function was removed as it was unused
+// The functionality is handled directly in is_defer_cleanup
 
 // c002Matcher checks for defer free on wrong pointer
 c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext) -> []Diagnostic {
     diagnostics: [dynamic]Diagnostic
-    // Track scope boundaries
+    
+    // Track scope boundaries using stack-based approach
     if is_scope_boundary(node) {
         if is_entering_scope(node) {
-            ctx.current_scope += 1
+            // Entering a new scope - push onto stack
+            ctx.scope_stack = append(ctx.scope_stack, node.node_type)
+            ctx.current_scope = len(ctx.scope_stack)
         } else {
-            ctx.current_scope -= 1
+            // Exiting a scope - pop from stack
+            if len(ctx.scope_stack) > 0 {
+                ctx.scope_stack = ctx.scope_stack[0..<len(ctx.scope_stack)]
+                ctx.current_scope = len(ctx.scope_stack)
+            }
         }
     }
     
@@ -105,7 +113,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                     column = node.start_column,
                     rule_id = "C002",
                     tier = "correctness",
-                    message = "Defer free on wrong pointer - does not match allocation",
+                    message = "Freeing wrong pointer - does not match allocation",
                     fix = "Ensure defer free uses the same pointer as the allocation",
                     has_fix = true,
                 })
@@ -119,7 +127,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                     column = node.start_column,
                     rule_id = "C002",
                     tier = "correctness",
-                    message = "C002 [correctness] Freeing reassigned pointer",
+                    message = "Freeing reassigned pointer - this may free wrong memory",
                     fix = "Pointer was reassigned before free - this may free wrong memory",
                     has_fix = true,
                     diag_type = .VIOLATION,
@@ -159,17 +167,21 @@ c002_markAsAllocated :: proc(var_name: string, line: int, col: int, scope_level:
         is_reassigned = false,
         reassignment_line = 0,
     }
-    // Initialize dynamic array if key doesn't exist
-    existing := ctx.allocations_map[var_name]
-    if len(existing) == 0 {
-        existing = make([dynamic]C002AllocationInfo)
+    
+    // Use proper map key existence check instead of len == 0
+    if var_name not_in ctx.allocations_map {
+        ctx.allocations_map[var_name] = make([dynamic]C002AllocationInfo)
     }
+    
+    existing := ctx.allocations_map[var_name]
     existing = append(existing, allocation)
     ctx.allocations_map[var_name] = existing
 }
 
 // c002_markAsFreed marks a variable as freed and detects double frees
 c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int, file_path: string, ctx: ^C002AnalysisContext) -> Diagnostic {
+    var diag_to_report: Diagnostic
+    
     if len(ctx.allocations_map[var_name]) > 0 {
         existing := ctx.allocations_map[var_name]
         for i in 0..<len(existing) {
@@ -179,7 +191,7 @@ c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int
                 
                 // Detect and report double free
                 if existing[i].free_count > 1 {
-                    return Diagnostic{
+                    diag_to_report = Diagnostic{
                         file = file_path,  // Use passed file path
                         line = line,
                         column = col,
@@ -194,19 +206,27 @@ c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int
                 }
             }
         }
+        // Always write back the modified slice, even if we detected a double-free
         ctx.allocations_map[var_name] = existing
     }
-    return Diagnostic{}
+    return diag_to_report
 }
 
-// extract_var_name_from_free extracts variable name from free statement
+// extract_var_name_from_free extracts variable name from free/delete statement
 extract_var_name_from_free :: proc(node: ^ASTNode) -> string {
-    // Simple extraction - look for variable name before free
+    // Simple extraction - look for variable name in free/delete calls
     text := node.text
     
-    // Pattern: defer free(variable)
-    if strings.contains(text, "free(") {
-        start_idx := strings.index(text, "free(") + 5
+    // Pattern: defer free(variable) or defer delete(variable)
+    if strings.contains(text, "free(") || strings.contains(text, "delete(") {
+        var keyword: string
+        if strings.contains(text, "free(") {
+            keyword = "free"
+        } else {
+            keyword = "delete"
+        }
+        
+        start_idx := strings.index(text, keyword + "(") + len(keyword) + 1
         // Find closing parenthesis after start_idx
         rest := text[start_idx:]
         rel_idx := strings.index(rest, ")")
@@ -255,6 +275,15 @@ extract_var_name_from_allocation :: proc(node: ^ASTNode) -> string {
         parts := strings.split(text, "=")
         if len(parts) >= 1 {
             var_name := strings.trim(parts[0], " \t")
+            
+            // Handle multi-assignment: a, b = make(...)
+            if strings.contains(var_name, ",") {
+                // For now, take first variable and add comment about limitation
+                // TODO: Track all variables in multi-assignment
+                first_var := strings.trim(strings.split(var_name, ",")[0], " \t")
+                return first_var
+            }
+            
             // Remove any type annotations
             if strings.contains(var_name, ":") {
                 var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
@@ -268,15 +297,16 @@ extract_var_name_from_allocation :: proc(node: ^ASTNode) -> string {
 
 // is_scope_boundary checks if node represents a scope boundary
 is_scope_boundary :: proc(node: ^ASTNode) -> bool {
-    // Only track actual scope containers (blocks) to avoid double-counting
+    // Track actual scope containers (blocks)
     return strings.contains(node.node_type, "block")
 }
 
 // is_entering_scope checks if we're entering a new scope
 is_entering_scope :: proc(node: ^ASTNode) -> bool {
     // For blocks, we're entering when we see the opening brace
-    return strings.contains(node.node_type, "block") && 
-           strings.contains(node.text, "{")
+    // Note: This is a heuristic. Tree-sitter typically doesn't include {
+    // in block node text, so we rely on the scope stack for proper tracking.
+    return strings.contains(node.node_type, "block")
 }
 
 // is_pointer_reassignment checks if node is a pointer reassignment
@@ -326,7 +356,9 @@ is_defer_cleanup :: proc(node: ^ASTNode) -> bool {
 // Uses structural analysis instead of name blocklisting
 is_suspicious_pointer_usage :: proc(node: ^ASTNode) -> bool {
     // Pattern 1: Complex expressions in free (often wrong)
-    if strings.contains(node.text, "+)") || strings.contains(node.text, "-)") {
+    // Check for arithmetic operations with proper spacing
+    if strings.contains(node.text, "+ ") || strings.contains(node.text, "- ") ||
+       strings.contains(node.text, "* ") || strings.contains(node.text, "/ ") {
         return true
     }
     

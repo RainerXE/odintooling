@@ -1,5 +1,5 @@
 === C002 Rule Test Summary ===
-Generated: Sat Apr  4 18:57:39 CEST 2026
+Generated: Sat Apr  4 19:19:29 CEST 2026
 Test directory: ./tests/C002_COR_POINTER
 
 ./tests/C002_COR_POINTER/c002_explicit_violation.odin - 1 violations
@@ -73,7 +73,7 @@ Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 Checking stub rule for: ./tests/C002_COR_POINTER/c002_explicit_violation.odin
 Cleaning up tree-sitter
 
-./tests/C002_COR_POINTER/c002_fixture_fail.odin - 2 violations
+./tests/C002_COR_POINTER/c002_fixture_fail.odin - 4 violations
 
 === DETAILED OUTPUT FOR c002_fixture_fail.odin ===
 Starting odin-lint
@@ -139,18 +139,25 @@ DEBUG: Checking tree language...
 === DEBUG: Getting root node ===
 DEBUG: Tree is valid, calling ts_tree_root_node...
 ✅ DEBUG: Root node obtained successfully
+🔴 ./tests/C002_COR_POINTER/c002_fixture_fail.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 ./tests/C002_COR_POINTER/c002_fixture_fail.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_fixture_fail.odin:31:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 ./tests/C002_COR_POINTER/c002_fixture_fail.odin:32:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 Checking stub rule for: ./tests/C002_COR_POINTER/c002_fixture_fail.odin
 Cleaning up tree-sitter
 
-./tests/C002_COR_POINTER/c002_edge_case_complex.odin - 2 violations
+./tests/C002_COR_POINTER/c002_edge_case_complex.odin - No violations
+./tests/C002_COR_POINTER/c002_edge_case_scope.odin - No violations
+./tests/C002_COR_POINTER/c002_all.odin - No violations
+./tests/C002_COR_POINTER/c002_fixture_pass.odin - 1 violations
 
-=== DETAILED OUTPUT FOR c002_edge_case_complex.odin ===
+=== DETAILED OUTPUT FOR c002_fixture_pass.odin ===
 Starting odin-lint
-Processing file: ./tests/C002_COR_POINTER/c002_edge_case_complex.odin
+Processing file: ./tests/C002_COR_POINTER/c002_fixture_pass.odin
 === DEBUG: Initializing tree-sitter ===
 DEBUG: Creating parser...
 ✅ DEBUG: Parser created successfully
@@ -160,80 +167,19 @@ DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
 DEBUG: Setting parser language...
 ✅ DEBUG: Parser language set successfully
 === DEBUG: Tree-sitter initialization complete ===
-Parsing file: ./tests/C002_COR_POINTER/c002_edge_case_complex.odin
+Parsing file: ./tests/C002_COR_POINTER/c002_fixture_pass.odin
 === DEBUG: Parsing source code ===
-DEBUG: Source length: 1875
-DEBUG: Source content: // C002 Edge Case: Complex expressions and pointer arithmetic
-// Tests advanced patterns that might confuse the analyzer
-
+DEBUG: Source length: 236
+DEBUG: Source content: // Test case for C002: proper single free
 package main
 
-import "core:fmt"
-
 main :: proc() {
-    // Case 1: Pointer arithmetic (if supported by Odin)
     data := make([]int, 100)
-    // pointer_math := &data[10]  // Pointer arithmetic - not typical in Odin
-    defer free(data)
+    defer free(data)  // Single free - proper
     
-    // Case 2: Array slicing before free
-    array := make([]int, 50)
-    slice := array[10..<30]  // Create slice
-    defer free(array)  // Free original array - should be OK
-    
-    // Case 3: Multiple defers in complex order
-    test_multiple_defers()
-    
-    // Case 4: Pointer used in multiple contexts
-    multi_context_test()
-}
-
-proc test_multiple_defers() {
-    a := make([]int, 10)
-    b := make([]int, 20)
-    c := make([]int, 30)
-    
-    // Multiple reassignments with multiple defers
-    target := a
-    defer free(target)  // Should free 'a'
-    
-    target = b
-    defer free(target)  // Should free 'b' - but 'a' is now leaked
-    
-    target = c
-    defer free(target)  // Should free 'c' - but 'a' and 'b' are leaked
-}
-
-proc multi_context_test() {
-    // Pointer used in struct
-    Data :: struct {
-        buffer: []int,
-    }
-    
-    d := Data{buffer: make([]int, 25)}
-    
-    // Reassign struct field
-    d.buffer = make([]int, 35)
-    
-    defer free(d.buffer)  // Which allocation? Original or reassigned?
-    
-    // Pointer in array
-    pointers := [^[]int]{^make([]int, 40), ^make([]int, 45)}
-    defer free(pointers[0]^)  // Complex expression
-    defer free(pointers[1]^)
-}
-
-// Case 5: Defer in loop with conditional break
-proc test_defer_loop() {
-    for i in 0..<5 {
-        ptr := make([]int, i * 10)
-        
-        if i == 3 {
-            defer free(ptr)
-            break  // Early exit - what happens to other allocations?
-        }
-        
-        defer free(ptr)
+    // Process data...
+    for i in 0..<len(data) {
+        data[i] = i * 2
     }
 }
 DEBUG: Converting string to C string...
@@ -244,16 +190,11 @@ DEBUG: Checking tree language...
 === DEBUG: Getting root node ===
 DEBUG: Tree is valid, calling ts_tree_root_node...
 ✅ DEBUG: Root node obtained successfully
-🔴 ./tests/C002_COR_POINTER/c002_edge_case_complex.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+🔴 ./tests/C002_COR_POINTER/c002_fixture_pass.odin:5:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 ./tests/C002_COR_POINTER/c002_edge_case_complex.odin:15:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-Checking stub rule for: ./tests/C002_COR_POINTER/c002_edge_case_complex.odin
+Checking stub rule for: ./tests/C002_COR_POINTER/c002_fixture_pass.odin
 Cleaning up tree-sitter
 
-./tests/C002_COR_POINTER/c002_edge_case_scope.odin - No violations
-./tests/C002_COR_POINTER/c002_all.odin - No violations
-./tests/C002_COR_POINTER/c002_fixture_pass.odin - No violations
 ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin - 3 violations
 
 === DETAILED OUTPUT FOR c002_edge_case_reassignment.odin ===
@@ -423,7 +364,7 @@ Total test files: 8
 Files with violations: 5
 Files without violations: 3
 Internal errors: 0
-Total C002 violations found: 11
+Total C002 violations found: 12
 
 ✅ TESTING COMPLETE
 The C002 rule is working and finding pointer safety issues
