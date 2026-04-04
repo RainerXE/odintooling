@@ -1,7 +1,7 @@
 package core
 
 import "core:fmt"
-import "core:os"
+
 import "core:strings"
 
 // C002 rule implementation
@@ -64,12 +64,12 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
     if is_scope_boundary(node) {
         if is_entering_scope(node) {
             // Entering a new scope - push onto stack
-            ctx.scope_stack = append(ctx.scope_stack, node.node_type)
+            append(&ctx.scope_stack, node.node_type)
             ctx.current_scope = len(ctx.scope_stack)
         } else {
             // Exiting a scope - pop from stack
             if len(ctx.scope_stack) > 0 {
-                ctx.scope_stack = ctx.scope_stack[0..<len(ctx.scope_stack)]
+                pop(&ctx.scope_stack)
                 ctx.current_scope = len(ctx.scope_stack)
             }
         }
@@ -107,7 +107,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
         if var_name != "" {
             // Check if this defer free references a different variable than the allocation
             if is_suspicious_pointer_usage(node) {
-                diagnostics = append(diagnostics, Diagnostic{
+                append(&diagnostics, Diagnostic{
                     file = file_path,
                     line = node.start_line,
                     column = node.start_column,
@@ -121,7 +121,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
             
             // Check if pointer was reassigned before free
             if ctx.reassignments[var_name] {
-                diagnostics = append(diagnostics, Diagnostic{
+                append(&diagnostics, Diagnostic{
                     file = file_path,
                     line = node.start_line,
                     column = node.start_column,
@@ -137,7 +137,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
             // Track the free operation with current scope
             diag := c002_markAsFreed(var_name, node.start_line, node.start_column, ctx.current_scope, file_path, ctx)
             if diag.message != "" {
-                diagnostics = append(diagnostics, diag)
+                append(&diagnostics, diag)
             }
         }
     }
@@ -147,7 +147,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
         child_diagnostics := c002Matcher(file_path, &child, ctx)
         for child_diag in child_diagnostics {
             if child_diag.message != "" {
-                diagnostics = append(diagnostics, child_diag)
+                append(&diagnostics, child_diag)
             }
         }
     }
@@ -174,13 +174,13 @@ c002_markAsAllocated :: proc(var_name: string, line: int, col: int, scope_level:
     }
     
     existing := ctx.allocations_map[var_name]
-    existing = append(existing, allocation)
+    append(&existing, allocation)
     ctx.allocations_map[var_name] = existing
 }
 
 // c002_markAsFreed marks a variable as freed and detects double frees
 c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int, file_path: string, ctx: ^C002AnalysisContext) -> Diagnostic {
-    var diag_to_report: Diagnostic
+    diag_to_report: Diagnostic
     
     if len(ctx.allocations_map[var_name]) > 0 {
         existing := ctx.allocations_map[var_name]
@@ -219,14 +219,17 @@ extract_var_name_from_free :: proc(node: ^ASTNode) -> string {
     
     // Pattern: defer free(variable) or defer delete(variable)
     if strings.contains(text, "free(") || strings.contains(text, "delete(") {
-        var keyword: string
+        keyword: string
         if strings.contains(text, "free(") {
             keyword = "free"
         } else {
             keyword = "delete"
         }
         
-        start_idx := strings.index(text, keyword + "(") + len(keyword) + 1
+        start_idx := strings.index(text, keyword) + len(keyword) + 1
+        if start_idx > len(text) || text[start_idx-1] != '(' {
+            return ""
+        }
         // Find closing parenthesis after start_idx
         rest := text[start_idx:]
         rel_idx := strings.index(rest, ")")
