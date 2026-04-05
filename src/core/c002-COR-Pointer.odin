@@ -144,8 +144,21 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
             
             // Only perform violation analysis if not a known safe pattern
             if !should_skip_analysis {
-                // Check if this defer free references a different variable than the allocation
-                if is_suspicious_pointer_usage(node) {
+                // First check for definite violations that should be VIOLATION
+                if is_clear_double_free(var_name, ctx) || is_definite_pointer_misuse(node, var_name, ctx) {
+                    // These are definite pointer safety issues - use VIOLATION
+                    append(&diagnostics, Diagnostic{
+                        file = file_path,
+                        line = node.start_line,
+                        column = node.start_column,
+                        rule_id = "C002",
+                        tier = "correctness",
+                        message = "Definite pointer safety violation detected",
+                        fix = "This is a clear pointer misuse that must be fixed",
+                        has_fix = true,
+                        diag_type = .VIOLATION,  // Definite violation
+                    })
+                } else if is_suspicious_pointer_usage(node) {
                     // Use CONTEXTUAL for suspicious patterns - more cautious approach
                     append(&diagnostics, Diagnostic{
                         file = file_path,
@@ -156,24 +169,37 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                         message = "Freeing wrong pointer - does not match allocation (POTENTIAL)",
                         fix = "Ensure defer free uses the same pointer as the allocation",
                         has_fix = true,
-                        diag_type = .CONTEXTUAL,  // More cautious - potential issue rather than definite violation
+                        diag_type = .CONTEXTUAL,  // Potential issue rather than definite violation
                     })
-                }
-                
-                // Check if pointer was reassigned before free
-                if ctx.reassignments[var_name] {
-                    // Use CONTEXTUAL for reassignment patterns - more cautious approach
-                    append(&diagnostics, Diagnostic{
-                        file = file_path,
-                        line = node.start_line,
-                        column = node.start_column,
-                        rule_id = "C002",
-                        tier = "correctness",
-                        message = "Freeing reassigned pointer - this may free wrong memory (POTENTIAL)",
-                        fix = "Pointer was reassigned before free - this may free wrong memory",
-                        has_fix = true,
-                        diag_type = .CONTEXTUAL,  // More cautious - potential issue rather than definite violation
-                    })
+                } else if ctx.reassignments[var_name] {
+                    // Check if this is a definite violation or potential
+                    if is_definite_pointer_misuse(node, var_name, ctx) {
+                        // Definite violation
+                        append(&diagnostics, Diagnostic{
+                            file = file_path,
+                            line = node.start_line,
+                            column = node.start_column,
+                            rule_id = "C002",
+                            tier = "correctness",
+                            message = "Definite pointer safety violation - reassignment misuse",
+                            fix = "Pointer was reassigned before free - this is definitely wrong",
+                            has_fix = true,
+                            diag_type = .VIOLATION,
+                        })
+                    } else {
+                        // Potential violation
+                        append(&diagnostics, Diagnostic{
+                            file = file_path,
+                            line = node.start_line,
+                            column = node.start_column,
+                            rule_id = "C002",
+                            tier = "correctness",
+                            message = "Freeing reassigned pointer - this may free wrong memory (POTENTIAL)",
+                            fix = "Pointer was reassigned before free - this may free wrong memory",
+                            has_fix = true,
+                            diag_type = .CONTEXTUAL,  // Potential issue rather than definite violation
+                        })
+                    }
                 }
             }
             
@@ -558,5 +584,57 @@ is_string_processing_pattern :: proc(node: ^ASTNode) -> bool {
        strings.contains(node.text, "string(") {
         return true
     }
+    return false
+}
+
+// Detect clear double free patterns that should be definite violations
+is_clear_double_free :: proc(var_name: string, ctx: ^C002AnalysisContext) -> bool {
+    // Check if this is a clear case of freeing the same pointer multiple times
+    // This should be a definite VIOLATION, not just CONTEXTUAL
+    
+    if len(ctx.allocations_map[var_name]) > 0 {
+        allocation_info := ctx.allocations_map[var_name][0]
+        
+        // If the same variable is freed multiple times in the same scope
+        // and there's no reassignment, this is a clear double free
+        if allocation_info.free_count > 1 && !allocation_info.is_reassigned {
+            return true
+        }
+        
+        // If there are multiple defers on the same line or consecutive lines
+        // This often indicates intentional double free (which is definitely wrong)
+        if allocation_info.free_count > 1 {
+            // Check if the free operations are very close together
+            // This suggests deliberate double free rather than accidental
+            return true
+        }
+    }
+    
+    return false
+}
+
+// Detect obvious pointer misuse that should be definite violations
+is_definite_pointer_misuse :: proc(node: ^ASTNode, var_name: string, ctx: ^C002AnalysisContext) -> bool {
+    // Check for patterns that are clearly wrong pointer usage
+    
+    // Pattern 1: Multiple consecutive defers on same variable
+    // This is almost always a definite bug
+    if len(ctx.allocations_map[var_name]) > 0 {
+        allocation_info := ctx.allocations_map[var_name][0]
+        if allocation_info.free_count >= 3 {
+            // Three or more defers on same variable is definitely wrong
+            return true
+        }
+    }
+    
+    // Pattern 2: Complex pointer arithmetic in free expression
+    // This is usually definitely wrong
+    if strings.contains(node.text, "+ ") || 
+       strings.contains(node.text, "- ") ||
+       strings.contains(node.text, "* ") ||
+       strings.contains(node.text, "/ ") {
+        return true
+    }
+    
     return false
 }
