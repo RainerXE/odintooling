@@ -1,0 +1,663 @@
+=== FILE: vendor/ols/src/main.odin ===
+Starting odin-lint
+Processing file: vendor/ols/src/main.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: vendor/ols/src/main.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 2898
+DEBUG: Source content: package main
+
+import "base:intrinsics"
+
+import "core:fmt"
+import "core:log"
+import "core:mem"
+import "core:os"
+import "core:thread"
+
+import "src:common"
+import "src:server"
+
+VERSION := #config(VERSION, "dev")
+
+os_read :: proc(handle: rawptr, data: []byte) -> (int, int) {
+	ptr := cast(^os.File)handle
+	a, b := os.read(ptr, data)
+	return a, cast(int)(b != nil)
+}
+
+os_write :: proc(handle: rawptr, data: []byte) -> (int, int) {
+	ptr := cast(^os.File)handle
+	a, b := os.write(ptr, data)
+	return a, cast(int)(b != nil)
+}
+
+//Note(Daniel, Should look into handling errors without crashing from parsing)
+
+request_thread: ^thread.Thread
+
+logger: ^log.Logger
+
+
+run :: proc(reader: ^server.Reader, writer: ^server.Writer) {
+	common.config.collections = make(map[string]string)
+	common.config.running = true
+
+	logger = new(log.Logger)
+
+	request_thread_data := server.RequestThreadData {
+		reader = reader,
+		writer = writer,
+		logger = logger,
+	}
+
+	/*
+	tracking_allocator: mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracking_allocator, context.allocator)
+    context.allocator = mem.tracking_allocator(&tracking_allocator)
+	*/
+
+	server.requests = make([dynamic]server.Request, context.allocator)
+	server.deletings = make([dynamic]server.Request, context.allocator)
+
+	request_thread = thread.create_and_start_with_data(cast(rawptr)&request_thread_data, server.thread_request_main)
+
+	logger^ = server.create_lsp_logger(writer, log.Level.Error)
+
+	{
+		context.logger = logger^
+		log.error("Starting Odin Language Server", VERSION)
+	}
+
+	context.logger = logger^
+	server.create_and_start_check_worker(writer)
+	defer server.stop_check_worker()
+
+
+	for common.config.running {
+		if common.config.verbose {
+			//Currently letting verbose use error, since some ast prints causes crashes - most likely a bug in core:fmt.
+			logger^ = server.create_lsp_logger(writer, log.Level.Info)
+		} else {
+			logger^ = server.create_lsp_logger(writer, log.Level.Info)
+		}
+
+		context.logger = logger^
+
+		server.consume_requests(&common.config, writer)
+	}
+
+	for k, v in common.config.collections {
+		delete(k)
+		delete(v)
+	}
+
+	delete(common.config.collections)
+	delete(common.config.workspace_folders)
+
+	server.document_storage_shutdown()
+
+	server.free_index()
+
+	/*
+    for key, value in tracking_allocator.allocation_map {
+        log.errorf("%v: Leaked %v bytes\n", value.location, value.size)
+    }	
+	*/
+}
+
+end :: proc() {
+}
+
+main :: proc() {
+	if len(os.args) > 1 && os.args[1] == "version" {
+		fmt.println("ols version", VERSION)
+		os.exit(0)
+	}
+	reader := server.make_reader(os_read, cast(rawptr)os.stdin)
+	writer := server.make_writer(os_write, cast(rawptr)os.stdout)
+
+	/*
+	fh, err := os.open("log.txt", os.O_RDWR|os.O_CREATE) 
+	
+	if err != os.ERROR_NONE {
+		return
+	}
+	
+	context.logger = log.create_file_logger(fh, log.Level.Info)
+	*/
+
+	init_global_temporary_allocator(mem.Megabyte * 100)
+
+	run(&reader, &writer)
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 vendor/ols/src/main.odin:39:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: vendor/ols/src/main.odin
+Cleaning up tree-sitter
+
+=== FILE: vendor/ols/src/server/references.odin ===
+Starting odin-lint
+Processing file: vendor/ols/src/server/references.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: vendor/ols/src/server/references.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 12395
+DEBUG: Source content: package server
+
+import "base:runtime"
+
+import "core:log"
+import "core:mem"
+import "core:odin/ast"
+import "core:odin/parser"
+import "core:os"
+import "core:path/filepath"
+import path "core:path/slashpath"
+import "core:slice"
+import "core:strings"
+
+import "src:common"
+
+prepare_references :: proc(
+	document: ^Document,
+	ast_context: ^AstContext,
+	position_context: ^DocumentPositionContext,
+) -> (
+	symbol: Symbol,
+	resolve_flag: ResolveReferenceFlag,
+	ok: bool,
+) {
+	ok = false
+	pkg := ""
+
+	if position_context.enum_type != nil {
+		found := false
+		done_enum: for field in position_context.enum_type.fields {
+			if ident, ok := field.derived.(^ast.Ident); ok {
+				if position_in_node(ident, position_context.position) {
+					symbol = Symbol {
+						pkg   = ast_context.current_package,
+						range = common.get_token_range(ident, ast_context.file.src),
+					}
+					found = true
+					resolve_flag = .Field
+					break done_enum
+				}
+			} else if value, ok := field.derived.(^ast.Field_Value); ok {
+				if position_in_node(value.field, position_context.position) {
+					symbol = Symbol {
+						range = common.get_token_range(value.field, ast_context.file.src),
+						pkg   = ast_context.current_package,
+					}
+					found = true
+					resolve_flag = .Field
+					break done_enum
+				} else if position_in_node(value.value, position_context.position) {
+					if ident, ok := value.value.derived.(^ast.Ident); ok {
+						symbol, ok = resolve_location_identifier(ast_context, ident^)
+						if !ok {
+							return
+						}
+
+						found = true
+						resolve_flag = .Identifier
+						break done_enum
+					}
+				}
+			}
+		}
+		if !found {
+			return
+		}
+	} else if position_context.bitset_type != nil {
+		if position_in_node(position_context.bitset_type.elem, position_context.position) {
+			symbol, ok = resolve_location_type_expression(ast_context, position_context.bitset_type.elem)
+			if !ok {
+				return
+			}
+			resolve_flag = .Identifier
+		}
+		return
+	} else if position_context.union_type != nil {
+		found := false
+		for variant in position_context.union_type.variants {
+			if position_in_node(variant, position_context.position) {
+				if ident, _, ok := unwrap_pointer_ident(variant); ok {
+					symbol, ok = resolve_location_identifier(ast_context, ident)
+					resolve_flag = .Identifier
+
+					if !ok {
+						return
+					}
+
+					found = true
+
+					break
+				} else {
+					return
+				}
+			}
+		}
+		if !found {
+			return
+		}
+
+	} else if position_context.field_value != nil &&
+	   !is_expr_basic_lit(position_context.field_value.field) &&
+	   position_in_node(position_context.field_value.field, position_context.position) {
+		if position_context.comp_lit != nil {
+			symbol, ok = resolve_location_comp_lit_field(ast_context, position_context)
+			if !ok {
+				return
+			}
+		} else if position_context.call != nil {
+			symbol, ok = resolve_location_proc_param_name(ast_context, position_context)
+			if !ok {
+				return
+			}
+		}
+
+		resolve_flag = .Field
+	} else if position_context.selector_expr != nil {
+		if position_in_node(position_context.selector, position_context.position) &&
+		   position_context.identifier != nil {
+			ident := position_context.identifier.derived.(^ast.Ident)
+
+			symbol, ok = resolve_location_identifier(ast_context, ident^)
+
+			if !ok {
+				return
+			}
+
+			resolve_flag = .Identifier
+		} else {
+			symbol, ok = resolve_location_selector(ast_context, position_context.selector_expr)
+			symbol.flags -= {.Local}
+
+			resolve_flag = .Field
+		}
+	} else if position_context.implicit {
+		resolve_flag = .Field
+
+		symbol, ok = resolve_location_implicit_selector(
+			ast_context,
+			position_context,
+			position_context.implicit_selector_expr,
+		)
+		symbol.flags -= {.Local}
+
+		if !ok {
+			return
+		}
+	} else {
+		// The order of these is important as a lot of the above can be defined within a struct so we
+		// need to make sure we resolve that last
+		if position_context.bit_field_type != nil {
+			for field in position_context.bit_field_type.fields {
+				if position_in_node(field.name, position_context.position) {
+					symbol = Symbol {
+						range = common.get_token_range(field.name, ast_context.file.src),
+						pkg   = ast_context.current_package,
+						uri   = document.uri.uri,
+					}
+					return symbol, .Field, true
+				}
+				if position_in_node(field.type, position_context.position) {
+					node := get_desired_expr(field.type, position_context.position)
+					if symbol, ok = resolve_location_type_expression(ast_context, node); ok {
+						return symbol, .Identifier, true
+					}
+				}
+			}
+		}
+
+		if position_context.struct_type != nil {
+			for field in position_context.struct_type.fields.list {
+				for name in field.names {
+					if position_in_node(name, position_context.position) {
+						symbol = Symbol {
+							range = common.get_token_range(name, ast_context.file.src),
+							pkg   = ast_context.current_package,
+							uri   = document.uri.uri,
+						}
+						return symbol, .Field, true
+					}
+				}
+				if position_in_node(field.type, position_context.position) {
+					node := get_desired_expr(field.type, position_context.position)
+					if symbol, ok = resolve_location_type_expression(ast_context, node); ok {
+						return symbol, .Identifier, true
+					}
+				}
+			}
+		}
+
+		if position_context.identifier != nil {
+			ident := position_context.identifier.derived.(^ast.Ident)
+			symbol, ok = resolve_location_identifier(ast_context, ident^)
+
+			resolve_flag = .Identifier
+
+			if !ok {
+				return
+			}
+		} else {
+			return
+		}
+	}
+	if symbol.uri == "" {
+		symbol.uri = document.uri.uri
+	}
+
+	return symbol, resolve_flag, true
+}
+
+get_target_name :: proc(position_context: ^DocumentPositionContext, resolve_flag: ResolveReferenceFlag) -> string {
+	if resolve_flag == .Field {
+		if position_context.field != nil {
+			if ident, ok := position_context.field.derived.(^ast.Ident); ok {
+				return ident.name
+			}
+		}
+
+		if position_context.implicit_selector_expr != nil {
+			return position_context.implicit_selector_expr.field.name
+		}
+	}
+
+	if position_context.identifier != nil {
+		if ident, ok := position_context.identifier.derived.(^ast.Ident); ok {
+			return ident.name
+		}
+	}
+
+	return ""
+}
+
+resolve_references :: proc(
+	document: ^Document,
+	ast_context: ^AstContext,
+	position_context: ^DocumentPositionContext,
+	current_file_only := false,
+	include_declaration := true,
+) -> (
+	[]common.Location,
+	bool,
+) {
+	locations := make([dynamic]common.Location, 0, ast_context.allocator)
+	fullpaths := make([dynamic]string, 0, ast_context.allocator)
+
+	symbol, resolve_flag, ok := prepare_references(document, ast_context, position_context)
+	if !ok {
+		return {}, true
+	}
+
+	target_name := get_target_name(position_context, resolve_flag)
+	symbols_and_nodes := resolve_entire_file(document, resolve_flag, ast_context.allocator, target_name)
+
+	for k, v in symbols_and_nodes {
+		if strings.equal_fold(v.symbol.uri, symbol.uri) && v.symbol.range == symbol.range {
+			node_uri := common.create_uri(v.node.pos.file, ast_context.allocator)
+			range := common.get_token_range(v.node^, ast_context.file.src)
+
+			if !include_declaration && v.symbol.range == range && strings.equal_fold(node_uri.uri, symbol.uri) {
+				// This is the declaration and so we skip it
+				continue
+			}
+
+			//We don't have to have the `.` with, otherwise it renames the dot.
+			if _, ok := v.node.derived.(^ast.Implicit_Selector_Expr); ok {
+				range.start.character += 1
+			}
+
+			location := common.Location {
+				range = range,
+				uri   = strings.clone(node_uri.uri, ast_context.allocator),
+			}
+
+			append(&locations, location)
+		}
+	}
+
+	if .Local in symbol.flags || current_file_only {
+		return locations[:], true
+	}
+
+	when !ODIN_TEST {
+		for workspace in common.config.workspace_folders {
+			uri, _ := common.parse_uri(workspace.uri, context.temp_allocator)
+			w := os.walker_create(uri.path)
+			defer os.walker_destroy(&w)
+			for info in os.walker_walk(&w) {
+				if info.type == .Directory {
+					continue
+				}
+
+				if info.fullpath == "" {
+					continue
+				}
+
+				if strings.has_suffix(info.name, ".odin") {
+					slash_path, _ := filepath.replace_path_separators(info.fullpath, '/', context.temp_allocator)
+					if !strings.equal_fold(slash_path, document.fullpath) {
+						append(&fullpaths, strings.clone(info.fullpath, context.temp_allocator))
+					}
+				}
+			}
+		}
+	}
+
+	reset_ast_context(ast_context)
+
+
+	arena: runtime.Arena
+
+	_ = runtime.arena_init(&arena, mem.Megabyte * 40, runtime.default_allocator())
+
+	defer runtime.arena_destroy(&arena)
+
+	context.allocator = runtime.arena_allocator(&arena)
+
+	paths := slice.unique(fullpaths[:])
+
+	for fullpath in paths {
+		defer free_all(context.allocator)
+
+		fullpath := fullpath
+		when ODIN_OS == .Windows {
+			path := common.get_case_sensitive_path(fullpath, context.temp_allocator)
+			fullpath, _ = filepath.replace_path_separators(path, '/', context.allocator)
+		}
+		dir := filepath.dir(fullpath)
+		base := filepath.base(dir)
+
+		data, err := os.read_entire_file(fullpath, context.allocator)
+
+		if err != nil {
+			log.errorf("failed to read entire file for indexing %v: %v", fullpath, err)
+			continue
+		}
+
+		if target_name != "" && !strings.contains(string(data), target_name) {
+			continue
+		}
+
+		p := parser.Parser {
+			flags = {.Optional_Semicolons},
+		}
+		if !is_ols_builtin_file(fullpath) {
+			p.err = log_error_handler
+			p.warn = log_warning_handler
+		}
+
+		pkg := new(ast.Package)
+		pkg.kind = .Normal
+		pkg.fullpath = fullpath
+		pkg.name = base
+
+		if base == "runtime" {
+			pkg.kind = .Runtime
+		}
+
+		file := ast.File {
+			fullpath = fullpath,
+			src      = string(data),
+			pkg      = pkg,
+		}
+
+		ok := parser.parse_file(&p, &file)
+
+		if !ok {
+			if !is_ols_builtin_file(fullpath) {
+				log.errorf("error in parse file for indexing %v", fullpath)
+			}
+			continue
+		}
+
+		uri := common.create_uri(fullpath, context.allocator)
+
+		document := Document {
+			ast = file,
+		}
+
+		document.uri = uri
+		document.text = transmute([]u8)file.src
+		document.used_text = len(file.src)
+
+		document_setup(&document)
+
+		parse_imports(&document, &common.config)
+
+		in_pkg := false
+
+		for pkg in document.imports {
+			if pkg.name == symbol.pkg {
+				in_pkg = true
+				continue
+			}
+		}
+
+		if in_pkg || symbol.pkg == document.package_name {
+			symbols_and_nodes := resolve_entire_file(&document, resolve_flag, context.allocator, target_name)
+			for k, v in symbols_and_nodes {
+				if strings.equal_fold(v.symbol.uri, symbol.uri) && v.symbol.range == symbol.range {
+					node_uri := common.create_uri(v.node.pos.file, ast_context.allocator)
+					range := common.get_token_range(v.node^, string(document.text))
+
+					if !include_declaration &&
+					   v.symbol.range == range &&
+					   strings.equal_fold(node_uri.uri, symbol.uri) {
+						// This is the declaration and so we skip it
+						continue
+					}
+					//We don't have to have the `.` with, otherwise it renames the dot.
+					if _, ok := v.node.derived.(^ast.Implicit_Selector_Expr); ok {
+						range.start.character += 1
+					}
+					location := common.Location {
+						range = range,
+						uri   = strings.clone(node_uri.uri, ast_context.allocator),
+					}
+					append(&locations, location)
+				}
+			}
+		}
+	}
+
+	return locations[:], true
+}
+
+get_references :: proc(
+	document: ^Document,
+	position: common.Position,
+	current_file_only := false,
+	include_declaration := true,
+) -> (
+	[]common.Location,
+	bool,
+) {
+	ast_context := make_ast_context(
+		document.ast,
+		document.imports,
+		document.package_name,
+		document.uri.uri,
+		document.fullpath,
+		context.temp_allocator,
+	)
+
+	position_context, ok := get_document_position_context(document, position, .Hover)
+	if !ok {
+		log.warn("Failed to get position context")
+		return {}, false
+	}
+
+	ast_context.position_hint = position_context.hint
+
+	get_globals(document.ast, &ast_context)
+
+	ast_context.current_package = ast_context.document_package
+
+	if position_context.function != nil {
+		get_locals(document.ast, position_context.function, &ast_context, &position_context)
+	}
+
+	locations, ok2 := resolve_references(
+		document,
+		&ast_context,
+		&position_context,
+		current_file_only,
+		include_declaration = include_declaration,
+	)
+
+	temp_locations := make([dynamic]common.Location, 0, context.temp_allocator)
+
+	for location in locations {
+		temp_location := common.Location {
+			range = location.range,
+			uri   = strings.clone(location.uri, context.temp_allocator),
+		}
+		append(&temp_locations, temp_location)
+	}
+
+	return temp_locations[:], ok2
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 vendor/ols/src/server/references.odin:349:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: vendor/ols/src/server/references.odin
+Cleaning up tree-sitter
+
