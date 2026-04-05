@@ -146,30 +146,33 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
             if !should_skip_analysis {
                 // Check if this defer free references a different variable than the allocation
                 if is_suspicious_pointer_usage(node) {
+                    // Use CONTEXTUAL for suspicious patterns - more cautious approach
                     append(&diagnostics, Diagnostic{
                         file = file_path,
                         line = node.start_line,
                         column = node.start_column,
                         rule_id = "C002",
                         tier = "correctness",
-                        message = "Freeing wrong pointer - does not match allocation",
+                        message = "Freeing wrong pointer - does not match allocation (POTENTIAL)",
                         fix = "Ensure defer free uses the same pointer as the allocation",
                         has_fix = true,
+                        diag_type = .CONTEXTUAL,  // More cautious - potential issue rather than definite violation
                     })
                 }
                 
                 // Check if pointer was reassigned before free
                 if ctx.reassignments[var_name] {
+                    // Use CONTEXTUAL for reassignment patterns - more cautious approach
                     append(&diagnostics, Diagnostic{
                         file = file_path,
                         line = node.start_line,
                         column = node.start_column,
                         rule_id = "C002",
                         tier = "correctness",
-                        message = "Freeing reassigned pointer - this may free wrong memory",
+                        message = "Freeing reassigned pointer - this may free wrong memory (POTENTIAL)",
                         fix = "Pointer was reassigned before free - this may free wrong memory",
                         has_fix = true,
-                        diag_type = .VIOLATION,
+                        diag_type = .CONTEXTUAL,  // More cautious - potential issue rather than definite violation
                     })
                 }
             }
