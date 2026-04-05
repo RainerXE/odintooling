@@ -1,9 +1,9 @@
 
 # Comprehensive Odin Lint Test Report
 
-**Generated**: 2026-04-05 11:54:48
+**Generated**: 2026-04-05 17:55:51
 **Files Tested**: 956
-**Files with Violations**: 29
+**Files with Violations**: 23
 
 ## 📊 Summary
 
@@ -12,8 +12,8 @@
 **Files Affected**: 0
 
 ### 🟣 C002 Violations (Pointer Safety)
-**Total**: 39
-**Files Affected**: 29
+**Total**: 30
+**Files Affected**: 23
 
 ### 🟥 Internal Errors
 **Total**: 0
@@ -28,18 +28,10 @@
 
 🔴 /Users/rainer/odin/core/compress/shoco/shoco.odin:196:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
-### 🟣 C002 Violations in: /Users/rainer/odin/core/strings/strings.odin
-
-🔴 /Users/rainer/odin/core/strings/strings.odin:3378:2: C002 [correctness] Freeing wrong pointer - does not match allocation
-
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/net/url.odin
 
 🔴 /Users/rainer/odin/core/net/url.odin:47:4: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 🔴 /Users/rainer/odin/core/net/url.odin:51:5: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-
-### 🟣 C002 Violations in: /Users/rainer/odin/core/flags/internal_assignment.odin
-
-🔴 /Users/rainer/odin/core/flags/internal_assignment.odin:194:3: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/unicode/tools/ucd/ucd.odin
 
@@ -49,11 +41,9 @@
 
 🔴 /Users/rainer/odin/core/slice/sort.odin:77:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
-### 🟣 C002 Violations in: /Users/rainer/odin/core/encoding/cbor/coding.odin
+### 🟣 C002 Violations in: /Users/rainer/odin/core/encoding/cbor/tags.odin
 
-🔴 /Users/rainer/odin/core/encoding/cbor/coding.odin:432:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-🔴 /Users/rainer/odin/core/encoding/cbor/coding.odin:448:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-🔴 /Users/rainer/odin/core/encoding/cbor/coding.odin:491:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
+🔴 /Users/rainer/odin/core/encoding/cbor/tags.odin:203:3: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/encoding/cbor/marshal.odin
 
@@ -61,14 +51,6 @@
 🔴 /Users/rainer/odin/core/encoding/cbor/marshal.odin:435:5: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 🔴 /Users/rainer/odin/core/encoding/cbor/marshal.odin:471:5: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 🔴 /Users/rainer/odin/core/encoding/cbor/marshal.odin:548:4: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-
-### 🟣 C002 Violations in: /Users/rainer/odin/core/encoding/cbor/tags.odin
-
-🔴 /Users/rainer/odin/core/encoding/cbor/tags.odin:203:3: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-
-### 🟣 C002 Violations in: /Users/rainer/odin/core/encoding/base32/base32.odin
-
-🔴 /Users/rainer/odin/core/encoding/base32/base32.odin:194:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/math/big/radix_os.odin
 
@@ -88,29 +70,21 @@
 🔴 /Users/rainer/odin/core/testing/runner.odin:434:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 🔴 /Users/rainer/odin/core/testing/runner.odin:444:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
-### 🟣 C002 Violations in: /Users/rainer/odin/core/os/path_linux.odin
-
-🔴 /Users/rainer/odin/core/os/path_linux.odin:84:3: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/os/path.odin
 
 🔴 /Users/rainer/odin/core/os/path.odin:743:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
-### 🟣 C002 Violations in: /Users/rainer/odin/core/os/dir_wasi.odin
+### 🟣 C002 Violations in: /Users/rainer/odin/core/os/path_linux.odin
 
-🔴 /Users/rainer/odin/core/os/dir_wasi.odin:83:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-
-### 🟣 C002 Violations in: /Users/rainer/odin/core/os/env_wasi.odin
-
-🔴 /Users/rainer/odin/core/os/env_wasi.odin:37:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-
-### 🟣 C002 Violations in: /Users/rainer/odin/core/os/path_posix.odin
-
-🔴 /Users/rainer/odin/core/os/path_posix.odin:138:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
+🔴 /Users/rainer/odin/core/os/path_linux.odin:84:3: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/os/path_openbsd.odin
 
 🔴 /Users/rainer/odin/core/os/path_openbsd.odin:22:3: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
+
+### 🟣 C002 Violations in: /Users/rainer/odin/core/os/path_posix.odin
+
+🔴 /Users/rainer/odin/core/os/path_posix.odin:138:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/os/old/dir_unix.odin
 
@@ -127,7 +101,6 @@
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/os/old/stat_windows.odin
 
 🔴 /Users/rainer/odin/core/os/old/stat_windows.odin:18:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-🔴 /Users/rainer/odin/core/os/old/stat_windows.odin:96:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/text/regex/compiler/debugging.odin
 
@@ -150,13 +123,13 @@
 ## 🎯 Analysis
 
 ### ✅ Success Rate
-**Clean Files**: 927 (97.0%)
-**Violation Rate**: 3.0%
+**Clean Files**: 933 (97.6%)
+**Violation Rate**: 2.4%
 
 ### 📊 Rule Effectiveness
 - C001 (Memory Safety): 0 violations
-- C002 (Pointer Safety): 39 violations
-- Total violations: 39
+- C002 (Pointer Safety): 30 violations
+- Total violations: 30
 
 ## 🎉 Conclusion
 
