@@ -142,8 +142,11 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                 should_skip_analysis = true
             }
             
-            // Only perform violation analysis if not a known safe pattern
-            if !should_skip_analysis {
+            // Flag to track if we find a definite violation from c002_markAsFreed
+            found_definite_violation := false
+            
+            // Only perform violation analysis if not a known safe pattern and no definite violation found
+            if !should_skip_analysis && !found_definite_violation {
                 // First check for definite violations that should be VIOLATION
                 if is_clear_double_free(var_name, ctx) || is_definite_pointer_misuse(node, var_name, ctx) {
                     // These are definite pointer safety issues - use VIOLATION
@@ -206,7 +209,10 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
             // Always track the free operation with current scope (for both safe and unsafe patterns)
             diag := c002_markAsFreed(var_name, node.start_line, node.start_column, ctx.current_scope, file_path, ctx)
             if diag.message != "" {
+                // Double free detected - this is a definite violation, don't add contextual diagnostics
                 append(&diagnostics, diag)
+                // Set flag to skip the rest of the violation analysis
+                found_definite_violation = true
             }
         }
     }
