@@ -105,36 +105,68 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
         // Extract variable name from defer free statement
         var_name := extract_var_name_from_free(node)
         if var_name != "" {
-            // Check if this defer free references a different variable than the allocation
-            if is_suspicious_pointer_usage(node) {
-                append(&diagnostics, Diagnostic{
-                    file = file_path,
-                    line = node.start_line,
-                    column = node.start_column,
-                    rule_id = "C002",
-                    tier = "correctness",
-                    message = "Freeing wrong pointer - does not match allocation",
-                    fix = "Ensure defer free uses the same pointer as the allocation",
-                    has_fix = true,
-                })
+            
+            // 🛑 FALSE POSITIVE PREVENTION: Skip analysis for known safe patterns
+            should_skip_analysis := false
+            
+            // Pattern 1: Conditional defer statements
+            if is_conditional_defer(node) {
+                // Skip analysis for defer if condition { free(ptr) } patterns
+                // These are typically used for error handling and resource management
+                should_skip_analysis = true
             }
             
-            // Check if pointer was reassigned before free
-            if ctx.reassignments[var_name] {
-                append(&diagnostics, Diagnostic{
-                    file = file_path,
-                    line = node.start_line,
-                    column = node.start_column,
-                    rule_id = "C002",
-                    tier = "correctness",
-                    message = "Freeing reassigned pointer - this may free wrong memory",
-                    fix = "Pointer was reassigned before free - this may free wrong memory",
-                    has_fix = true,
-                    diag_type = .VIOLATION,
-                })
+            // Pattern 2: System allocator patterns
+            // Check if the allocation used system allocators (temp_allocator, context.allocator)
+            if !should_skip_analysis && var_name != "" && len(ctx.allocations_map[var_name]) > 0 {
+                allocation_info := ctx.allocations_map[var_name][0]
+                // TODO: Implement allocator pattern detection in allocation tracking
+                // For now, skip if this looks like a system-level pattern
+                if strings.contains(var_name, "temp_") || 
+                   strings.contains(var_name, "ctx_") ||
+                   strings.contains(var_name, "context_") {
+                    should_skip_analysis = true
+                }
             }
             
-            // Track the free operation with current scope
+            // Pattern 3: Complex expressions that are hard to analyze reliably
+            if !should_skip_analysis && is_complex_expression(node) {
+                should_skip_analysis = true
+            }
+            
+            // Only perform violation analysis if not a known safe pattern
+            if !should_skip_analysis {
+                // Check if this defer free references a different variable than the allocation
+                if is_suspicious_pointer_usage(node) {
+                    append(&diagnostics, Diagnostic{
+                        file = file_path,
+                        line = node.start_line,
+                        column = node.start_column,
+                        rule_id = "C002",
+                        tier = "correctness",
+                        message = "Freeing wrong pointer - does not match allocation",
+                        fix = "Ensure defer free uses the same pointer as the allocation",
+                        has_fix = true,
+                    })
+                }
+                
+                // Check if pointer was reassigned before free
+                if ctx.reassignments[var_name] {
+                    append(&diagnostics, Diagnostic{
+                        file = file_path,
+                        line = node.start_line,
+                        column = node.start_column,
+                        rule_id = "C002",
+                        tier = "correctness",
+                        message = "Freeing reassigned pointer - this may free wrong memory",
+                        fix = "Pointer was reassigned before free - this may free wrong memory",
+                        has_fix = true,
+                        diag_type = .VIOLATION,
+                    })
+                }
+            }
+            
+            // Always track the free operation with current scope (for both safe and unsafe patterns)
             diag := c002_markAsFreed(var_name, node.start_line, node.start_column, ctx.current_scope, file_path, ctx)
             if diag.message != "" {
                 append(&diagnostics, diag)
@@ -385,4 +417,63 @@ c002Message :: proc() -> string {
 // c002FixHint returns the fix hint
 c002FixHint :: proc() -> string {
     return "Ensure defer free uses the same pointer as the allocation"
+}
+
+// Helper functions to detect false positive patterns
+is_conditional_defer :: proc(node: ^ASTNode) -> bool {
+    // Check if this defer is inside a conditional statement
+    // Pattern: defer if condition { free(ptr) }
+    if node.node_type != "defer_statement" {
+        return false
+    }
+    
+    // Check if defer has a condition (conditional defer)
+    for &child in node.children {
+        if child.node_type == "if_statement" {
+            return true
+        }
+    }
+    return false
+}
+
+is_system_allocator_pattern :: proc(node: ^ASTNode) -> bool {
+    // Check for system allocator patterns that should be skipped
+    // Patterns: temp_allocator, context.allocator, etc.
+    
+    // Look for allocator parameters in make statements
+    if node.node_type != "call_expression" {
+        return false
+    }
+    
+    // Check if this is a make call with allocator parameter
+    for &child in node.children {
+        if child.node_type == "identifier" && (child.text == "temp_allocator" || child.text == "context.allocator") {
+            return true
+        }
+    }
+    return false
+}
+
+is_complex_expression :: proc(node: ^ASTNode, depth: int = 0) -> bool {
+    // Check if expression is too complex for reliable analysis
+    // Skip analysis if depth > 3 to avoid false positives
+    
+    if depth > 3 {
+        return true
+    }
+    
+    // Count complex patterns
+    complex_count := 0
+    for &child in node.children {
+        if child.node_type == "binary_expression" || 
+           child.node_type == "array_expression" || 
+           child.node_type == "slice_expression" {
+            complex_count += 1
+            if is_complex_expression(&child, depth + 1) {
+                return true
+            }
+        }
+    }
+    
+    return complex_count > 2
 }
