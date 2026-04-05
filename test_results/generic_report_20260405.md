@@ -1,7 +1,7 @@
 
 # Comprehensive Odin Lint Test Report
 
-**Generated**: 2026-04-05 17:55:51
+**Generated**: 2026-04-05 18:02:03
 **Files Tested**: 956
 **Files with Violations**: 23
 
@@ -41,16 +41,16 @@
 
 🔴 /Users/rainer/odin/core/slice/sort.odin:77:2: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
-### 🟣 C002 Violations in: /Users/rainer/odin/core/encoding/cbor/tags.odin
-
-🔴 /Users/rainer/odin/core/encoding/cbor/tags.odin:203:3: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
-
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/encoding/cbor/marshal.odin
 
 🔴 /Users/rainer/odin/core/encoding/cbor/marshal.odin:401:5: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 🔴 /Users/rainer/odin/core/encoding/cbor/marshal.odin:435:5: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 🔴 /Users/rainer/odin/core/encoding/cbor/marshal.odin:471:5: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 🔴 /Users/rainer/odin/core/encoding/cbor/marshal.odin:548:4: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
+
+### 🟣 C002 Violations in: /Users/rainer/odin/core/encoding/cbor/tags.odin
+
+🔴 /Users/rainer/odin/core/encoding/cbor/tags.odin:203:3: C002 [correctness] Freeing reassigned pointer - this may free wrong memory
 
 ### 🟣 C002 Violations in: /Users/rainer/odin/core/math/big/radix_os.odin
 
