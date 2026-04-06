@@ -65,17 +65,21 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
     }
     
     // Check for pointer allocations (make, new, etc.)
+    // Debug: Show node types that contain make(
+    if strings.contains(node.text, "make(") {
+        fmt.println("DEBUG: Found make( in node type:", node.node_type, "text:", node.text)
+    }
+    
     if is_pointer_allocation(node) {
         var_name := extract_var_name_from_allocation(node)
         if var_name != "" {
+            fmt.println("DEBUG: Allocating", var_name, "at line", node.start_line, "scope", ctx.current_scope)
             c002_markAsAllocated(var_name, node.start_line, node.start_column, ctx.current_scope, ctx)
         }
-    }
-    
-    // Check for pointer reassignment
-    if is_pointer_reassignment(node) {
+    } else if is_pointer_reassignment(node) {
         var_name := extract_var_name_from_assignment(node)
         if var_name != "" {
+            fmt.println("DEBUG: Reassigning", var_name, "at line", node.start_line, "scope", ctx.current_scope)
             ctx.reassignments[var_name] = true
             // Mark as reassigned in tracking map
             if len(ctx.allocations_map[var_name]) > 0 {
@@ -105,22 +109,30 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                     // Double free detected - definite violation
                     append(&diagnostics, diag)
                 } else {
-                    // Check for reassignment issues
+                    // Check for reassignment issues - find allocation in current scope
                     if len(ctx.allocations_map[var_name]) > 0 {
-                        allocation_info := ctx.allocations_map[var_name][0]
-                        if allocation_info.is_reassigned {
-                            // Potential misuse - contextual
-                            append(&diagnostics, Diagnostic{
-                                file = file_path,
-                                line = node.start_line,
-                                column = node.start_column,
-                                rule_id = "C002",
-                                tier = "correctness",
-                                message = "Freeing reassigned pointer - this may free wrong memory (POTENTIAL)",
-                                fix = "Pointer was reassigned before free - this may free wrong memory",
-                                has_fix = true,
-                                diag_type = .CONTEXTUAL,
-                            })
+                        // Find the allocation record that matches the current scope
+                        found_allocation := false
+                        for i in 0..<len(ctx.allocations_map[var_name]) {
+                            if ctx.allocations_map[var_name][i].scope_level == ctx.current_scope {
+                                allocation_info := ctx.allocations_map[var_name][i]
+                                if allocation_info.is_reassigned {
+                                    // Potential misuse - contextual
+                                    append(&diagnostics, Diagnostic{
+                                        file = file_path,
+                                        line = node.start_line,
+                                        column = node.start_column,
+                                        rule_id = "C002",
+                                        tier = "correctness",
+                                        message = "Freeing reassigned pointer - this may free wrong memory (POTENTIAL)",
+                                        fix = "Pointer was reassigned before free - this may free wrong memory",
+                                        has_fix = true,
+                                        diag_type = .CONTEXTUAL,
+                                    })
+                                }
+                                found_allocation = true
+                                break
+                            }
                         }
                     }
                 }
@@ -189,16 +201,19 @@ c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int
                         column = col,
                         rule_id = "C002",
                         tier = "correctness",
-                        message = "C002 [correctness] Multiple defer frees on same allocation",
+                        message = "Multiple defer frees on same allocation",
                         fix = fmt.tprintf("Allocation at line %d,%d freed %d times",
                                         existing[i].line, existing[i].col, existing[i].free_count),
                         has_fix = true,
                         diag_type = .VIOLATION,
                     }
+                    // Return immediately on first double-free detection
+                    ctx.allocations_map[var_name] = existing
+                    return diag_to_report
                 }
             }
         }
-        // Always write back the modified slice, even if we detected a double-free
+        // Always write back the modified slice if no double-free detected
         ctx.allocations_map[var_name] = existing
     }
     return diag_to_report
@@ -327,11 +342,10 @@ extract_var_name_from_assignment :: proc(node: ^ASTNode) -> string {
 // is_defer_cleanup checks if node is defer with cleanup function
 is_defer_cleanup :: proc(node: ^ASTNode) -> bool {
     // Check node type and content for defer + cleanup pattern
+    // Note: "os.free" and "mem.free" contain "free", so single check suffices
     return strings.contains(node.node_type, "defer_statement") && 
            (strings.contains(node.text, "free") || 
-            strings.contains(node.text, "delete") ||
-            strings.contains(node.text, "os.free") ||
-            strings.contains(node.text, "mem.free"))
+            strings.contains(node.text, "delete"))
 }
 
 // c002Message returns the rule message
