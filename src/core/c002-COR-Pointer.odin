@@ -87,7 +87,6 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                         // Check for make, new, alloc, malloc
                         if callee_text == "make" || callee_text == "new" || 
                            callee_text == "alloc" || callee_text == "malloc" {
-                            fmt.println("DEBUG: Found allocation:", var_name, "via", callee_text, "at line", node.start_line)
                             c002_markAsAllocated(var_name, node.start_line, node.start_column, ctx.current_scope, ctx)
                             break
                         }
@@ -163,10 +162,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
         }
     }
     
-    // Debug: Show what node types we're processing
-    if strings.contains(node.text, "make(") || strings.contains(node.text, "free(") {
-        fmt.println("DEBUG C002: Processing node type:", node.node_type, "text:", node.text)
-    }
+
     
     // Check children recursively
     for &child in node.children {
