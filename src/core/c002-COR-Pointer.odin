@@ -12,7 +12,6 @@ C002AllocationInfo :: struct {
     var_name: string,
     line: int,
     col: int,
-    is_freed: bool,
     free_count: int,  // Track number of defer frees
     scope_level: int,  // Track scope level for proper matching
     is_reassigned: bool,  // Track if pointer was reassigned
@@ -156,7 +155,6 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
         }
     }
     
-
     
     // Check children recursively
     for &child in node.children {
@@ -183,7 +181,6 @@ c002_markAsAllocated :: proc(var_name: string, line: int, col: int, scope_level:
         var_name = var_name,
         line = line,
         col = col,
-        is_freed = false,
         free_count = 0,
         scope_level = scope_level,
         is_reassigned = false,
@@ -260,7 +257,7 @@ extract_var_name_from_free :: proc(node: ^ASTNode) -> string {
         rel_idx := strings.index(rest, ")")
         if rel_idx >= 0 {
             end_idx := start_idx + rel_idx
-            if start_idx >= 0 && end_idx > start_idx {
+            if end_idx > start_idx {
                 var_name := strings.trim(text[start_idx:end_idx], " \t")
                 // Remove any trailing commas or whitespace
                 var_name = strings.trim(var_name, " ,")
@@ -296,10 +293,11 @@ extract_lhs_var_name :: proc(node: ^ASTNode) -> string {
             return var_name
         }
     } else if strings.contains(text, "=") {
-        // Guard against relational operators >=, <=, !=
+        // Guard against relational operators >=, <=, !=, ==
         has_relational_op := strings.contains(text, ">=") || 
                            strings.contains(text, "<=") || 
-                           strings.contains(text, "!=")
+                           strings.contains(text, "!=") ||
+                           strings.contains(text, "==")
         
         if !has_relational_op {
             parts := strings.split(text, "=")
@@ -323,7 +321,6 @@ extract_lhs_var_name :: proc(node: ^ASTNode) -> string {
     
     return ""
 }
-
 
 
 // is_defer_cleanup checks if node is defer with cleanup function
