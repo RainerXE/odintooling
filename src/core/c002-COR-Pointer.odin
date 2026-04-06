@@ -64,31 +64,54 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
         ctx.current_scope = len(ctx.scope_stack)
     }
     
-    // Check for pointer allocations (make, new, etc.)
-    // Debug: Show node types that contain make(
-    if strings.contains(node.text, "make(") {
-        fmt.println("DEBUG: Found make( in node type:", node.node_type, "text:", node.text)
-    }
-    
-    if is_pointer_allocation(node) {
-        var_name := extract_var_name_from_allocation(node)
-        if var_name != "" {
-            fmt.println("DEBUG: Allocating", var_name, "at line", node.start_line, "scope", ctx.current_scope)
-            c002_markAsAllocated(var_name, node.start_line, node.start_column, ctx.current_scope, ctx)
-        }
-    } else if is_pointer_reassignment(node) {
-        var_name := extract_var_name_from_assignment(node)
-        if var_name != "" {
-            fmt.println("DEBUG: Reassigning", var_name, "at line", node.start_line, "scope", ctx.current_scope)
-            ctx.reassignments[var_name] = true
-            // Mark as reassigned in tracking map
-            if len(ctx.allocations_map[var_name]) > 0 {
-                existing := ctx.allocations_map[var_name]
-                for i in 0..<len(existing) {
-                    existing[i].is_reassigned = true
-                    existing[i].reassignment_line = node.start_line
+    // Check for pointer allocations (make, new, etc.) using AST structure like C001
+    // Look for assignment_statement with make/new calls
+    if node.node_type == "assignment_statement" {
+        // Check if this assignment contains a make or new call
+        has_allocation_call := false
+        for &child in node.children {
+            if child.node_type == "call_expression" {
+                has_allocation_call = true
+                // Found a call expression - check if it's make or new
+                // We'll extract the variable name and check the call type
+                var_name := extract_lhs_var_name(node)
+                if var_name != "" {
+                    // Check if this is a make/new call by looking at the callee
+                    if len(child.children) > 0 {
+                        callee := &child.children[0]
+                        callee_text := ""
+                        if callee.node_type == "identifier" {
+                            callee_text = callee.text
+                        }
+                        
+                        // Check for make, new, alloc, malloc
+                        if callee_text == "make" || callee_text == "new" || 
+                           callee_text == "alloc" || callee_text == "malloc" {
+                            fmt.println("DEBUG: Found allocation:", var_name, "via", callee_text, "at line", node.start_line)
+                            c002_markAsAllocated(var_name, node.start_line, node.start_column, ctx.current_scope, ctx)
+                            break
+                        }
+                    }
                 }
-                ctx.allocations_map[var_name] = existing
+            }
+        }
+        
+        // If no allocation call found, check for reassignment
+        if !has_allocation_call {
+            var_name := extract_lhs_var_name(node)
+            if var_name != "" {
+                // This is a pure reassignment, not an allocation
+                fmt.println("DEBUG: Reassigning", var_name, "at line", node.start_line, "scope", ctx.current_scope)
+                ctx.reassignments[var_name] = true
+                // Mark as reassigned in tracking map
+                if len(ctx.allocations_map[var_name]) > 0 {
+                    existing := ctx.allocations_map[var_name]
+                    for i in 0..<len(existing) {
+                        existing[i].is_reassigned = true
+                        existing[i].reassignment_line = node.start_line
+                    }
+                    ctx.allocations_map[var_name] = existing
+                }
             }
         }
     }
@@ -138,6 +161,11 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                 }
             }
         }
+    }
+    
+    // Debug: Show what node types we're processing
+    if strings.contains(node.text, "make(") || strings.contains(node.text, "free(") {
+        fmt.println("DEBUG C002: Processing node type:", node.node_type, "text:", node.text)
     }
     
     // Check children recursively
@@ -248,6 +276,51 @@ extract_var_name_from_free :: proc(node: ^ASTNode) -> string {
                 var_name = strings.trim(var_name, " ,")
                 return var_name
             }
+        }
+    }
+    
+    return ""
+}
+
+// extract_lhs_var_name extracts variable name from left-hand side of assignment
+extract_lhs_var_name :: proc(node: ^ASTNode) -> string {
+    text := node.text
+    
+    // Pattern: variable := value or variable = value
+    // Handle both declaration and assignment syntax
+    if strings.contains(text, ":=") {
+        parts := strings.split(text, ":=")
+        if len(parts) >= 1 {
+            var_name := strings.trim(parts[0], " \t")
+            // Remove any type annotations
+            if strings.contains(var_name, ":") {
+                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
+            }
+            // Handle multi-assignment: a, b := value
+            if strings.contains(var_name, ",") {
+                // For now, take first variable and add comment about limitation
+                // TODO: Track all variables in multi-assignment
+                first_var := strings.trim(strings.split(var_name, ",")[0], " \t")
+                return first_var
+            }
+            return var_name
+        }
+    } else if strings.contains(text, "=") {
+        parts := strings.split(text, "=")
+        if len(parts) >= 1 {
+            var_name := strings.trim(parts[0], " \t")
+            // Remove any type annotations
+            if strings.contains(var_name, ":") {
+                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
+            }
+            // Handle multi-assignment: a, b = value
+            if strings.contains(var_name, ",") {
+                // For now, take first variable and add comment about limitation
+                // TODO: Track all variables in multi-assignment
+                first_var := strings.trim(strings.split(var_name, ",")[0], " \t")
+                return first_var
+            }
+            return var_name
         }
     }
     
