@@ -23,7 +23,6 @@ C002AllocationInfo :: struct {
 C002AnalysisContext :: struct {
     allocations_map: map[string][dynamic]C002AllocationInfo,
     current_scope: int,
-    reassignments: map[string]bool,
     scope_stack: [dynamic]string,  // Track entered scopes for proper exit detection
 }
 
@@ -32,7 +31,6 @@ create_c002_context :: proc() -> C002AnalysisContext {
     return C002AnalysisContext{
         allocations_map = {},
         current_scope = 0,
-        reassignments = {},
         scope_stack = {},
     }
 }
@@ -65,13 +63,12 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
     }
     
     // Check for pointer allocations (make, new, etc.) using AST structure like C001
-    // Look for assignment_statement with make/new calls
-    if node.node_type == "assignment_statement" {
+    // Look for assignment_statement or short_var_declaration with make/new calls
+    if node.node_type == "assignment_statement" || node.node_type == "short_var_declaration" {
         // Check if this assignment contains a make or new call
         has_allocation_call := false
         for &child in node.children {
             if child.node_type == "call_expression" {
-                has_allocation_call = true
                 // Found a call expression - check if it's make or new
                 // We'll extract the variable name and check the call type
                 var_name := extract_lhs_var_name(node)
@@ -87,6 +84,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                         // Check for make, new, alloc, malloc
                         if callee_text == "make" || callee_text == "new" || 
                            callee_text == "alloc" || callee_text == "malloc" {
+                            has_allocation_call = true
                             c002_markAsAllocated(var_name, node.start_line, node.start_column, ctx.current_scope, ctx)
                             break
                         }
@@ -100,8 +98,6 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
             var_name := extract_lhs_var_name(node)
             if var_name != "" {
                 // This is a pure reassignment, not an allocation
-                fmt.println("DEBUG: Reassigning", var_name, "at line", node.start_line, "scope", ctx.current_scope)
-                ctx.reassignments[var_name] = true
                 // Mark as reassigned in tracking map
                 if len(ctx.allocations_map[var_name]) > 0 {
                     existing := ctx.allocations_map[var_name]
@@ -134,7 +130,6 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                     // Check for reassignment issues - find allocation in current scope
                     if len(ctx.allocations_map[var_name]) > 0 {
                         // Find the allocation record that matches the current scope
-                        found_allocation := false
                         for i in 0..<len(ctx.allocations_map[var_name]) {
                             if ctx.allocations_map[var_name][i].scope_level == ctx.current_scope {
                                 allocation_info := ctx.allocations_map[var_name][i]
@@ -152,7 +147,6 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                                         diag_type = .CONTEXTUAL,
                                     })
                                 }
-                                found_allocation = true
                                 break
                             }
                         }
@@ -302,111 +296,35 @@ extract_lhs_var_name :: proc(node: ^ASTNode) -> string {
             return var_name
         }
     } else if strings.contains(text, "=") {
-        parts := strings.split(text, "=")
-        if len(parts) >= 1 {
-            var_name := strings.trim(parts[0], " \t")
-            // Remove any type annotations
-            if strings.contains(var_name, ":") {
-                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
+        // Guard against relational operators >=, <=, !=
+        has_relational_op := strings.contains(text, ">=") || 
+                           strings.contains(text, "<=") || 
+                           strings.contains(text, "!=")
+        
+        if !has_relational_op {
+            parts := strings.split(text, "=")
+            if len(parts) >= 1 {
+                var_name := strings.trim(parts[0], " \t")
+                // Remove any type annotations
+                if strings.contains(var_name, ":") {
+                    var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
+                }
+                // Handle multi-assignment: a, b = value
+                if strings.contains(var_name, ",") {
+                    // For now, take first variable and add comment about limitation
+                    // TODO: Track all variables in multi-assignment
+                    first_var := strings.trim(strings.split(var_name, ",")[0], " \t")
+                    return first_var
+                }
+                return var_name
             }
-            // Handle multi-assignment: a, b = value
-            if strings.contains(var_name, ",") {
-                // For now, take first variable and add comment about limitation
-                // TODO: Track all variables in multi-assignment
-                first_var := strings.trim(strings.split(var_name, ",")[0], " \t")
-                return first_var
-            }
-            return var_name
         }
     }
     
     return ""
 }
 
-// is_pointer_allocation checks if node is a pointer allocation (make, new, etc.)
-is_pointer_allocation :: proc(node: ^ASTNode) -> bool {
-    return (strings.contains(node.node_type, "assignment") ||
-            strings.contains(node.node_type, "declaration")) &&
-           (strings.contains(node.text, "make(") || 
-            strings.contains(node.text, "new(") ||
-            strings.contains(node.text, "alloc(") ||
-            strings.contains(node.text, "malloc("))
-}
 
-// extract_var_name_from_allocation extracts variable name from allocation
-extract_var_name_from_allocation :: proc(node: ^ASTNode) -> string {
-    text := node.text
-    
-    // Pattern: variable := make(...) or variable = make(...)
-    // Look for assignment before the allocation call
-    if strings.contains(text, ":=") {
-        parts := strings.split(text, ":=")
-        if len(parts) >= 1 {
-            var_name := strings.trim(parts[0], " \t")
-            // Remove any type annotations
-            if strings.contains(var_name, ":") {
-                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
-            }
-            return var_name
-        }
-    } else if strings.contains(text, "=") {
-        // Handle variable = make(...) pattern
-        // Look for the assignment target before the =
-        parts := strings.split(text, "=")
-        if len(parts) >= 1 {
-            var_name := strings.trim(parts[0], " \t")
-            
-            // Handle multi-assignment: a, b = make(...)
-            if strings.contains(var_name, ",") {
-                // For now, take first variable and add comment about limitation
-                // TODO: Track all variables in multi-assignment
-                first_var := strings.trim(strings.split(var_name, ",")[0], " \t")
-                return first_var
-            }
-            
-            // Remove any type annotations
-            if strings.contains(var_name, ":") {
-                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
-            }
-            return var_name
-        }
-    }
-    
-    return ""
-}
-
-// is_pointer_reassignment checks if node is a pointer reassignment
-is_pointer_reassignment :: proc(node: ^ASTNode) -> bool {
-    // Rely on node type alone since we're already checking for "assignment"
-    // This avoids false positives from != and == operators
-    return strings.contains(node.node_type, "assignment")
-}
-
-// extract_var_name_from_assignment extracts variable name from assignment
-extract_var_name_from_assignment :: proc(node: ^ASTNode) -> string {
-    text := node.text
-    
-    // Pattern: variable := value or variable = value
-    if strings.contains(text, ":=") {
-        parts := strings.split(text, ":=")
-        if len(parts) >= 1 {
-            var_name := strings.trim(parts[0], " \t")
-            // Remove any type annotations
-            if strings.contains(var_name, ":") {
-                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
-            }
-            return var_name
-        }
-    } else if strings.contains(text, "=") {
-        parts := strings.split(text, "=")
-        if len(parts) >= 1 {
-            var_name := strings.trim(parts[0], " \t")
-            return var_name
-        }
-    }
-    
-    return ""
-}
 
 // is_defer_cleanup checks if node is defer with cleanup function
 is_defer_cleanup :: proc(node: ^ASTNode) -> bool {
