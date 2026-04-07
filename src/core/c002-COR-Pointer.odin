@@ -54,16 +54,26 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
     diagnostics: [dynamic]Diagnostic
     
     // Track scope boundaries using stack-based approach
-    is_block := strings.contains(node.node_type, "block")
+    is_block := node.node_type == "block"
     if is_block {
         // Entering a new scope - push onto stack
         append(&ctx.scope_stack, node.node_type)
         ctx.current_scope = len(ctx.scope_stack)
     }
-    
+
+    // Reset context at procedure boundaries to avoid cross-function false negatives
+    is_proc := node.node_type == "proc_declaration"
+    if is_proc {
+        // Save current context for parent scope
+        // Create fresh context for this procedure
+        ctx.allocations_map = make(map[string][dynamic]C002AllocationInfo)
+        ctx.scope_stack = make([dynamic]string)
+        ctx.current_scope = 0
+    }
+
     // Check for pointer allocations (make, new, etc.) using AST structure like C001
     // Look for assignment_statement or short_var_declaration with make/new calls
-    if node.node_type == "assignment_statement" || node.node_type == "short_var_declaration" {
+    if node.node_type == "assignment_statement" || node.node_type == "short_var_decl" {
         // Check if this assignment contains a make or new call
         has_allocation_call := false
         for &child in node.children {
