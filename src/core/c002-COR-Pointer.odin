@@ -246,100 +246,55 @@ c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int
 
 // extract_var_name_from_free extracts variable name from free/delete statement
 extract_var_name_from_free :: proc(node: ^ASTNode) -> string {
-    // Simple extraction - look for variable name in free/delete calls
-    text := node.text
-    
-    // Pattern: defer free(variable) or defer delete(variable)
-    if strings.contains(text, "free(") || strings.contains(text, "delete(") {
-        keyword: string
-        if strings.contains(text, "free(") {
-            keyword = "free"
-        } else {
-            keyword = "delete"
-        }
-        
-        start_idx := strings.index(text, keyword) + len(keyword) + 1
-        if start_idx > len(text) || text[start_idx-1] != '(' {
-            return ""
-        }
-        // Find closing parenthesis after start_idx
-        rest := text[start_idx:]
-        rel_idx := strings.index(rest, ")")
-        if rel_idx >= 0 {
-            end_idx := start_idx + rel_idx
-            if end_idx > start_idx {
-                var_name := strings.trim(text[start_idx:end_idx], " \t")
-                // Remove any trailing commas or whitespace
-                var_name = strings.trim(var_name, " ,")
-                return var_name
+    // Use AST navigation like C001 instead of unreliable node.text parsing
+    for &child in node.children {
+        if child.node_type != "call_expression" do continue
+        found_callee := false
+        for &gc in child.children {
+            // Modern grammar: arguments are inside an argument_list node.
+            if gc.node_type == "argument_list" {
+                for &arg in gc.children {
+                    if arg.node_type == "identifier" do return arg.text
+                }
+            }
+            // Fallback: flat identifier children (older grammar).
+            if gc.node_type == "identifier" {
+                if !found_callee {
+                    found_callee = true  // first identifier is the callee
+                    continue
+                }
+                return gc.text  // second identifier is the argument
             }
         }
     }
-    
     return ""
 }
 
 // extract_lhs_var_name extracts variable name from left-hand side of assignment
+// using AST navigation (replaces unreliable node.text parsing)
 extract_lhs_var_name :: proc(node: ^ASTNode) -> string {
-    text := node.text
-    
-    // Pattern: variable := value or variable = value
-    // Handle both declaration and assignment syntax
-    if strings.contains(text, ":=") {
-        parts := strings.split(text, ":=")
-        if len(parts) >= 1 {
-            var_name := strings.trim(parts[0], " \t")
-            // Remove any type annotations
-            if strings.contains(var_name, ":") {
-                var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
-            }
-            // Handle multi-assignment: a, b := value
-            if strings.contains(var_name, ",") {
-                // For now, take first variable and add comment about limitation
-                // TODO: Track all variables in multi-assignment
-                first_var := strings.trim(strings.split(var_name, ",")[0], " \t")
-                return first_var
-            }
-            return var_name
-        }
-    } else if strings.contains(text, "=") {
-        // Guard against relational operators >=, <=, !=, ==
-        has_relational_op := strings.contains(text, ">=") || 
-                           strings.contains(text, "<=") || 
-                           strings.contains(text, "!=") ||
-                           strings.contains(text, "==")
-        
-        if !has_relational_op {
-            parts := strings.split(text, "=")
-            if len(parts) >= 1 {
-                var_name := strings.trim(parts[0], " \t")
-                // Remove any type annotations
-                if strings.contains(var_name, ":") {
-                    var_name = strings.trim(strings.split(var_name, ":")[0], " \t")
-                }
-                // Handle multi-assignment: a, b = value
-                if strings.contains(var_name, ",") {
-                    // For now, take first variable and add comment about limitation
-                    // TODO: Track all variables in multi-assignment
-                    first_var := strings.trim(strings.split(var_name, ",")[0], " \t")
-                    return first_var
-                }
-                return var_name
-            }
-        }
+    // Navigate AST children to find first identifier (like C001's extract_lhs_name)
+    for &child in node.children {
+        if child.node_type == "identifier" do return child.text
     }
-    
     return ""
 }
 
 
 // is_defer_cleanup checks if node is defer with cleanup function
+// Uses AST navigation like C001 instead of unreliable node.text
 is_defer_cleanup :: proc(node: ^ASTNode) -> bool {
-    // Check node type and content for defer + cleanup pattern
-    // Note: "os.free" and "mem.free" contain "free", so single check suffices
-    return strings.contains(node.node_type, "defer_statement") && 
-           (strings.contains(node.text, "free") || 
-            strings.contains(node.text, "delete"))
+    if node.node_type != "defer_statement" do return false
+    for &child in node.children {
+        if child.node_type != "call_expression" do continue
+        for &gc in child.children {
+            if gc.node_type == "identifier" &&
+               (gc.text == "free" || gc.text == "delete") {
+                return true
+            }
+        }
+    }
+    return false
 }
 
 // c002Message returns the rule message
