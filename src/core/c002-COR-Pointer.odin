@@ -4,8 +4,9 @@ import "core:fmt"
 import "core:strings"
 
 // C002 rule implementation
-// C002: Defer free on wrong pointer
-// This rule detects when defer free is called on a different pointer than the one allocated
+// C002: Double-free detection
+// This rule detects when the same allocation is freed multiple times via defer
+// Pattern: defer free(ptr); defer free(ptr); // Double-free
 
 // C002AllocationInfo tracks allocation and free information
 C002AllocationInfo :: struct {
@@ -299,7 +300,7 @@ is_defer_cleanup :: proc(node: ^ASTNode) -> bool {
 
 // c002Message returns the rule message
 c002Message :: proc() -> string {
-    return "Defer free on wrong pointer - does not match allocation"
+    return "Multiple defer frees on same allocation - potential double-free"
 }
 
 // c002FixHint returns the fix hint
