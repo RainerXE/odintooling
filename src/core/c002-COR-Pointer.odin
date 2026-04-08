@@ -1,6 +1,7 @@
 package core
 
 import "core:fmt"
+import "core:os"
 import "core:strings"
 
 // C002 rule implementation
@@ -29,9 +30,9 @@ C002AnalysisContext :: struct {
 // create_c002_context creates a new analysis context
 create_c002_context :: proc() -> C002AnalysisContext {
     return C002AnalysisContext{
-        allocations_map = {},
+        allocations_map = make(map[string][dynamic]C002AllocationInfo),
         current_scope = 0,
-        scope_stack = {},
+        scope_stack = make([dynamic]string),
     }
 }
 
@@ -51,7 +52,19 @@ C002Rule :: proc() -> Rule {
 }
 
 // c002Matcher checks for defer free on wrong pointer
-c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext) -> []Diagnostic {
+c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext, file_lines: []string = {}) -> []Diagnostic {
+    // Read file once at top-level call if not provided
+    lines := file_lines
+    owned_content: []u8
+    owned_lines: []string
+    
+    if len(lines) == 0 {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err != nil do return {}
+        owned_content = content
+        owned_lines = strings.split(string(content), "\n")
+        lines = owned_lines
+    }
     diagnostics: [dynamic]Diagnostic
     
     // Track scope boundaries using stack-based approach
@@ -65,7 +78,11 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
     // Reset context at procedure boundaries to avoid cross-function false negatives
     is_proc := node.node_type == "proc_declaration"
     if is_proc {
-        // Save current context for parent scope
+        // Free old allocations to prevent memory leaks
+        for _, &v in ctx.allocations_map do delete(v)
+        delete(ctx.allocations_map)
+        delete(ctx.scope_stack)
+        
         // Create fresh context for this procedure
         ctx.allocations_map = make(map[string][dynamic]C002AllocationInfo)
         ctx.scope_stack = make([dynamic]string)
@@ -86,14 +103,24 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                     // Check if this is a make/new call by looking at the callee
                     if len(child.children) > 0 {
                         callee := &child.children[0]
-                        callee_text := ""
-                        if callee.node_type == "identifier" {
-                            callee_text = callee.text
+                        
+                        // Check for make, new using reliable file_lines (like C001)
+                        is_allocation := false
+                        if callee.node_type == "identifier" && callee.start_line > 0 {
+                            line_idx := callee.start_line - 1
+                            if line_idx < len(lines) {
+                                line := lines[line_idx]
+                                col := callee.start_column - 1
+                                if col >= 0 && col < len(line) {
+                                    rest := line[col:]
+                                    if strings.has_prefix(rest, "make(") || strings.has_prefix(rest, "new(") {
+                                        is_allocation = true
+                                    }
+                                }
+                            }
                         }
                         
-                        // Check for make, new, alloc, malloc
-                        if callee_text == "make" || callee_text == "new" || 
-                           callee_text == "alloc" || callee_text == "malloc" {
+                        if is_allocation {
                             has_allocation_call = true
                             c002_markAsAllocated(var_name, node.start_line, node.start_column, ctx.current_scope, ctx)
                             break
@@ -141,7 +168,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                     if len(ctx.allocations_map[var_name]) > 0 {
                         // Find the allocation record that matches the current scope
                         for i in 0..<len(ctx.allocations_map[var_name]) {
-                            if ctx.allocations_map[var_name][i].scope_level == ctx.current_scope {
+                            if ctx.allocations_map[var_name][i].scope_level <= ctx.current_scope {
                                 allocation_info := ctx.allocations_map[var_name][i]
                                 if allocation_info.is_reassigned {
                                     // Potential misuse - contextual
@@ -215,8 +242,8 @@ c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int
     if len(ctx.allocations_map[var_name]) > 0 {
         existing := ctx.allocations_map[var_name]
         for i in 0..<len(existing) {
-            // Only process allocations in the same scope
-            if existing[i].scope_level == scope_level {
+            // Allow cross-scope double-free detection (allocation at outer scope, free at inner scope)
+            if existing[i].scope_level <= scope_level {
                 existing[i].free_count += 1  // Increment instead of setting true
                 
                 // Detect and report double free
