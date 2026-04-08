@@ -139,8 +139,11 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
                 if len(ctx.allocations_map[var_name]) > 0 {
                     existing := ctx.allocations_map[var_name]
                     for i in 0..<len(existing) {
-                        existing[i].is_reassigned = true
-                        existing[i].reassignment_line = node.start_line
+                        // Only mark allocations in the current scope (fix reassignment scope bug)
+                        if existing[i].scope_level == ctx.current_scope {
+                            existing[i].is_reassigned = true
+                            existing[i].reassignment_line = node.start_line
+                        }
                     }
                     ctx.allocations_map[var_name] = existing
                 }
@@ -300,9 +303,14 @@ extract_var_name_from_free :: proc(node: ^ASTNode) -> string {
 
 // extract_lhs_var_name extracts variable name from left-hand side of assignment
 // using AST navigation (replaces unreliable node.text parsing)
+// Skips complex LHS expressions like buf[i] and thing.field
 extract_lhs_var_name :: proc(node: ^ASTNode) -> string {
     // Navigate AST children to find first identifier (like C001's extract_lhs_name)
     for &child in node.children {
+        // Skip LHS expressions that aren't plain variable names
+        if child.node_type == "selector_expression" || child.node_type == "index_expression" {
+            return ""  // Complex LHS - skip tracking
+        }
         if child.node_type == "identifier" do return child.text
     }
     return ""
@@ -328,6 +336,14 @@ is_defer_cleanup :: proc(node: ^ASTNode) -> bool {
 // c002Message returns the rule message
 c002Message :: proc() -> string {
     return "Multiple defer frees on same allocation - potential double-free"
+}
+
+// destroy_c002_context cleans up memory allocated by C002 analysis
+// Should be called after analysis completes to prevent memory leaks
+destroy_c002_context :: proc(ctx: ^C002AnalysisContext) {
+    for _, &v in ctx.allocations_map do delete(v)
+    delete(ctx.allocations_map)
+    delete(ctx.scope_stack)
 }
 
 // c002FixHint returns the fix hint
