@@ -1,8 +1,8 @@
 === C002 Rule Test Summary ===
-Generated: Thu Apr  9 09:42:45 CEST 2026
+Generated: Thu Apr  9 20:52:15 CEST 2026
 Test directory: ./tests/C002_COR_POINTER
 
-./tests/C002_COR_POINTER/c002_explicit_violation.odin - 1 violations
+./tests/C002_COR_POINTER/c002_explicit_violation.odin - 3 violations
 
 === DETAILED OUTPUT FOR c002_explicit_violation.odin ===
 Starting odin-lint
@@ -70,6 +70,10 @@ DEBUG: Tree is valid, calling ts_tree_root_node...
 ✅ DEBUG: Root node obtained successfully
 🔴 ./tests/C002_COR_POINTER/c002_explicit_violation.odin:16:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_explicit_violation.odin:12:5: C002 [correctness] Multiple defer frees on the same allocation (double-free)
+Fix: Remove duplicate defer free — allocation at line 10 col 5 has been freed 2 times
+🔴 ./tests/C002_COR_POINTER/c002_explicit_violation.odin:20:5: C002 [correctness] Multiple defer frees on the same allocation (double-free)
+Fix: Remove duplicate defer free — allocation at line 15 col 5 has been freed 2 times
 Checking stub rule for: ./tests/C002_COR_POINTER/c002_explicit_violation.odin
 Cleaning up tree-sitter
 
@@ -152,69 +156,7 @@ Cleaning up tree-sitter
 
 ./tests/C002_COR_POINTER/c002_edge_case_complex.odin - No violations
 ./tests/C002_COR_POINTER/c002_potential_violations.odin - No violations
-./tests/C002_COR_POINTER/c002_false_positive_allocators.odin - 2 violations
-
-=== DETAILED OUTPUT FOR c002_false_positive_allocators.odin ===
-Starting odin-lint
-Processing file: ./tests/C002_COR_POINTER/c002_false_positive_allocators.odin
-=== DEBUG: Initializing tree-sitter ===
-DEBUG: Creating parser...
-✅ DEBUG: Parser created successfully
-DEBUG: Loading Odin language grammar...
-✅ DEBUG: Odin language loaded successfully
-DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
-DEBUG: Setting parser language...
-✅ DEBUG: Parser language set successfully
-=== DEBUG: Tree-sitter initialization complete ===
-Parsing file: ./tests/C002_COR_POINTER/c002_false_positive_allocators.odin
-=== DEBUG: Parsing source code ===
-DEBUG: Source length: 910
-DEBUG: Source content: // Test system allocator patterns that should NOT trigger C002
-package main
-
-import "core:runtime"
-
-main :: proc() {
-    // Pattern 1: Temporary allocator
-    temp_data := make([]int, 100, runtime.temp_allocator)
-    defer delete(temp_data)  // Should NOT trigger C002
-    
-    // Pattern 2: Context allocator simulation
-    // Note: context.allocator is a common pattern in Odin core
-    ctx_data := make([]int, 200)
-    // Simulate context allocator pattern
-    defer free(ctx_data)  // Should NOT trigger C002 in system contexts
-    
-    // Pattern 3: Custom allocator parameter
-    custom_alloc_data := make([]int, 150)
-    defer free(custom_alloc_data)  // Should NOT trigger C002
-    
-    // Use the allocations
-    if len(temp_data) > 0 {
-        temp_data[0] = 1
-    }
-    if len(ctx_data) > 0 {
-        ctx_data[0] = 2
-    }
-    if len(custom_alloc_data) > 0 {
-        custom_alloc_data[0] = 3
-    }
-}
-DEBUG: Converting string to C string...
-DEBUG: Calling ts_parser_parse_string...
-✅ DEBUG: Parsing successful, tree created
-DEBUG: Checking tree language...
-✅ DEBUG: Tree language is valid
-=== DEBUG: Getting root node ===
-DEBUG: Tree is valid, calling ts_tree_root_node...
-✅ DEBUG: Root node obtained successfully
-🔴 ./tests/C002_COR_POINTER/c002_false_positive_allocators.odin:13:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 ./tests/C002_COR_POINTER/c002_false_positive_allocators.odin:18:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-Checking stub rule for: ./tests/C002_COR_POINTER/c002_false_positive_allocators.odin
-Cleaning up tree-sitter
-
+./tests/C002_COR_POINTER/c002_false_positive_allocators.odin - No violations
 ./tests/C002_COR_POINTER/c002_false_positive_complex.odin - 2 violations
 
 === DETAILED OUTPUT FOR c002_false_positive_complex.odin ===
@@ -290,7 +232,7 @@ Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 Checking stub rule for: ./tests/C002_COR_POINTER/c002_false_positive_complex.odin
 Cleaning up tree-sitter
 
-./tests/C002_COR_POINTER/c002_multiple_allocations.odin - 4 violations
+./tests/C002_COR_POINTER/c002_multiple_allocations.odin - 1 violations
 
 === DETAILED OUTPUT FOR c002_multiple_allocations.odin ===
 Starting odin-lint
@@ -337,14 +279,8 @@ DEBUG: Checking tree language...
 === DEBUG: Getting root node ===
 DEBUG: Tree is valid, calling ts_tree_root_node...
 ✅ DEBUG: Root node obtained successfully
-🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:6:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:7:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:8:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:15:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:16:5: C002 [correctness] Multiple defer frees on the same allocation (double-free)
+Fix: Remove duplicate defer free — allocation at line 7 col 5 has been freed 2 times
 Checking stub rule for: ./tests/C002_COR_POINTER/c002_multiple_allocations.odin
 Cleaning up tree-sitter
 
@@ -460,12 +396,12 @@ DEBUG: Checking tree language...
 === DEBUG: Getting root node ===
 DEBUG: Tree is valid, calling ts_tree_root_node...
 ✅ DEBUG: Root node obtained successfully
-🔴 ./tests/C002_COR_POINTER/c002_delete_support.odin:6:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_delete_support.odin:12:5: C002 [correctness] Multiple defer frees on the same allocation (double-free)
+Fix: Remove duplicate defer free — allocation at line 6 col 5 has been freed 2 times
 Checking stub rule for: ./tests/C002_COR_POINTER/c002_delete_support.odin
 Cleaning up tree-sitter
 
-./tests/C002_COR_POINTER/c002_definite_violations.odin - 7 violations
+./tests/C002_COR_POINTER/c002_definite_violations.odin - 5 violations
 
 === DETAILED OUTPUT FOR c002_definite_violations.odin ===
 Starting odin-lint
@@ -528,8 +464,6 @@ DEBUG: Checking tree language...
 === DEBUG: Getting root node ===
 DEBUG: Tree is valid, calling ts_tree_root_node...
 ✅ DEBUG: Root node obtained successfully
-🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:7:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:12:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:13:5: C001 [correctness] Allocation without matching defer free in same scope
@@ -538,10 +472,8 @@ Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:20:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:24:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:25:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:9:5: C002 [correctness] Multiple defer frees on the same allocation (double-free)
+Fix: Remove duplicate defer free — allocation at line 7 col 5 has been freed 2 times
 Checking stub rule for: ./tests/C002_COR_POINTER/c002_definite_violations.odin
 Cleaning up tree-sitter
 
@@ -731,7 +663,59 @@ Checking stub rule for: ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odi
 Cleaning up tree-sitter
 
 ./tests/C002_COR_POINTER/c002_double_free_comprehensive.odin - No violations
-./tests/C002_COR_POINTER/c002_complex_arithmetic.odin - No violations
+./tests/C002_COR_POINTER/c002_complex_arithmetic.odin - 1 violations
+
+=== DETAILED OUTPUT FOR c002_complex_arithmetic.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_complex_arithmetic.odin
+=== DEBUG: Initializing tree-sitter ===
+DEBUG: Creating parser...
+✅ DEBUG: Parser created successfully
+DEBUG: Loading Odin language grammar...
+✅ DEBUG: Odin language loaded successfully
+DEBUG: Using tree-sitter 0.24.7 with matching ABI versions
+DEBUG: Setting parser language...
+✅ DEBUG: Parser language set successfully
+=== DEBUG: Tree-sitter initialization complete ===
+Parsing file: ./tests/C002_COR_POINTER/c002_complex_arithmetic.odin
+=== DEBUG: Parsing source code ===
+DEBUG: Source length: 597
+DEBUG: Source content: // C002 Test: Complex pointer arithmetic patterns
+package main
+
+main :: proc() {
+    // Test various pointer arithmetic patterns
+    base := make([]int, 100)
+    
+    // Simple case - should not trigger
+    defer free(base)
+    
+    // Complex expression (should trigger suspicious pattern)
+    offset := 10
+    ptr := base[offset:]  // Slice operation
+    defer free(ptr)  // This might be suspicious
+    
+    // Pointer arithmetic in free call
+    unsafe_ptr := unsafe_ptr_cast(base)
+    // defer free(unsafe_ptr + 10)  // Would trigger pattern
+    
+    // Use the allocations
+    base[0] = 1
+}
+
+DEBUG: Converting string to C string...
+DEBUG: Calling ts_parser_parse_string...
+✅ DEBUG: Parsing successful, tree created
+DEBUG: Checking tree language...
+✅ DEBUG: Tree language is valid
+=== DEBUG: Getting root node ===
+DEBUG: Tree is valid, calling ts_tree_root_node...
+✅ DEBUG: Root node obtained successfully
+🔴 ./tests/C002_COR_POINTER/c002_complex_arithmetic.odin:6:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+Checking stub rule for: ./tests/C002_COR_POINTER/c002_complex_arithmetic.odin
+Cleaning up tree-sitter
+
 ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin - 3 violations
 
 === DETAILED OUTPUT FOR c002_edge_case_conditional.odin ===
@@ -828,7 +812,7 @@ Total test files: 20
 Files with violations: 12
 Files without violations: 8
 Internal errors: 0
-Total C002 violations found: 31
+Total C002 violations found: 27
 
 ✅ TESTING COMPLETE
 The C002 rule is working and finding pointer safety issues

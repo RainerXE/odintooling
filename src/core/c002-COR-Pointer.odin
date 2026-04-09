@@ -4,322 +4,346 @@ import "core:fmt"
 import "core:os"
 import "core:strings"
 
-// C002 rule implementation
+// =============================================================================
 // C002: Double-free detection
-// This rule detects when the same allocation is freed multiple times via defer
-// Pattern: defer free(ptr); defer free(ptr); // Double-free
+// =============================================================================
+//
+// Detects when the same allocation is freed more than once via defer:
+//
+//   buf := make([]u8, 1024)
+//   defer free(buf)   // first free — ok
+//   defer free(buf)   // second free — C002 VIOLATION
+//
+// Only make() and new() allocations are tracked.
+// Cross-scope double-frees are detected (allocation in outer scope,
+// two defer frees at equal or deeper scopes).
+//
+// ESCAPE HATCHES — the rule is silent when:
+//   1. No allocation record exists for the freed variable name
+//   2. Each proc body is analysed independently (state resets at boundaries)
+//
+// KNOWN LIMITATIONS:
+//   - mem.free() / mem.delete() qualified calls not detected (bare free/delete only)
+//   - Proc literals (anonymous procs) trigger a context reset the same as named
+//     procs; allocations in the enclosing scope are not visible inside them
+//
+// SUPPRESSION:
+//   defer free(buf)  // odin-lint:ignore C002
+//
+// =============================================================================
 
-// C002AllocationInfo tracks allocation and free information
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 C002AllocationInfo :: struct {
-    var_name: string,
-    line: int,
-    col: int,
-    free_count: int,  // Track number of defer frees
-    scope_level: int,  // Track scope level for proper matching
-    is_reassigned: bool,  // Track if pointer was reassigned
-    reassignment_line: int,  // Line where reassignment occurred
+    var_name:    string,
+    line:        int,
+    col:         int,
+    free_count:  int,   // number of defer frees seen for this allocation
+    scope_level: int,   // scope depth when the allocation was recorded
 }
 
-// C002AnalysisContext holds analysis state for a single file
 C002AnalysisContext :: struct {
     allocations_map: map[string][dynamic]C002AllocationInfo,
-    current_scope: int,
-    scope_stack: [dynamic]string,  // Track entered scopes for proper exit detection
+    current_scope:   int,
+    scope_stack:     [dynamic]int,  // stores block start_line for each entered scope
 }
 
-// create_c002_context creates a new analysis context
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+// create_c002_context returns an initialised analysis context.
+// Must be paired with destroy_c002_context when analysis is complete.
 create_c002_context :: proc() -> C002AnalysisContext {
     return C002AnalysisContext{
         allocations_map = make(map[string][dynamic]C002AllocationInfo),
-        current_scope = 0,
-        scope_stack = make([dynamic]string),
+        current_scope   = 0,
+        scope_stack     = make([dynamic]int),
     }
 }
 
-// C002Rule creates the C002 rule
-// IMPORTANT: c002Matcher is NOT stored in the Rule.matcher field due to signature mismatch
-// It requires a context parameter and is called directly from main.odin.
-// The matcher field is explicitly set to nil - any code using Rule.matcher must check for nil.
+// destroy_c002_context frees all memory owned by the context.
+destroy_c002_context :: proc(ctx: ^C002AnalysisContext) {
+    for _, &v in ctx.allocations_map do delete(v)
+    delete(ctx.allocations_map)
+    delete(ctx.scope_stack)
+}
+
+@(private)
+reset_c002_context :: proc(ctx: ^C002AnalysisContext) {
+    for _, &v in ctx.allocations_map do delete(v)
+    delete(ctx.allocations_map)
+    delete(ctx.scope_stack)
+    ctx.allocations_map = make(map[string][dynamic]C002AllocationInfo)
+    ctx.scope_stack     = make([dynamic]int)
+    ctx.current_scope   = 0
+}
+
+
+// ---------------------------------------------------------------------------
+// Rule entry point
+// ---------------------------------------------------------------------------
+
+// C002Rule returns the Rule struct.
+// NOTE: c002Matcher has a different signature than Rule.matcher — it requires
+// a context and file_lines parameter. Call c002Matcher directly from main.odin.
 C002Rule :: proc() -> Rule {
     return Rule{
-        id = "C002",
-        tier = "correctness",
-        category = .CORRECTNESS,  // Clippy-inspired categorization
-        matcher = nil,  // ⚠️ c002Matcher has different signature, called directly from main.odin
-        message = c002Message,
-        fix_hint = c002FixHint,
+        id       = "C002",
+        tier     = "correctness",
+        category = .CORRECTNESS,
+        matcher  = nil,        // called directly — see c002Matcher below
+        message  = c002_message,
+        fix_hint = c002_fix_hint,
     }
 }
 
-// c002Matcher checks for double-free patterns
-c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext, file_lines: []string = {}) -> []Diagnostic {
-    // Read file once at top-level call if not provided
+// c002Matcher is the primary entry point.
+// file_lines may be passed when the caller already has the file cached;
+// when nil the file is read once here and passed to all recursive calls.
+//
+// IMPORTANT: defer order for owned_content / owned_lines:
+//   owned_lines elements are subslices of owned_content, so owned_lines must
+//   be deleted (its slice header) BEFORE owned_content (the backing bytes).
+//   The defer at function scope runs in LIFO order, so:
+//     defer delete(owned_content)  ← registered first, runs second ✓
+//     defer delete(owned_lines)    ← registered second, runs first ✓
+c002Matcher :: proc(
+    file_path:  string,
+    node:       ^ASTNode,
+    ctx:        ^C002AnalysisContext,
+    file_lines: []string = {},
+) -> []Diagnostic {
     lines := file_lines
     owned_content: []u8
-    owned_lines: []string
-    
+    owned_lines:   []string
+
+    // Read file once at the top-level call; reuse in all recursive calls.
     if len(lines) == 0 {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
         if err != nil do return {}
         owned_content = content
-        owned_lines = strings.split(string(content), "\n")
-        lines = owned_lines
-        defer {
-            delete(owned_lines)
-            delete(owned_content)
-        }
+        owned_lines   = strings.split(string(content), "\n")
+        lines         = owned_lines
     }
+    // Defers at function scope — runs when c002Matcher returns, NOT when the
+    // if-block exits. owned_lines freed first (LIFO), then owned_content.
+    defer if owned_content != nil { delete(owned_lines);  delete(owned_content) }
+
     diagnostics: [dynamic]Diagnostic
-    
-    // Track scope boundaries using stack-based approach
+
+    // -- Scope tracking -------------------------------------------------------
     is_block := node.node_type == "block"
     if is_block {
-        // Entering a new scope - push onto stack
-        append(&ctx.scope_stack, node.node_type)
+        append(&ctx.scope_stack, node.start_line)
         ctx.current_scope = len(ctx.scope_stack)
     }
 
-    // Reset context at procedure boundaries to avoid cross-function false negatives
-    is_proc := node.node_type == "proc_declaration"
+    // -- Proc boundary: reset context to avoid cross-function bleed -----------
+    is_proc := node.node_type == "proc_declaration" ||
+               node.node_type == "proc_literal"
     if is_proc {
-        // Free old allocations to prevent memory leaks
-        for _, &v in ctx.allocations_map do delete(v)
-        delete(ctx.allocations_map)
-        delete(ctx.scope_stack)
-        
-        // Create fresh context for this procedure
-        ctx.allocations_map = make(map[string][dynamic]C002AllocationInfo)
-        ctx.scope_stack = make([dynamic]string)
-        ctx.current_scope = 0
+        reset_c002_context(ctx)
     }
 
-    // Check for pointer allocations (make, new, etc.) using AST structure like C001
-    // Look for assignment_statement or short_var_declaration with make/new calls
-    if node.node_type == "assignment_statement" || node.node_type == "short_var_decl" {
-        // Check if this assignment contains a make or new call
-        has_allocation_call := false
-        for &child in node.children {
-            if child.node_type == "call_expression" {
-                // Found a call expression - check if it's make or new
-                // We'll extract the variable name and check the call type
-                var_name := extract_lhs_var_name(node)
-                if var_name != "" {
-                    // Check if this is a make/new call by looking at the callee
-                    if len(child.children) > 0 {
-                        callee := &child.children[0]
-                        
-                        // Check for make, new using reliable file_lines (like C001)
-                        is_allocation := false
-                        if callee.node_type == "identifier" && callee.start_line > 0 {
-                            line_idx := callee.start_line - 1
-                            if line_idx < len(lines) {
-                                line := lines[line_idx]
-                                col := callee.start_column - 1
-                                if col >= 0 && col < len(line) {
-                                    rest := line[col:]
-                                    if strings.has_prefix(rest, "make(") || strings.has_prefix(rest, "new(") {
-                                        is_allocation = true
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if is_allocation {
-                            has_allocation_call = true
-                            c002_markAsAllocated(var_name, node.start_line, node.start_column, ctx.current_scope, ctx)
-                            break
-                        }
-                    }
-                }
-            }
-        }
-        
-        // If no allocation call found, check for reassignment
-        if !has_allocation_call {
-            var_name := extract_lhs_var_name(node)
-            if var_name != "" {
-                // This is a pure reassignment, not an allocation
-                // Mark as reassigned in tracking map
-                if len(ctx.allocations_map[var_name]) > 0 {
-                    existing := ctx.allocations_map[var_name]
-                    for i in 0..<len(existing) {
-                        // Only mark allocations in the current scope (fix reassignment scope bug)
-                        if existing[i].scope_level == ctx.current_scope {
-                            existing[i].is_reassigned = true
-                            existing[i].reassignment_line = node.start_line
-                        }
-                    }
-                    ctx.allocations_map[var_name] = existing
-                }
-            }
-        }
-    }
-    
-    // Check if this node is a defer statement with free/delete
-    if is_defer_cleanup(node, lines) {
-        // Extract variable name from defer free statement
-        var_name := extract_var_name_from_free(node)
+
+    // -- Allocation detection -------------------------------------------------
+    if node.node_type == "assignment_statement" ||
+       node.node_type == "short_var_decl" {
+
+        var_name := c002_extract_lhs_name(node)
         if var_name != "" {
-            
-            // Skip analysis if we don't have an allocation record
-            if var_name not_in ctx.allocations_map {
-                // Skip - no allocation record
-            } else {
-                // Check for double free first
-                diag := c002_markAsFreed(var_name, node.start_line, node.start_column, ctx.current_scope, file_path, ctx)
-                if diag.message != "" {
-                    // Double free detected - definite violation
-                    append(&diagnostics, diag)
-                } else {
-                    // Check for reassignment issues - find allocation in current scope
-                    if len(ctx.allocations_map[var_name]) > 0 {
-                        // Find the allocation record that matches the current scope
-                        for i in 0..<len(ctx.allocations_map[var_name]) {
-                            if ctx.allocations_map[var_name][i].scope_level <= ctx.current_scope {
-                                allocation_info := ctx.allocations_map[var_name][i]
-                                if allocation_info.is_reassigned {
-                                    // Potential misuse - contextual
-                                    append(&diagnostics, Diagnostic{
-                                        file = file_path,
-                                        line = node.start_line,
-                                        column = node.start_column,
-                                        rule_id = "C002",
-                                        tier = "correctness",
-                                        message = "Freeing reassigned pointer - this may free wrong memory (POTENTIAL)",
-                                        fix = "Pointer was reassigned before free - this may free wrong memory",
-                                        has_fix = true,
-                                        diag_type = .CONTEXTUAL,
-                                    })
-                                }
-                                break
-                            }
-                        }
-                    }
-                }
+            // Find the top-level call_expression on the RHS.
+            call := c002_find_direct_call(node)
+            if call != nil && c002_is_alloc_call(call, lines) {
+                // Track this allocation.
+                c002_mark_allocated(var_name, node.start_line, node.start_column,
+                                    ctx.current_scope, ctx)
+            } else if call == nil {
+                // Pure reassignment (no call on RHS) — mark existing record.
+                c002_mark_reassigned(var_name, ctx)
             }
         }
     }
-    
-    
-    // Check children recursively
+
+    // -- Double-free detection ------------------------------------------------
+    if freed_var := c002_extract_defer_free_target(node, lines); freed_var != "" {
+        if freed_var in ctx.allocations_map {
+            diag := c002_mark_freed(freed_var, node.start_line, node.start_column,
+                                    ctx.current_scope, file_path, ctx)
+            if diag.message != "" {
+                append(&diagnostics, diag)
+            }
+        }
+    }
+
+    // -- Recurse into children ------------------------------------------------
     for &child in node.children {
-        child_diagnostics := c002Matcher(file_path, &child, ctx, lines)
-        for child_diag in child_diagnostics {
-            if child_diag.message != "" {
-                append(&diagnostics, child_diag)
-            }
+        for d in c002Matcher(file_path, &child, ctx, lines) {
+            if d.message != "" do append(&diagnostics, d)
         }
     }
-    
-    // Exit scope after processing children
+
+    // -- Exit scope -----------------------------------------------------------
     if is_block && len(ctx.scope_stack) > 0 {
         pop(&ctx.scope_stack)
         ctx.current_scope = len(ctx.scope_stack)
     }
-    
-    return diagnostics[:]  // Convert dynamic array to slice for return
+
+    return diagnostics[:]
 }
 
-// c002_markAsAllocated tracks a new pointer allocation
-c002_markAsAllocated :: proc(var_name: string, line: int, col: int, scope_level: int, ctx: ^C002AnalysisContext) {
-    allocation := C002AllocationInfo{
-        var_name = var_name,
-        line = line,
-        col = col,
-        free_count = 0,
-        scope_level = scope_level,
-        is_reassigned = false,
-        reassignment_line = 0,
-    }
-    
-    // Use proper map key existence check instead of len == 0
+
+// ---------------------------------------------------------------------------
+// Allocation / free tracking
+// ---------------------------------------------------------------------------
+
+c002_mark_allocated :: proc(
+    var_name:    string,
+    line, col:   int,
+    scope_level: int,
+    ctx:         ^C002AnalysisContext,
+) {
     if var_name not_in ctx.allocations_map {
         ctx.allocations_map[var_name] = make([dynamic]C002AllocationInfo)
     }
-    
     existing := ctx.allocations_map[var_name]
-    append(&existing, allocation)
+    append(&existing, C002AllocationInfo{
+        var_name    = var_name,
+        line        = line,
+        col         = col,
+        free_count  = 0,
+        scope_level = scope_level,
+    })
     ctx.allocations_map[var_name] = existing
 }
 
-// c002_markAsFreed marks a variable as freed and detects double frees
-c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int, file_path: string, ctx: ^C002AnalysisContext) -> Diagnostic {
-    diag_to_report: Diagnostic
-    
-    if len(ctx.allocations_map[var_name]) > 0 {
-        existing := ctx.allocations_map[var_name]
-        // Find innermost matching scope
-        best_match := -1
-        for i in 0..<len(existing) {
-            if existing[i].scope_level <= scope_level {
-                if best_match == -1 || existing[i].scope_level > existing[best_match].scope_level {
-                    best_match = i
-                }
-            }
-        }
-        if best_match >= 0 {
-            existing[best_match].free_count += 1  // Increment instead of setting true
-            
-            // Detect and report double free
-            if existing[best_match].free_count > 1 {
-                diag_to_report = Diagnostic{
-                    file = file_path,  // Use passed file path
-                    line = line,
-                    column = col,
-                    rule_id = "C002",
-                    tier = "correctness",
-                    message = "Multiple defer frees on same allocation",
-                    fix = fmt.tprintf("Allocation at line %d,%d freed %d times",
-                                    existing[best_match].line, existing[best_match].col, existing[best_match].free_count),
-                    has_fix = true,
-                    diag_type = .VIOLATION,
-                }
-                // Return immediately on first double-free detection
-                ctx.allocations_map[var_name] = existing
-                return diag_to_report
-            }
-        }
-        // Always write back the modified slice if no double-free detected
-        ctx.allocations_map[var_name] = existing
-    }
-    return diag_to_report
+// c002_mark_reassigned marks the allocation at the current (or nearest outer)
+// scope as reassigned. Only used for informational tracking; the reassignment
+// diagnostic was removed because reslicing produces too many false positives.
+c002_mark_reassigned :: proc(var_name: string, ctx: ^C002AnalysisContext) {
+    // No-op in this version — reassignment tracking removed to reduce noise.
+    // Kept as a stub so call sites compile without change.
 }
 
-// extract_var_name_from_free extracts variable name from free/delete statement
-extract_var_name_from_free :: proc(node: ^ASTNode) -> string {
-    // Use AST navigation like C001 instead of unreliable node.text parsing
+// c002_mark_freed increments the free count for the innermost matching
+// allocation and returns a Diagnostic if a double-free is detected.
+// Uses fmt.aprintf (context.allocator) so the fix string outlives the call.
+c002_mark_freed :: proc(
+    var_name:    string,
+    line, col:   int,
+    scope_level: int,
+    file_path:   string,
+    ctx:         ^C002AnalysisContext,
+) -> Diagnostic {
+    existing, ok := ctx.allocations_map[var_name]
+    if !ok || len(existing) == 0 do return Diagnostic{}
+
+    // Find the innermost allocation whose scope is <= current scope.
+    best := -1
+    for i in 0..<len(existing) {
+        if existing[i].scope_level <= scope_level {
+            if best == -1 || existing[i].scope_level > existing[best].scope_level {
+                best = i
+            }
+        }
+    }
+    if best < 0 do return Diagnostic{}
+
+    existing[best].free_count += 1
+    ctx.allocations_map[var_name] = existing
+
+    if existing[best].free_count <= 1 do return Diagnostic{}
+
+    // Double-free detected.
+    fix_msg := fmt.aprintf(
+        "Remove duplicate defer free — allocation at line %d col %d has been freed %d times",
+        existing[best].line, existing[best].col, existing[best].free_count,
+    )
+    return Diagnostic{
+        file      = file_path,
+        line      = line,
+        column    = col,
+        rule_id   = "C002",
+        tier      = "correctness",
+        message   = "Multiple defer frees on the same allocation (double-free)",
+        fix       = fix_msg,
+        has_fix   = true,
+        diag_type = .VIOLATION,
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// AST helpers — detection
+// ---------------------------------------------------------------------------
+
+// c002_extract_defer_free_target returns the variable name freed by a
+// defer free(...) or defer delete(...) statement, or "" if not applicable.
+// Combines is_defer_cleanup + extract_var_name into a single tree walk.
+// Uses file_lines for callee detection (avoids unreliable node.text).
+c002_extract_defer_free_target :: proc(node: ^ASTNode, lines: []string) -> string {
+    if node.node_type != "defer_statement" do return ""
     for &child in node.children {
         if child.node_type != "call_expression" do continue
-        found_callee := false
+        found_free_callee := false
         for &gc in child.children {
-            // Modern grammar: arguments are inside an argument_list node.
-            if gc.node_type == "argument_list" {
-                for &arg in gc.children {
-                    if arg.node_type == "identifier" do return arg.text
+            // Check callee identifier via file_lines (node.text may be empty).
+            if gc.node_type == "identifier" && !found_free_callee {
+                if c002_ident_matches(&gc, lines, "free") ||
+                   c002_ident_matches(&gc, lines, "delete") {
+                    found_free_callee = true
                 }
+                continue
             }
-            // Fallback: flat identifier children (older grammar).
-            if gc.node_type == "identifier" {
-                if !found_callee {
-                    found_callee = true  // first identifier is the callee
-                    continue
+            // Extract the argument once we know the callee is free/delete.
+            if found_free_callee {
+                if gc.node_type == "argument_list" {
+                    for &arg in gc.children {
+                        if arg.node_type == "identifier" {
+                            name := c002_extract_ident_text(&arg, lines)
+                            if name != "" do return name
+                        }
+                    }
                 }
-                return gc.text  // second identifier is the argument
+                if gc.node_type == "identifier" {
+                    name := c002_extract_ident_text(&gc, lines)
+                    if name != "" do return name
+                }
             }
         }
     }
     return ""
 }
 
-// extract_lhs_var_name extracts variable name from left-hand side of assignment
-// using AST navigation (replaces unreliable node.text parsing)
-// Skips complex LHS expressions like buf[i] and thing.field
-extract_lhs_var_name :: proc(node: ^ASTNode) -> string {
-    // Navigate AST children to find first identifier (like C001's extract_lhs_name)
+// c002_is_alloc_call returns true when call_node's callee is make() or new().
+// Uses file_lines for reliable text extraction.
+c002_is_alloc_call :: proc(call_node: ^ASTNode, lines: []string) -> bool {
+    if len(call_node.children) == 0 do return false
+    callee := &call_node.children[0]
+    if callee.node_type != "identifier" do return false
+    return c002_ident_matches(callee, lines, "make") ||
+           c002_ident_matches(callee, lines, "new")
+}
+
+// c002_find_direct_call returns the first top-level call_expression child
+// without recursing (avoids matching nested calls as the top-level allocation).
+c002_find_direct_call :: proc(node: ^ASTNode) -> ^ASTNode {
     for &child in node.children {
-        // Skip LHS expressions that aren't plain variable names
-        if child.node_type == "selector_expression" || child.node_type == "index_expression" {
-            return ""  // Complex LHS - skip tracking
+        if child.node_type == "call_expression" do return &child
+    }
+    return nil
+}
+
+// c002_extract_lhs_name returns the plain variable name on the LHS.
+// Returns "" for field assignments (thing.field) and index expressions (buf[i]).
+c002_extract_lhs_name :: proc(node: ^ASTNode) -> string {
+    for &child in node.children {
+        if child.node_type == "selector_expression" ||
+           child.node_type == "index_expression" {
+            return ""
         }
         if child.node_type == "identifier" do return child.text
     }
@@ -327,45 +351,66 @@ extract_lhs_var_name :: proc(node: ^ASTNode) -> string {
 }
 
 
-// is_defer_cleanup checks if node is defer with cleanup function
-// Uses AST navigation like C001 instead of unreliable node.text
-is_defer_cleanup :: proc(node: ^ASTNode, lines: []string) -> bool {
-    if node.node_type != "defer_statement" do return false
-    for &child in node.children {
-        if child.node_type != "call_expression" do continue
-        for &gc in child.children {
-            if gc.node_type == "identifier" {
-                line_idx := gc.start_line - 1
-                if line_idx < len(lines) {
-                    line := lines[line_idx]
-                    col := gc.start_column - 1
-                    if col >= 0 && col < len(line) {
-                        rest := line[col:]
-                        if strings.has_prefix(rest, "free(") || strings.has_prefix(rest, "delete(") {
-                            return true
-                        }
-                    }
-                }
-            }
+// ---------------------------------------------------------------------------
+// Low-level text helpers (file_lines based — avoids node.text unreliability)
+// ---------------------------------------------------------------------------
+
+// c002_ident_matches returns true when the identifier node at its source
+// position starts with the given keyword followed by a non-identifier char
+// (e.g. "free(" but not "free_all").
+c002_ident_matches :: proc(node: ^ASTNode, lines: []string, keyword: string) -> bool {
+    if node.start_line < 1 do return false
+    idx := node.start_line - 1
+    if idx >= len(lines) do return false
+    line := lines[idx]
+    col  := node.start_column - 1
+    if col < 0 || col >= len(line) do return false
+    rest := line[col:]
+    if !strings.has_prefix(rest, keyword) do return false
+    // Ensure the match is a complete identifier (not a prefix of a longer name).
+    after := len(keyword)
+    if after < len(rest) {
+        c := rest[after]
+        if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') {
+            return false  // part of a longer identifier
         }
     }
-    return false
+    return true
 }
 
-// c002Message returns the rule message
-c002Message :: proc() -> string {
-    return "Multiple defer frees on same allocation - potential double-free"
+// c002_extract_ident_text extracts the identifier text from source using
+// file_lines. Returns "" when position is out of range.
+c002_extract_ident_text :: proc(node: ^ASTNode, lines: []string) -> string {
+    if node.start_line < 1 do return ""
+    idx := node.start_line - 1
+    if idx >= len(lines) do return ""
+    line := lines[idx]
+    col  := node.start_column - 1
+    if col < 0 || col >= len(line) do return ""
+    rest := line[col:]
+    end  := 0
+    for end < len(rest) {
+        c := rest[end]
+        if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') {
+            end += 1
+        } else {
+            break
+        }
+    }
+    return rest[:end]
 }
 
-// destroy_c002_context cleans up memory allocated by C002 analysis
-// Should be called after analysis completes to prevent memory leaks
-destroy_c002_context :: proc(ctx: ^C002AnalysisContext) {
-    for _, &v in ctx.allocations_map do delete(v)
-    delete(ctx.allocations_map)
-    delete(ctx.scope_stack)
+// ---------------------------------------------------------------------------
+// Rule message / fix hint
+// ---------------------------------------------------------------------------
+
+c002_message :: proc() -> string {
+    return "Multiple defer frees on the same allocation (double-free)"
 }
 
-// c002FixHint returns the fix hint
-c002FixHint :: proc() -> string {
-    return "Ensure defer free uses the same pointer as the allocation"
+c002_fix_hint :: proc() -> string {
+    return "Remove the duplicate defer free — each allocation should be freed exactly once"
 }
+
