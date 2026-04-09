@@ -51,7 +51,7 @@ C002Rule :: proc() -> Rule {
     }
 }
 
-// c002Matcher checks for defer free on wrong pointer
+// c002Matcher checks for double-free patterns
 c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext, file_lines: []string = {}) -> []Diagnostic {
     // Read file once at top-level call if not provided
     lines := file_lines
@@ -64,6 +64,10 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
         owned_content = content
         owned_lines = strings.split(string(content), "\n")
         lines = owned_lines
+        defer {
+            delete(owned_lines)
+            delete(owned_content)
+        }
     }
     diagnostics: [dynamic]Diagnostic
     
@@ -152,7 +156,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
     }
     
     // Check if this node is a defer statement with free/delete
-    if is_defer_cleanup(node) {
+    if is_defer_cleanup(node, lines) {
         // Extract variable name from defer free statement
         var_name := extract_var_name_from_free(node)
         if var_name != "" {
@@ -199,7 +203,7 @@ c002Matcher :: proc(file_path: string, node: ^ASTNode, ctx: ^C002AnalysisContext
     
     // Check children recursively
     for &child in node.children {
-        child_diagnostics := c002Matcher(file_path, &child, ctx)
+        child_diagnostics := c002Matcher(file_path, &child, ctx, lines)
         for child_diag in child_diagnostics {
             if child_diag.message != "" {
                 append(&diagnostics, child_diag)
@@ -244,29 +248,35 @@ c002_markAsFreed :: proc(var_name: string, line: int, col: int, scope_level: int
     
     if len(ctx.allocations_map[var_name]) > 0 {
         existing := ctx.allocations_map[var_name]
+        // Find innermost matching scope
+        best_match := -1
         for i in 0..<len(existing) {
-            // Allow cross-scope double-free detection (allocation at outer scope, free at inner scope)
             if existing[i].scope_level <= scope_level {
-                existing[i].free_count += 1  // Increment instead of setting true
-                
-                // Detect and report double free
-                if existing[i].free_count > 1 {
-                    diag_to_report = Diagnostic{
-                        file = file_path,  // Use passed file path
-                        line = line,
-                        column = col,
-                        rule_id = "C002",
-                        tier = "correctness",
-                        message = "Multiple defer frees on same allocation",
-                        fix = fmt.tprintf("Allocation at line %d,%d freed %d times",
-                                        existing[i].line, existing[i].col, existing[i].free_count),
-                        has_fix = true,
-                        diag_type = .VIOLATION,
-                    }
-                    // Return immediately on first double-free detection
-                    ctx.allocations_map[var_name] = existing
-                    return diag_to_report
+                if best_match == -1 || existing[i].scope_level > existing[best_match].scope_level {
+                    best_match = i
                 }
+            }
+        }
+        if best_match >= 0 {
+            existing[best_match].free_count += 1  // Increment instead of setting true
+            
+            // Detect and report double free
+            if existing[best_match].free_count > 1 {
+                diag_to_report = Diagnostic{
+                    file = file_path,  // Use passed file path
+                    line = line,
+                    column = col,
+                    rule_id = "C002",
+                    tier = "correctness",
+                    message = "Multiple defer frees on same allocation",
+                    fix = fmt.tprintf("Allocation at line %d,%d freed %d times",
+                                    existing[best_match].line, existing[best_match].col, existing[best_match].free_count),
+                    has_fix = true,
+                    diag_type = .VIOLATION,
+                }
+                // Return immediately on first double-free detection
+                ctx.allocations_map[var_name] = existing
+                return diag_to_report
             }
         }
         // Always write back the modified slice if no double-free detected
@@ -319,14 +329,23 @@ extract_lhs_var_name :: proc(node: ^ASTNode) -> string {
 
 // is_defer_cleanup checks if node is defer with cleanup function
 // Uses AST navigation like C001 instead of unreliable node.text
-is_defer_cleanup :: proc(node: ^ASTNode) -> bool {
+is_defer_cleanup :: proc(node: ^ASTNode, lines: []string) -> bool {
     if node.node_type != "defer_statement" do return false
     for &child in node.children {
         if child.node_type != "call_expression" do continue
         for &gc in child.children {
-            if gc.node_type == "identifier" &&
-               (gc.text == "free" || gc.text == "delete") {
-                return true
+            if gc.node_type == "identifier" {
+                line_idx := gc.start_line - 1
+                if line_idx < len(lines) {
+                    line := lines[line_idx]
+                    col := gc.start_column - 1
+                    if col >= 0 && col < len(line) {
+                        rest := line[col:]
+                        if strings.has_prefix(rest, "free(") || strings.has_prefix(rest, "delete(") {
+                            return true
+                        }
+                    }
+                }
             }
         }
     }
