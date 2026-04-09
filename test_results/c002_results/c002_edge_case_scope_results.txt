@@ -80,6 +80,7 @@ DEBUG: Checking tree language...
 === DEBUG: Getting root node ===
 DEBUG: Tree is valid, calling ts_tree_root_node...
 ✅ DEBUG: Root node obtained successfully
+🔴 tests/C002_COR_POINTER/c002_edge_case_scope.odin:15:9: C002 [correctness] Multiple defer frees on same allocation
+Fix: Allocation at line 10,5 freed 2 times
 Checking stub rule for: tests/C002_COR_POINTER/c002_edge_case_scope.odin
 Cleaning up tree-sitter
-No diagnostics found

@@ -61,11 +61,7 @@ DEBUG: Checking tree language...
 === DEBUG: Getting root node ===
 DEBUG: Tree is valid, calling ts_tree_root_node...
 ✅ DEBUG: Root node obtained successfully
-🔴 tests/C002_COR_POINTER/c002_fixture_fail.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 tests/C002_COR_POINTER/c002_fixture_fail.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 tests/C002_COR_POINTER/c002_fixture_fail.odin:31:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 tests/C002_COR_POINTER/c002_fixture_fail.odin:32:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
