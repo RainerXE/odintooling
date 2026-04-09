@@ -292,8 +292,8 @@ c002_extract_defer_free_target :: proc(node: ^ASTNode, lines: []string) -> strin
         for &gc in child.children {
             // Check callee identifier via file_lines (node.text may be empty).
             if gc.node_type == "identifier" && !found_free_callee {
-                if c002_ident_matches(&gc, lines, "free") ||
-                   c002_ident_matches(&gc, lines, "delete") {
+                if c002_ident_matches(gc, lines, "free") ||
+                   c002_ident_matches(gc, lines, "delete") {
                     found_free_callee = true
                 }
                 continue
@@ -303,13 +303,13 @@ c002_extract_defer_free_target :: proc(node: ^ASTNode, lines: []string) -> strin
                 if gc.node_type == "argument_list" {
                     for &arg in gc.children {
                         if arg.node_type == "identifier" {
-                            name := c002_extract_ident_text(&arg, lines)
+                            name := c002_extract_ident_text(arg, lines)
                             if name != "" do return name
                         }
                     }
                 }
                 if gc.node_type == "identifier" {
-                    name := c002_extract_ident_text(&gc, lines)
+                    name := c002_extract_ident_text(gc, lines)
                     if name != "" do return name
                 }
             }
