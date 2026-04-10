@@ -16,6 +16,29 @@ TSNode :: struct {
     tree: rawptr,
 }
 
+// Query API types (M3.1)
+TSQueryError :: enum u32 {
+    None      = 0,
+    Syntax    = 1,
+    NodeType  = 2,
+    Field     = 3,
+    Capture   = 4,
+    Structure = 5,
+    Language  = 6,
+}
+
+TSQueryCapture :: struct {
+    node:  TSNode,
+    index: u32,
+}
+
+TSQueryMatch :: struct {
+    id:            u32,
+    pattern_index: u16,
+    capture_count: u16,
+    captures:      ^TSQueryCapture,
+}
+
 // Tree-sitter structures
 TSPoint :: struct {
     row: c.uint,
@@ -69,4 +92,24 @@ foreign {
 	// Language functions (would need Odin language implementation)
 	// ts_language_symbol_count :: proc "c"(language: TSLanguage) -> c.uint ---;
 	// ts_language_symbol_name :: proc "c"(language: TSLanguage, symbol: c.ushort) -> ^c.char ---;
+
+	// --- Query API (M3.1) ---
+	ts_query_new :: proc "c"(
+		language:     rawptr,
+		source:       cstring,
+		source_len:   u32,
+		error_offset: ^u32,
+		error_type:   ^TSQueryError,
+	) -> rawptr ---;
+	ts_query_delete             :: proc "c"(query: rawptr) ---;
+	ts_query_capture_count      :: proc "c"(query: rawptr) -> u32 ---;
+	ts_query_capture_name_for_id :: proc "c"(
+		query:   rawptr,
+		id:      u32,
+		length:  ^u32,
+	) -> cstring ---;
+	ts_query_cursor_new         :: proc "c"() -> rawptr ---;
+	ts_query_cursor_delete      :: proc "c"(cursor: rawptr) ---;
+	ts_query_cursor_exec        :: proc "c"(cursor: rawptr, query: rawptr, node: TSNode) ---;
+	ts_query_cursor_next_match  :: proc "c"(cursor: rawptr, match: ^TSQueryMatch) -> bool ---;
 }
