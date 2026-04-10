@@ -63,7 +63,5 @@ DEBUG: Tree is valid, calling ts_tree_root_node...
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 tests/C002_COR_POINTER/c002_edge_case_reassignment.odin:19:13: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🟡 tests/C002_COR_POINTER/c002_edge_case_reassignment.odin:13:5: C002 [correctness] Freeing reassigned pointer - this may free wrong memory (POTENTIAL)
-Fix: Pointer was reassigned before free - this may free wrong memory
 Checking stub rule for: tests/C002_COR_POINTER/c002_edge_case_reassignment.odin
 Cleaning up tree-sitter
