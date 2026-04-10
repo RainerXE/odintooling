@@ -95,7 +95,5 @@ DEBUG: Tree is valid, calling ts_tree_root_node...
 ✅ DEBUG: Root node obtained successfully
 🔴 tests/C002_COR_POINTER/c002_edge_case_complex.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 tests/C002_COR_POINTER/c002_edge_case_complex.odin:15:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 Checking stub rule for: tests/C002_COR_POINTER/c002_edge_case_complex.odin
 Cleaning up tree-sitter
