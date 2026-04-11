@@ -414,3 +414,104 @@ c002_fix_hint :: proc() -> string {
     return "Remove the duplicate defer free — each allocation should be freed exactly once"
 }
 
+
+// Position struct for tracking line/column positions
+Position :: struct {
+    line: int,
+    col:  int,
+}
+
+// c002_scm_matcher is the SCM-based replacement for c002Matcher.
+// It is run in Shadow mode (parallel to the manual walker) until
+// verified correct, then replaces it.
+//
+// How it works:
+//   1. Run the defer_free query to find all "defer free(var)" occurrences
+//   2. Group them by freed variable name
+//   3. Any variable freed more than once in the same procedure is a violation
+c002_scm_matcher :: proc(
+    file_path:  string,
+    root_node:  TSNode,
+    file_lines: []string,
+    q:          ^CompiledQuery,
+) -> []Diagnostic {
+    results := run_query(q, root_node, file_lines)
+    defer free_query_results(results)
+
+    // Count: var_name → list of (line, col) where it appears in a defer free
+    free_sites := make(map[string][dynamic]Position)
+    defer {
+        for _, &sites in free_sites { delete(sites) }
+        delete(free_sites)
+    }
+
+    for result in results {
+        freed_node, has_freed := result.captures["freed_var"]
+        if !has_freed { continue }
+
+        // Extract identifier text from TSNode (not ASTNode)
+        name := c002_extract_ident_text_from_tsnode(freed_node, file_lines)
+        if name == "" || name == "_" { continue }
+
+        pt   := ts_node_start_point(freed_node)
+        pos  := Position{line = int(pt.row) + 1, col = int(pt.column) + 1}
+        append(&free_sites[name], pos)
+    }
+
+    diagnostics := make([dynamic]Diagnostic)
+
+    for var_name, sites in free_sites {
+        if len(sites) < 2 { continue }
+
+        // First site: the first defer free — that is fine
+        // Second+ sites: violations
+        for i in 1..<len(sites) {
+            site := sites[i]
+            append(&diagnostics, Diagnostic{
+                file      = file_path,
+                line      = site.line,
+                column    = site.col,
+                rule_id   = "C002",
+                tier      = "CORRECTNESS",
+                message   = fmt.aprintf(
+                    "Double-free: '%s' is already freed by a defer in this scope",
+                    var_name,
+                ),
+                diag_type = .VIOLATION,
+            })
+        }
+    }
+
+    return diagnostics[:]
+}
+
+// c002_extract_ident_text_from_tsnode extracts identifier text from a TSNode
+// using file_lines for reliable text extraction (like c002_extract_ident_text but for TSNode)
+c002_extract_ident_text_from_tsnode :: proc(node: TSNode, lines: []string) -> string {
+    // Get node type using tree-sitter API
+    node_type_cstr := ts_node_type(node)
+    node_type := strings.string_from_null_terminated_ptr(node_type_cstr, 64)
+    if node_type != "identifier" { return "" }
+    
+    // Get node position
+    start_point := ts_node_start_point(node)
+    line_idx := int(start_point.row)
+    if line_idx < 0 || line_idx >= len(lines) { return "" }
+    
+    line := lines[line_idx]
+    col := int(start_point.column)
+    if col < 0 || col >= len(line) { return "" }
+    
+    rest := line[col:]
+    end  := 0
+    for end < len(rest) {
+        c := rest[end]
+        if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') {
+            end += 1
+        } else {
+            break
+        }
+    }
+    return rest[:end]
+}
