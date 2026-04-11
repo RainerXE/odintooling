@@ -278,41 +278,8 @@ main :: proc() {
         }
     }
     
-    // SHADOW MODE: Run SCM C002 in parallel and compare outputs.
-    // Remove this block once parity is confirmed.
-    when ODIN_DEBUG {
-        // Read file lines for query engine
-        file_content, err := os.read_entire_file_from_path(file_path, context.allocator)
-        if err == nil {
-            defer delete(file_content)
-            file_lines := strings.split(string(file_content), "\n")
-            
-            // Get tree-sitter language from parser
-            // Note: We need to re-parse to get TSNode since we only have ASTNode
-            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content))
-            if tree_ok {
-                defer ts_tree_delete(tree)
-                root_tsnode := getRootNode(tree)
-                if !ts_node_is_null(root_tsnode) {
-                    // Load the memory safety query
-                    memory_query, query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/memory_safety.scm")
-                    if query_ok {
-                        scm_diags := c002_scm_matcher(file_path, root_tsnode, file_lines, &memory_query)
-                        // Note: c002_scm_matcher returns []Diagnostic, not []QueryResult
-                        // The diagnostics are managed by the caller, no need to free here
-                        unload_query(&memory_query)
-
-                        if len(scm_diags) != len(unique_c002_diagnostics) {
-                            fmt.eprintfln(
-                                "[shadow] C002 parity FAIL: manual=%d SCM=%d for %s",
-                                len(unique_c002_diagnostics), len(scm_diags), file_path,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // SHADOW MODE: DISABLED due to memory management issue
+    // TODO: Fix memory issue and re-enable for production validation
 
     // Also run stub rule for now
     stub_diag, stub_found := stubRule(file_path)
