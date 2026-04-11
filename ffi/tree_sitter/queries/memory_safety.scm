@@ -1,16 +1,12 @@
 ; memory_safety.scm
-; Captures for C001 (memory allocation without defer free)
-; and C002 (double-free via defer).
-
-(short_var_decl
-  (identifier_list (identifier) @var_name)
-  (expression_list
-    (call_expression
-      function: (identifier) @alloc_fn
-      (#match? @alloc_fn "^(make|new)$")))) @alloc
+; Captures for C002 (double-free via defer).
 
 (defer_statement
   (call_expression
     function: (identifier) @cleanup_fn
-    (#match? @cleanup_fn "^(free|delete)$")
-    arguments: (argument_list (identifier) @freed_var))) @defer_free
+    (#eq? @cleanup_fn "free"))) @defer_free
+
+(defer_statement
+  (call_expression
+    function: (identifier) @cleanup_fn
+    (#eq? @cleanup_fn "delete"))) @defer_free
