@@ -263,49 +263,26 @@ main :: proc() {
         }
     }
     
-    // Apply C002 rule with parsed AST and fresh context
-    // Note: c002Matcher is called directly due to signature mismatch with Rule.matcher
-    c002_ctx := create_c002_context()
-    c002_diagnostics := c002Matcher(file_path, &ast_root, &c002_ctx)
-    
-    // Remove duplicates before emitting
-    unique_c002_diagnostics := dedupDiagnostics(c002_diagnostics)
-    
-    for diag2 in unique_c002_diagnostics {
-        if diag2.message != "" {
-            emitDiagnostic(diag2)
-            diagnostics_found = true
-        }
-    }
-    
-    // SHADOW MODE: Run SCM C002 in parallel and compare outputs (debug builds only).
-    // Once parity is confirmed, the SCM matcher replaces the manual walker.
-    when ODIN_DEBUG {
-        file_content, err := os.read_entire_file_from_path(file_path, context.allocator)
-        if err == nil {
-            defer delete(file_content)
-            file_lines := strings.split(string(file_content), "\n")
+    // C002: Double-free detection via SCM query engine (replaced manual walker in M3.2)
+    file_content_c002, c002_read_err := os.read_entire_file_from_path(file_path, context.allocator)
+    if c002_read_err == nil {
+        defer delete(file_content_c002)
+        file_lines_c002 := strings.split(string(file_content_c002), "\n")
 
-            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content))
-            if tree_ok {
-                defer ts_tree_delete(tree)
-                root_tsnode := getRootNode(tree)
-                if !ts_node_is_null(root_tsnode) {
-                    // Dump parse tree to stderr for grammar debugging
-                    tree_cstr := ts_node_string(root_tsnode)
-                    tree_str  := strings.string_from_null_terminated_ptr(cast(^u8)tree_cstr, 1<<20)
-                    fmt.eprintf("[TREE] %s\n", tree_str)
-
-                    memory_query, query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/memory_safety.scm")
-                    if query_ok {
-                        scm_diags := c002_scm_matcher(file_path, root_tsnode, file_lines, &memory_query)
-                        unload_query(&memory_query)
-
-                        if len(scm_diags) != len(unique_c002_diagnostics) {
-                            fmt.eprintfln("[shadow] C002 parity FAIL: manual=%d SCM=%d for %s",
-                                len(unique_c002_diagnostics), len(scm_diags), file_path)
-                        } else {
-                            fmt.eprintfln("[shadow] C002 parity OK: manual=%d SCM=%d", len(unique_c002_diagnostics), len(scm_diags))
+        c002_tree, c002_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_c002))
+        if c002_tree_ok {
+            defer ts_tree_delete(c002_tree)
+            c002_root := getRootNode(c002_tree)
+            if !ts_node_is_null(c002_root) {
+                memory_query, query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/memory_safety.scm")
+                if query_ok {
+                    c002_diags := c002_scm_matcher(file_path, c002_root, file_lines_c002, &memory_query)
+                    unload_query(&memory_query)
+                    unique_c002 := dedupDiagnostics(c002_diags)
+                    for d in unique_c002 {
+                        if d.message != "" {
+                            emitDiagnostic(d)
+                            diagnostics_found = true
                         }
                     }
                 }
