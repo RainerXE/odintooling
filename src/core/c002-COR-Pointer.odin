@@ -455,7 +455,10 @@ c002_scm_matcher :: proc(
 
         pt   := ts_node_start_point(freed_node)
         pos  := Position{line = int(pt.row) + 1, col = int(pt.column) + 1}
-        append(&free_sites[name], pos)
+        // Odin map values are NOT addressable, so we must read-modify-write explicitly.
+        existing, _ := free_sites[name]
+        append(&existing, pos)
+        free_sites[name] = existing
     }
 
     diagnostics := make([dynamic]Diagnostic)

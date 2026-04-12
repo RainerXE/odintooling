@@ -48,6 +48,8 @@ load_query :: proc(language: rawptr, scm_path: string) -> (CompiledQuery, bool) 
     }
 
     // Build capture name table (index → string)
+    // IMPORTANT: We must copy the strings because tree-sitter's memory gets freed
+    // when ts_query_delete is called, but we need the names to persist.
     count  := ts_query_capture_count(handle)
     names  := make([]string, count)
     for i in 0..<count {
@@ -55,7 +57,9 @@ load_query :: proc(language: rawptr, scm_path: string) -> (CompiledQuery, bool) 
         raw_ptr := ts_query_capture_name_for_id(handle, i, &length)
         if raw_ptr != nil && length > 0 {
             // Convert ^u8 to string - tree-sitter returns null-terminated C strings
-            names[i] = strings.string_from_null_terminated_ptr(cast(^u8)raw_ptr, 1024)
+            cstr := strings.string_from_null_terminated_ptr(cast(^u8)raw_ptr, 1024)
+            // Copy to stable memory to avoid dangling pointers after ts_query_delete
+            names[i] = strings.clone(cstr)
         }
     }
 

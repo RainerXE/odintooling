@@ -20,50 +20,28 @@ TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION :: 13
 
 // initTreeSitter initializes the tree-sitter system
 initTreeSitter :: proc() -> (TSParser, TSLanguage, bool) {
-    fmt.println("=== DEBUG: Initializing tree-sitter ===")
-    
-    // Create parser instance
-    fmt.println("DEBUG: Creating parser...")
     parser := ts_parser_new()
     if parser == nil {
-        fmt.println("❌ DEBUG: ts_parser_new() returned nil")
         return nil, nil, false
     }
-    fmt.println("✅ DEBUG: Parser created successfully")
-    
-    // Load Odin language grammar from tree-sitter-odin library
-    fmt.println("DEBUG: Loading Odin language grammar...")
+
     language := tree_sitter_odin()
     if language == nil {
-        fmt.println("❌ DEBUG: tree_sitter_odin() returned nil - grammar loading failed")
         ts_parser_delete(parser)
         return nil, nil, false
     }
-    fmt.println("✅ DEBUG: Odin language loaded successfully")
 
-    // Check language ABI version for compatibility
-    // Note: ts_language_abi_version() not available in tree-sitter 0.24.7
-    // With matching versions (both ABI 14), compatibility should be perfect
-    fmt.println("DEBUG: Using tree-sitter 0.24.7 with matching ABI versions")
-
-    // Set the language in the parser
-    fmt.println("DEBUG: Setting parser language...")
     success := ts_parser_set_language(parser, language)
     if !success {
-        fmt.println("❌ DEBUG: ts_parser_set_language() returned false - VERSION MISMATCH!")
-        fmt.println("DEBUG: This usually means the grammar was built with an incompatible tree-sitter version")
         ts_parser_delete(parser)
         return nil, nil, false
     }
-    fmt.println("✅ DEBUG: Parser language set successfully")
 
-    fmt.println("=== DEBUG: Tree-sitter initialization complete ===")
     return parser, language, true
 }
 
 // deinitTreeSitter cleans up tree-sitter resources
 deinitTreeSitter :: proc(parser: TSParser, language: TSLanguage) {
-    fmt.println("Cleaning up tree-sitter")
     if parser != nil {
         ts_parser_delete(parser)
     }
@@ -72,50 +50,24 @@ deinitTreeSitter :: proc(parser: TSParser, language: TSLanguage) {
 
 // parseSource parses source code and returns a syntax tree
 parseSource :: proc(parser: TSParser, language: TSLanguage, source: string) -> (TSTree, bool) {
-    fmt.println("=== DEBUG: Parsing source code ===")
-    fmt.println("DEBUG: Source length:", len(source))
-    fmt.println("DEBUG: Source content:", source)
-    
-    // Parse source code
-    // Convert string to cstring, then get ^u8 pointer for the C function
-    fmt.println("DEBUG: Converting string to C string...")
     source_cstr := strings.unsafe_string_to_cstring(source)
     source_ptr := (^u8)(source_cstr)
-    fmt.println("DEBUG: Calling ts_parser_parse_string...")
-    
     tree := ts_parser_parse_string(parser, nil, source_ptr, c.uint(len(source)))
     if tree == nil {
-        fmt.println("❌ DEBUG: ts_parser_parse_string() returned nil")
         return nil, false
     }
-    fmt.println("✅ DEBUG: Parsing successful, tree created")
-    
-    // Additional safety check - verify tree is not null
-    if tree == nil {
-        fmt.println("❌ DEBUG: Tree became nil after parsing (should not happen)")
-        return nil, false
-    }
-    
     return tree, true
 }
 
 // getRootNode gets the root node of a syntax tree
 getRootNode :: proc(tree: TSTree) -> TSNode {
-    fmt.println("=== DEBUG: Getting root node ===")
     if tree == nil {
-        fmt.println("❌ DEBUG: tree is nil")
         return TSNode{}
     }
-    fmt.println("DEBUG: Tree is valid, calling ts_tree_root_node...")
-    
-    // This is where the crash occurs - let's see if we can catch it
     root := ts_tree_root_node(tree)
     if ts_node_is_null(root) {
-        fmt.println("❌ DEBUG: ts_tree_root_node() returned null node")
         return TSNode{}
     }
-    fmt.println("✅ DEBUG: Root node obtained successfully")
-    
     return root
 }
 
@@ -211,28 +163,19 @@ parseToAST :: proc(adapter: TreeSitterASTAdapter, source: string) -> (ASTNode, b
         return ASTNode{}, false
     }
     
-    // Debug: Check if tree is valid by trying to access its language
-    fmt.println("DEBUG: Checking tree language...")
     tree_language := ts_tree_language(tree)
     if tree_language == nil {
-        fmt.println("❌ DEBUG: ts_tree_language() returned nil - tree may be corrupted")
         return ASTNode{}, false
     }
-    fmt.println("✅ DEBUG: Tree language is valid")
-    
-    // Try regular root node first
+
     root := getRootNode(tree)
     if ts_node_is_null(root) {
-        fmt.println("❌ DEBUG: ts_tree_root_node() returned null node, trying with offset...")
-        
-        // Try root node with zero offset as fallback
+        // Fallback: try root node with zero offset
         zero_point := TSPoint{row = 0, column = 0}
         root = ts_tree_root_node_with_offset(tree, 0, zero_point)
         if ts_node_is_null(root) {
-            fmt.println("❌ DEBUG: ts_tree_root_node_with_offset() also returned null node")
             return ASTNode{}, false
         }
-        fmt.println("✅ DEBUG: Root node obtained using offset method")
     }
     
     ast_root := convertToASTNode(root, source)
