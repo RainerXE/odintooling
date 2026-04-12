@@ -76,6 +76,7 @@ foreign {
 	ts_node_end_point :: proc "c"(node: TSNode) -> TSPoint ---;
 	ts_node_child_count :: proc "c"(node: TSNode) -> c.uint ---;
 	ts_node_child :: proc "c"(node: TSNode, index: c.uint) -> TSNode ---;
+	ts_node_parent :: proc "c"(node: TSNode) -> TSNode ---;
 	ts_node_is_null :: proc "c"(node: TSNode) -> c.bool ---;
 
 	// Language functions
