@@ -10,11 +10,12 @@ TSQuery :: distinct rawptr;
 TSQueryCursor :: distinct rawptr;
 
 // TSNode is a value type struct, not a pointer
+// Layout must match C: { uint32_t context[4]; const void *id; const TSTree *tree; } = 32 bytes
 TSNode :: struct {
-    ctx: [4]rawptr,  // opaque internal state — do not touch
-    id:  rawptr,
-    tree: rawptr,
-}
+    ctx: [4]u32,  // 16 bytes — matches C uint32_t context[4]
+    id:  rawptr,  // 8 bytes
+    tree: rawptr, // 8 bytes
+}  // Total: 32 bytes
 
 // Query API types (M3.1)
 TSQueryError :: enum u32 {
@@ -112,4 +113,6 @@ foreign {
 	ts_query_cursor_delete      :: proc "c"(cursor: rawptr) ---;
 	ts_query_cursor_exec        :: proc "c"(cursor: rawptr, query: rawptr, node: TSNode) ---;
 	ts_query_cursor_next_match  :: proc "c"(cursor: rawptr, match: ^TSQueryMatch) -> bool ---;
+	// Returns S-expression string of a subtree — for debug only. Caller must free via libc free().
+	ts_node_string :: proc "c"(node: TSNode) -> cstring ---;
 }

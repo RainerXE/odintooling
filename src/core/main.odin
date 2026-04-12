@@ -141,7 +141,7 @@ stubRule :: proc(file_path: string) -> (Diagnostic, bool) {
     // Check if file contains "TODO_FIXME" pattern
     // This is a placeholder - actual implementation will use tree-sitter
     
-    fmt.println("Checking stub rule for:", file_path)
+    when ODIN_DEBUG { fmt.println("Checking stub rule for:", file_path) }
     
     // Simple file content check for now
     content, err := os.read_entire_file_from_path(file_path, context.allocator)
@@ -278,8 +278,40 @@ main :: proc() {
         }
     }
     
-    // SHADOW MODE: DISABLED due to memory management issue
-    // TODO: Fix memory issue and re-enable for production validation
+    // SHADOW MODE: Run SCM C002 in parallel and compare outputs (debug builds only).
+    // Once parity is confirmed, the SCM matcher replaces the manual walker.
+    when ODIN_DEBUG {
+        file_content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(file_content)
+            file_lines := strings.split(string(file_content), "\n")
+
+            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content))
+            if tree_ok {
+                defer ts_tree_delete(tree)
+                root_tsnode := getRootNode(tree)
+                if !ts_node_is_null(root_tsnode) {
+                    // Dump parse tree to stderr for grammar debugging
+                    tree_cstr := ts_node_string(root_tsnode)
+                    tree_str  := strings.string_from_null_terminated_ptr(cast(^u8)tree_cstr, 1<<20)
+                    fmt.eprintf("[TREE] %s\n", tree_str)
+
+                    memory_query, query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/memory_safety.scm")
+                    if query_ok {
+                        scm_diags := c002_scm_matcher(file_path, root_tsnode, file_lines, &memory_query)
+                        unload_query(&memory_query)
+
+                        if len(scm_diags) != len(unique_c002_diagnostics) {
+                            fmt.eprintfln("[shadow] C002 parity FAIL: manual=%d SCM=%d for %s",
+                                len(unique_c002_diagnostics), len(scm_diags), file_path)
+                        } else {
+                            fmt.eprintfln("[shadow] C002 parity OK: manual=%d SCM=%d", len(unique_c002_diagnostics), len(scm_diags))
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Also run stub rule for now
     stub_diag, stub_found := stubRule(file_path)

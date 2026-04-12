@@ -14,19 +14,20 @@ TREE_SITTER_LIB_DIR :: FFI_DIR + "/tree_sitter/tree-sitter-lib"
 main :: proc() {
     fmt.println("🚀 Building odin-lint with tree-sitter integration...")
     
-    // Build command with tree-sitter linking
+    // Build command with tree-sitter static library linking
     build_cmd := fmt.tprintf(
         "odin build %s/core -out:%s/odin-lint -define:DEBUG=true " +
-        "-extra-linker-flags:\"-L%s/lib/src/macos -ltree-sitter\"",
+        "-extra-linker-flags:\"%s/libtree-sitter.a %s/../tree-sitter-odin/libtree-sitter-odin.a\"",
         SRC_DIR,
         ARTIFACTS_DIR,
+        TREE_SITTER_LIB_DIR,
         TREE_SITTER_LIB_DIR
     )
     
     fmt.println("🔨 Executing:", build_cmd)
     
     // Execute the build
-    exit_code := libc.system(strings.to_cstring(build_cmd))
+    exit_code := libc.system(strings.clone_to_cstring(build_cmd))
     
     if exit_code == 0 {
         fmt.println("✅ Build successful!")
