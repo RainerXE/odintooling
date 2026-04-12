@@ -1,6 +1,6 @@
 # odin-lint — Implementation Plan (v7)
 *A Super Linter & Semantic Engine for the Odin Programming Language*
-*Version 7.1 · April 2026 — SCM Query Architecture, AI Integration Layer & Semantic-Graph Agent Strategy*
+*Version 7.2 · April 2026 — SCM Query Architecture, AI Integration Layer, Semantic-Graph Agent Strategy & FFI Safety Rules*
 
 ---
 
@@ -79,6 +79,50 @@ Extends the DNA export layer with "Call Radius" extraction (callers + callees pe
 symbol) and vector embedding generation — producing a hybrid graph-RAG structure that
 outperforms pure structural or pure semantic retrieval.
 
+### New in V7.2
+
+**C011: FFI Memory Safety Rule (M3.4)**
+Derived from real bugs encountered during tree-sitter FFI integration. Three
+patterns, all SCM-detectable, covering the C/Odin boundary: C strings used
+without cloning (dangling pointer risk), C resource handles allocated without
+a matching `defer ts_*_delete()` (leak), and C function return values used
+without checking the error output parameter. Placed in M3.4 alongside the
+Odin 2026 migration rules — same milestone, same SCM infrastructure.
+
+### What Was Incorporated from the Addon Proposals
+
+**Call Graph as SQLite backing store (M5.6):** The addon proposal's SQLite
+schema (`functions`, `variables`, `usages`, `calls`) is a strong fit for the
+DNA Impact Analysis milestone. Rather than keeping `symbols.json` as the only
+persistent format, M5.6 now uses SQLite as the primary backing store for the
+call graph — enabling SQL queries over the codebase graph (e.g. "find all
+variables freed then used after free") without loading the entire graph into
+memory. `symbols.json` remains the portable export format.
+
+**`--explain` and `--refactor` CLI flags (M4 + M5.6):** The addon's `--explain`
+and `--refactor` subcommands are real user value. `--explain <file:line>` is
+added to M4 CLI enhancements as a local flag that describes *why* a rule fired.
+`--refactor` maps to the `run_lint_denoise` MCP tool (M5.6) and is surfaced as
+a CLI flag post-M5.6.
+
+### What Was Rejected from the Addon Proposals
+
+**`p_`, `pa_`, `_unsafe` pointer prefix conventions:** These are non-standard
+Odin naming rules not used in the Odin core library, OLS, or any major Odin
+project. Adding them as lint rules would generate enormous noise on real
+codebases. If a user wants these conventions enforced, they belong in a
+*configurable* rule file (future: `odin-lint.toml` custom rules), not as
+built-in rules. Not adopted.
+
+**`SAFE_ARRAY_ACCESS` macro and `NonNullPointer` wrapper type:** These are
+user-defined constructs that do not exist in Odin's standard library. A lint
+rule that flags array accesses for not using a non-existent macro would be
+unusable on any real codebase. Not adopted.
+
+**`_dangling` and `_oboe` naming conventions:** Same issue as above —
+project-specific conventions with no grounding in the Odin ecosystem.
+Not adopted.
+
 ### What Was Rejected from the V7 Draft
 
 **C101 SOA hint as M4 scope** — deferred to M6. SOA analysis requires type-size
@@ -105,7 +149,8 @@ odin-lint/
 │           ├── memory_safety.scm      # make/new/free/delete tracking
 │           ├── naming_rules.scm       # snake_case, PascalCase
 │           ├── error_handling.scm     # unchecked error returns
-│           ├── odin2026_migration.scm # os/old imports + Small_Array usage (M3.4)
+│           ├── ffi_safety.scm         # C string cloning, C handle cleanup (C011)
+│           ├── odin2026_migration.scm # os/old imports + Small_Array usage (C009/C010)
 │           └── dod_patterns.scm       # SOA / hot-cold field analysis (M6)
 ├── plans/
 │   ├── odin-lint-implementation-planV7.md   # this file
@@ -141,6 +186,8 @@ odin-lint/
 │   │   ├── mcp_server.odin            # Streamable HTTP transport
 │   │   ├── mcp_tools.odin
 │   │   └── server_card.json           # .well-known capability discovery
+│   ├── db/                            # NEW (M5.6): Call graph SQLite store
+│   │   └── call_graph.odin            # Schema + query helpers
 │   └── integrations/
 │       └── ols/
 ├── tests/
@@ -573,17 +620,106 @@ M0   Foundation                          ✅ COMPLETE
 M1   CLI Tree-sitter Integration         ✅ COMPLETE
 M2   C001 Rule Implementation            ✅ COMPLETE
 M3   C002 + C003-C008 Rules              🔄 IN PROGRESS
-  M3.1  Query Engine Integration         ⬜ NEW (V7)
-  M3.2  C002 via SCM                     ⬜ NEW (V7)
+  M3.1  Query Engine Integration         🔧 INFRASTRUCTURE DONE — SCM BUG BLOCKING GATE
+  M3.2  C002 via SCM                     ⬜ PLANNED (blocked on M3.1 gate)
   M3.3  C003-C008 Naming Rules           ⬜ PLANNED
-  M3.4  Odin 2026 Migration Rules        ⬜ NEW (V7.1)
+  M3.4  Odin 2026 Migration + FFI Safety Rules ⬜ PLANNED
 M4   CLI Enhancements                    ⬜ PLANNED
 M4.5 Autofix Layer                       ⬜ PLANNED
 M5   OLS Plugin Integration              ⬜ PLANNED
 M5.5 MCP Gateway                         ⬜ PLANNED
-M5.6 DNA Impact Analysis                 ⬜ NEW (V7.1)
-M6   Extended Rules (C101, C201, C202)   ⬜ NEW (V7)
+M5.6 DNA Impact Analysis                 ⬜ PLANNED
+M6   Extended Rules (C101, C201, C202)   ⬜ PLANNED
 ```
+
+---
+
+### Current State Assessment — April 11 2026
+
+**Last reviewed:** April 11 2026 via full codebase audit.
+
+#### What exists and compiles
+
+| File | Status | Notes |
+|------|--------|-------|
+| `src/core/query_engine.odin` | ✅ Created | `load_query`, `run_query`, `free_query_results` all implemented |
+| `src/core/tree_sitter_bindings.odin` | ✅ Updated | Query API added: `ts_query_new`, cursor API, `TSQueryError`/`TSQueryCapture`/`TSQueryMatch` |
+| `ffi/tree_sitter/queries/memory_safety.scm` | ⚠️ Created but incomplete | See bug below |
+| `src/core/c002-COR-Pointer.odin` | ✅ Updated | `c002_scm_matcher` added at line 424 |
+| `src/core/main.odin` | ✅ Updated | Shadow mode wired and running |
+| Build | ✅ Succeeds | Two macOS version warnings (harmless) |
+
+#### Known Bug — M3.1 Gate Blocked
+
+`memory_safety.scm` captures the cleanup function name but **not the variable
+being freed**. The file currently reads:
+
+```scheme
+(defer_statement
+  (call_expression
+    function: (identifier) @cleanup_fn
+    (#eq? @cleanup_fn "free"))) @defer_free
+```
+
+`c002_scm_matcher` expects `result.captures["freed_var"]` but that capture does
+not exist in the SCM. Every match immediately `continue`s at line 450:
+
+```odin
+freed_node, has_freed := result.captures["freed_var"]
+if !has_freed { continue }   // ← always taken — SCM never returns freed_var
+```
+
+**Result:** SCM always returns 0 diagnostics. Shadow parity reports `0==0` on
+every file — which looks like a pass but is a false positive (SCM is silently
+broken, not genuinely matching the manual walker).
+
+**Fix required:** Add the `@freed_var` argument capture to `memory_safety.scm`:
+
+```scheme
+(defer_statement
+  (call_expression
+    function: (identifier) @cleanup_fn
+    (#match? @cleanup_fn "^(free|delete)$")
+    arguments: (argument_list (identifier) @freed_var))) @defer_free
+```
+
+#### Secondary Issue — Shadow Mode Noise in All Builds
+
+Shadow mode (`[SHADOW]` prints) runs in every build, not just debug. Every
+`odin-lint` invocation currently emits ~10 lines of stderr noise:
+
+```
+[SHADOW] Starting shadow mode analysis...
+[SHADOW] Reading file content...
+...
+[SHADOW] Shadow mode finished
+```
+
+The plan specified `when ODIN_DEBUG` guard. This needs to be applied.
+
+#### Cleanup Still Pending
+
+| File | Action Needed |
+|------|--------------|
+| `src/core/odin_lint_plugin.odin` | Delete — duplicate of `plugin_main.odin` |
+| `src/core/odin_lint_plugin.odin-e` | Delete — editor backup |
+
+#### Not Yet Started
+
+C003–C008 (stubs), C009, C010, C011, `autofix.odin`, `config.odin`,
+`dna_exporter.odin`, `src/mcp/`, `ffi/tree_sitter/queries/naming_rules.scm`,
+`ffi/tree_sitter/queries/odin2026_migration.scm`.
+
+---
+
+### ⏭ Immediate Next Actions (in order)
+
+1. **Fix `memory_safety.scm`** — add `@freed_var` argument capture (5-minute fix)
+2. **Guard shadow mode** with `when ODIN_DEBUG` in `main.odin`
+3. **Run real parity test** — rebuild debug, run `./scripts/run_c002_tests.sh`,
+   confirm shadow reports actual match counts (not `0==0`)
+4. **Delete cleanup files** — `odin_lint_plugin.odin` and `odin_lint_plugin.odin-e`
+5. **Gate M3.1** — all four checks must pass before starting M3.2
 
 ---
 
@@ -600,23 +736,47 @@ M6   Extended Rules (C101, C201, C202)   ⬜ NEW (V7)
 
 ### 🔄 Milestone 3 — C002 + C003-C008 + Query Engine (IN PROGRESS)
 
-#### ⬜ M3.1 — Query Engine Integration (NEW)
+#### 🔧 M3.1 — Query Engine Integration — INFRASTRUCTURE DONE, GATE BLOCKED
 
-**Goal:** SCM query API working end-to-end. C001 running via SCM query
-in parallel with manual walker, outputs matching.
+**Goal:** SCM query API working end-to-end, C002 running via SCM in shadow
+mode with verified parity against the manual walker.
 
-Tasks:
-- Add `ts_query_new`, `ts_query_cursor_*` to FFI bindings
-- Implement `load_query` and `run_query` in `query_engine.odin`
-- Write `memory_safety.scm` — allocation and defer-free captures
-- Run SCM C001 in parallel with manual C001 on 1172-file corpus
-- Log divergences to `tests/query_parity_report.txt`
+**Completed tasks:**
+- ✅ `ts_query_new`, `ts_query_cursor_*`, `ts_query_capture_*` added to FFI bindings
+- ✅ `TSQueryError`, `TSQueryCapture`, `TSQueryMatch` structs defined
+- ✅ `query_engine.odin` implemented: `load_query`, `run_query`, `free_query_results`, `unload_query`
+- ✅ `memory_safety.scm` created (partial — see bug)
+- ✅ `c002_scm_matcher` implemented in `c002-COR-Pointer.odin` (line 424)
+- ✅ Shadow mode wired into `main.odin` — query loaded and compared per run
+- ✅ Build succeeds with all new code
+
+**Remaining tasks (blocking the gate):**
+- ❌ **Fix `memory_safety.scm`**: missing `@freed_var` capture — SCM always returns 0
+  ```scheme
+  ; Current (broken — no @freed_var):
+  (defer_statement (call_expression
+    function: (identifier) @cleanup_fn
+    (#eq? @cleanup_fn "free"))) @defer_free
+
+  ; Required fix:
+  (defer_statement (call_expression
+    function: (identifier) @cleanup_fn
+    (#match? @cleanup_fn "^(free|delete)$")
+    arguments: (argument_list (identifier) @freed_var))) @defer_free
+  ```
+- ❌ **Guard shadow mode with `when ODIN_DEBUG`** in `main.odin` — currently
+  emits ~10 `[SHADOW]` debug lines to stderr on every production run
+- ❌ **Run real parity test** after fix — build with `-debug`, run `run_c002_tests.sh`,
+  confirm shadow reports actual counts, not spurious `0==0`
+- ❌ **Add alloc captures** to `memory_safety.scm` for C001 shadow work (the
+  `@var_name` / `@alloc` patterns from the plan — needed for future C001 SCM migration)
 
 **Gate M3.1:**
-- [ ] `load_query` compiles `memory_safety.scm` without error
-- [ ] `run_query` returns correct captures on 5 hand-crafted fixtures
-- [ ] SCM C001 matches manual C001 output on 1172-file corpus (0 divergences)
-- [ ] Performance: SCM path ≤ manual walker path (should be faster)
+- [ ] `memory_safety.scm` fixed — `@freed_var` capture present and compiling
+- [ ] Shadow mode guarded by `when ODIN_DEBUG` (no `[SHADOW]` output in release builds)
+- [ ] `run_query` returns non-zero captures on C002 double-free fixtures
+- [ ] SCM C002 matches manual C002 count on full C002 test suite (22 fixtures)
+- [ ] No `[shadow] FAIL` lines on RuiShin corpus run
 
 #### ⬜ M3.2 — C002 via SCM Query
 
@@ -645,10 +805,11 @@ appropriate convention.
 | C007 | Type names must be `PascalCase` |
 | C008 | Acronyms in identifiers should be treated as words |
 
-#### ⬜ M3.4 — Odin 2026 Migration Rules (NEW in V7.1)
+#### ⬜ M3.4 — Odin 2026 Migration Rules + FFI Safety (NEW in V7.1/V7.2)
 
-**Context: the April 2026 Odin language landscape has two immediately actionable
-migrations that odin-lint can detect automatically.**
+**Context: three concrete rules that deliver immediate value in the April 2026
+Odin landscape, all implementable with the SCM query engine and no type-system
+dependency.**
 
 **C009: Legacy OS API (`core:os/old`)**
 
@@ -691,17 +852,87 @@ procedures.
 Fix hint: "Replace `Small_Array(N, T)` with `[dynamic; N]T`. Example:
 `arr: Small_Array(8, int)` → `arr: [dynamic; 8]int`."
 
+**C011: FFI Memory Safety**
+
+Earned directly from the tree-sitter integration work. Three patterns, all
+reliably detectable via SCM queries on the CLI path:
+
+**Pattern 1 — C string used without cloning:**
+```scheme
+; Flag: string_from_null_terminated_ptr result used without clone()
+(short_var_decl
+  (identifier_list (identifier) @var)
+  (expression_list
+    (call_expression
+      function: (selector_expression
+        field: (field_identifier) @fn
+        (#eq? @fn "string_from_null_terminated_ptr"))))) @c_string_assign
+```
+The captured `@var` is then checked: if no subsequent `strings.clone(@var)` or
+`strings.clone_to_cstring(@var)` exists before the owning C resource is freed,
+fire a violation.
+
+Message: "C string pointer used directly — will become dangling when C resource is freed. Use `strings.clone()` to copy to Odin-owned memory."
+
+Fix: `name := strings.clone(strings.string_from_null_terminated_ptr(raw_ptr))`
+
+**Pattern 2 — C resource handle without paired cleanup:**
+This is C001 applied to the FFI boundary. The existing `memory_safety.scm` can
+be extended with a pattern for known C resource-returning functions:
+
+```scheme
+; Flag: ts_query_new / ts_parser_new / ts_query_cursor_new without matching delete
+(short_var_decl
+  (identifier_list (identifier) @handle)
+  (expression_list
+    (call_expression
+      function: (identifier) @fn
+      (#match? @fn "^ts_(query_new|parser_new|query_cursor_new)$")))) @c_alloc
+```
+
+Same escape hatch logic as C001: if a `defer ts_*_delete(@handle)` exists in the
+same block, suppress. If the handle is returned, suppress.
+
+Message: "C resource allocated without paired cleanup. Add `defer ts_*_delete(handle)` immediately after allocation."
+
+**Pattern 3 — C function error output parameter ignored:**
+```scheme
+; Flag: ts_query_new called where error_type output is never read
+(short_var_decl
+  (identifier_list (identifier) @result)
+  (expression_list
+    (call_expression
+      function: (identifier) @fn
+      (#eq? @fn "ts_query_new")
+      arguments: (argument_list
+        (_) (_) (_)
+        (unary_expression operator: "&" operand: (identifier) @err_offset)
+        (unary_expression operator: "&" operand: (identifier) @err_type))))) @ts_query_call
+```
+
+After the capture, check whether `@err_type` appears in a subsequent conditional.
+If not, fire a violation.
+
+Message: "ts_query_new error output parameter not checked. Verify `error_type == .None` before using the returned handle."
+
+**Design note:** Patterns 1 and 2 are reliable enough for VIOLATION tier. Pattern 3
+is harder to check without dataflow analysis — start at CONTEXTUAL tier and
+promote to VIOLATION once false positive rate is confirmed below 5%.
+
 **Gate M3.4:**
 - [ ] C009 fires on `import "core:os/old"`, silent on `import "core:os"`
 - [ ] C010 fires on `Small_Array` usage, provides correct replacement syntax
-- [ ] Both rules tested against RuiShin (C009: expected 0 violations if up to date;
-      C010: expected some violations if using small_array)
-- [ ] 3 pass + 3 fail fixtures for each rule
+- [ ] C011-P1 fires on `string_from_null_terminated_ptr` without `strings.clone`
+- [ ] C011-P2 fires on `ts_*_new` without matching `defer ts_*_delete`
+- [ ] C011-P3 fires (CONTEXTUAL) when `ts_query_new` error param not read
+- [ ] C011 is silent on correctly written FFI code in `src/core/tree_sitter.odin`
+- [ ] All rules: 3 pass + 3 fail fixtures each
 
 **Gate 3 (full M3):**
 - [ ] C002 FP rate < 5% documented
 - [ ] C003-C008 implemented and tested
 - [ ] C009-C010 Odin 2026 migration rules implemented
+- [ ] C011 FFI safety rules implemented (P1, P2 at VIOLATION; P3 at CONTEXTUAL)
 - [ ] All rules: 3 pass + 3 fail fixtures
 - [ ] Manual walker retired for C001 and C002 (Phase C complete)
 - [ ] Rule documentation template applied to all rules
@@ -717,6 +948,7 @@ Fix hint: "Replace `Small_Array(N, T)` with `[dynamic; N]T`. Example:
 **Gate 4:**
 - [ ] All flags working
 - [ ] JSON output valid against schema
+- [ ] [ ] `--explain` produces human-readable output for every rule in M3
 
 ---
 
@@ -794,6 +1026,53 @@ structural graphs with vector embeddings improves factual correctness ~8% over
 either approach alone.
 
 #### What M5.6 Adds to `dna_exporter.odin`
+
+**0. SQLite Call Graph Store**
+
+The call graph is persisted to SQLite (`odin_lint_graph.db`) rather than
+kept solely in `symbols.json`. This makes the graph queryable without loading
+everything into memory — critical for large codebases.
+
+```sql
+CREATE TABLE functions (
+    id      INTEGER PRIMARY KEY,
+    name    TEXT NOT NULL,
+    file    TEXT NOT NULL,
+    line    INTEGER,
+    role    TEXT   -- "allocator" | "deallocator" | "borrower" | "neutral"
+);
+CREATE TABLE calls (
+    caller_id  INTEGER REFERENCES functions(id),
+    callee_id  INTEGER REFERENCES functions(id),
+    line       INTEGER
+);
+CREATE TABLE variables (
+    id           INTEGER PRIMARY KEY,
+    name         TEXT,
+    type         TEXT,
+    function_id  INTEGER REFERENCES functions(id)
+);
+CREATE TABLE usages (
+    variable_id  INTEGER REFERENCES variables(id),
+    line         INTEGER,
+    kind         TEXT   -- "declare" | "read" | "write" | "free"
+);
+```
+
+SQL enables queries that `symbols.json` cannot serve efficiently:
+```sql
+-- Dangling pointer candidates: freed then used after free
+SELECT v.name, f.name as in_function
+FROM variables v
+JOIN usages free_use ON v.id = free_use.variable_id AND free_use.kind = 'free'
+JOIN usages after_use ON v.id = after_use.variable_id
+    AND after_use.line > free_use.line
+    AND after_use.kind = 'read'
+JOIN functions f ON v.function_id = f.id;
+```
+
+`symbols.json` remains the portable export format for AI tooling.
+SQLite is the local query engine. Both are produced by `--export-symbols`.
 
 **1. Call Radius Extraction**
 
@@ -976,6 +1255,24 @@ cases against the enum's member list.
     code generation backend than a quantized Gemma 4 on underpowered hardware.
     Fine-tune Gemma 4 locally; use Qwen3-Coder API for heavy generation tasks.
 
+### New for V7.2: FFI Boundary Safety
+
+11. **The C/Odin FFI boundary has distinct memory ownership rules** — three patterns
+    have proven consistently dangerous in practice and are now codified as C011:
+    - C strings from FFI are *views* into C-owned memory. They become dangling the
+      moment the C resource is freed. Always `strings.clone()` before storing.
+    - C resource handles (parsers, queries, cursors) follow the same pattern as
+      Odin `make`/`new` — they need a `defer ts_*_delete()` immediately after
+      creation, not at the end of a distant scope.
+    - C functions that return results via output pointer parameters (like
+      `ts_query_new`'s `error_type`) must have those parameters checked. Ignoring
+      them is equivalent to ignoring an error return in Odin.
+
+12. **Lint rules derived from real bugs in the project's own FFI code are the highest-
+    quality rules** — they have zero false positives on the existing codebase (the
+    correct code is already written), and they encode hard-won knowledge about a
+    class of bugs that is genuinely hard to reason about without the rule.
+
 ---
 
 ## Gate Summary
@@ -985,8 +1282,11 @@ cases against the enum's member list.
 | 0 | Foundation | CLI skeleton, stub rule | ✅ |
 | 1 | Tree-sitter | Real file parsing | ✅ |
 | 2 | C001 | Real allocation detection, 1172 files | ✅ |
-| 3 | C002 + C003-C010 + Query Engine | SCM parity, FP rate documented | 🔄 |
-| 4 | CLI enhancements | --help, --list-rules, JSON output | ⬜ |
+| 3.1 | Query Engine | SCM bug fixed, real parity on C002 suite | 🔧 |
+| 3.2 | C002 via SCM | Manual walker retired, FP < 5% | ⬜ |
+| 3.3 | C003-C008 | Naming rules implemented and tested | ⬜ |
+| 3.4 | C009-C011 | Migration + FFI safety rules | ⬜ |
+| 4 | CLI enhancements | --help, --list-rules, JSON output, --explain | ⬜ |
 | 4.5 | Autofix | --fix flag, FixEdit + SCM capture binding | ⬜ |
 | 5 | OLS plugin | Editor diagnostics + code actions | ⬜ |
 | 5.5 | MCP gateway | Agent-driven semantic editing + symbol export | ⬜ |
@@ -1218,6 +1518,6 @@ codebase structurally, execute lint analysis, and apply verified fixes.
 
 ---
 
-*Version: 7.1*
-*Updated: April 2026*
+*Version: 7.2*
+*Last status review: April 11 2026*
 *Previous version: odin-lint-implementation-planV6.md (V7.0 was the internal draft)*

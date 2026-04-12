@@ -30,5 +30,5 @@ build_plugin :: proc() -> int {
         fmt.println("❌ Plugin build failed with exit code:", exit_code)
     }
     
-    return exit_code
+    return int(exit_code)
 }
