@@ -282,7 +282,7 @@ main :: proc() {
             defer ts_tree_delete(c002_tree)
             c002_root := getRootNode(c002_tree)
             if !ts_node_is_null(c002_root) {
-                memory_query, query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/memory_safety.scm")
+                memory_query, query_ok := load_query_src(ts_parser.adapter.language, MEMORY_SAFETY_SCM, "memory_safety.scm")
                 if query_ok {
                     c002_diags := c002_scm_matcher(file_path, c002_root, file_lines_c002, &memory_query)
                     unload_query(&memory_query)
@@ -309,7 +309,7 @@ main :: proc() {
             defer ts_tree_delete(naming_tree)
             naming_root := getRootNode(naming_tree)
             if !ts_node_is_null(naming_root) {
-                naming_query, naming_query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/naming_rules.scm")
+                naming_query, naming_query_ok := load_query_src(ts_parser.adapter.language, NAMING_RULES_SCM, "naming_rules.scm")
                 if naming_query_ok {
                     naming_diags := naming_scm_run(file_path, naming_root, file_lines_naming, &naming_query)
                     unload_query(&naming_query)
@@ -336,7 +336,7 @@ main :: proc() {
             defer ts_tree_delete(mig_tree)
             mig_root := getRootNode(mig_tree)
             if !ts_node_is_null(mig_root) {
-                mig_query, mig_query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/odin2026_migration.scm")
+                mig_query, mig_query_ok := load_query_src(ts_parser.adapter.language, ODIN2026_SCM, "odin2026_migration.scm")
                 if mig_query_ok {
                     c009_diags := c009_scm_run(file_path, mig_root, file_lines_mig, &mig_query)
                     c010_diags := c010_scm_run(file_path, mig_root, file_lines_mig, &mig_query)
@@ -358,7 +358,7 @@ main :: proc() {
             defer ts_tree_delete(ffi_tree)
             ffi_root := getRootNode(ffi_tree)
             if !ts_node_is_null(ffi_root) {
-                ffi_query, ffi_query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/ffi_safety.scm")
+                ffi_query, ffi_query_ok := load_query_src(ts_parser.adapter.language, FFI_SAFETY_SCM, "ffi_safety.scm")
                 if ffi_query_ok {
                     c011_diags := c011_scm_run(file_path, ffi_root, file_lines_ffi, &ffi_query)
                     unload_query(&ffi_query)
@@ -380,7 +380,7 @@ main :: proc() {
                 defer ts_tree_delete(c012sem_tree)
                 c012sem_root := getRootNode(c012sem_tree)
                 if !ts_node_is_null(c012sem_root) {
-                    c012_query, c012_query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/c012_rules.scm")
+                    c012_query, c012_query_ok := load_query_src(ts_parser.adapter.language, C012_RULES_SCM, "c012_rules.scm")
                     if c012_query_ok {
                         c012_diags := c012_scm_run(file_path, c012sem_root, file_lines_c012sem, &c012_query)
                         unload_query(&c012_query)
