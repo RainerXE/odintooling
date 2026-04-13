@@ -1,71 +1,136 @@
 package core
 
 import "core:fmt"
-import "core:os"
 import "core:strings"
 
 // =============================================================================
-// C003: Inconsistent Naming Conventions
+// C003: Procedure names must use camelCase or snake_case (not PascalCase)
 // =============================================================================
 //
-// Detects violations of Odin naming conventions:
-// - Variables: snake_case
-// - Types: PascalCase
-// - Procedures: snake_case
-// - Constants: SCREAMING_SNAKE_CASE
+// In Odin, PascalCase is reserved for type names (structs, enums, unions).
+// Procedure names should start with a lowercase letter.
 //
-// Category: STYLE (Clippy-inspired)
+// Violation:   InitParser :: proc() { ... }   ← starts uppercase
+// OK:          init_parser :: proc() { ... }
+// OK:          initParser  :: proc() { ... }
+//
+// Category: STYLE
 // =============================================================================
 
-// C003Rule creates the C003 rule
 C003Rule :: proc() -> Rule {
     return Rule{
-        id = "C003",
-        tier = "style",
-        category = .STYLE,  // Clippy-inspired categorization
-        matcher = c003Matcher,
-        message = c003Message,
-        fix_hint = c003FixHint,
+        id       = "C003",
+        tier     = "style",
+        category = .STYLE,
+        matcher  = nil,  // called via naming_scm_run in main.odin
+        message  = c003_message,
+        fix_hint = c003_fix_hint,
     }
 }
 
-c003Message :: proc() -> string {
-    return "Naming convention violation"
+c003_message :: proc() -> string {
+    return "Procedure name should start with lowercase (camelCase or snake_case, not PascalCase)"
 }
 
-c003FixHint :: proc() -> string {
-    return "Use snake_case for variables, PascalCase for types"
+c003_fix_hint :: proc() -> string {
+    return "Rename: e.g. 'InitFoo' → 'initFoo' or 'init_foo'"
 }
 
-// Pattern matching for naming conventions (file-specific to avoid conflicts)
-c003_variable_pattern :: `^[a-z][a-z0-9_]*$`
-c003_type_pattern :: `^[A-Z][a-zA-Z0-9]*$`
-c003_procedure_pattern :: `^[a-z][a-z0-9_]*$`
-c003_constant_pattern :: `^[A-Z][A-Z0-9_]*$`
+// ---------------------------------------------------------------------------
+// Shared naming-rule SCM runner (C003 + C007 in one pass)
+// ---------------------------------------------------------------------------
 
-// c003Matcher checks for naming convention violations
-c003Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
-    // TODO: Implement actual naming convention checking
-    // This is a stub implementation
-    
-    // Check if this is an identifier node
-    if node.node_type == "identifier" {
-        text := node.text
-        
-        // Determine what kind of identifier this is
-        // (This would require more sophisticated AST analysis)
-        
-        // For now, return empty diagnostic (stub)
-        return Diagnostic{}
-    }
-    
-    // Check children recursively
-    for &child in node.children {
-        diag := c003Matcher(file_path, &child)
-        if diag.message != "" {
-            return diag
+// naming_scm_run runs naming_rules.scm over the file and returns all C003 and
+// C007 violations in a single pass.  Called once from main.odin.
+naming_scm_run :: proc(
+    file_path:  string,
+    root_node:  TSNode,
+    file_lines: []string,
+    q:          ^CompiledQuery,
+) -> []Diagnostic {
+    results := run_query(q, root_node, file_lines)
+    defer free_query_results(results)
+
+    diagnostics := make([dynamic]Diagnostic)
+
+    for result in results {
+        // C003: proc names must start lowercase
+        if proc_node, ok := result.captures["proc_name"]; ok {
+            name := naming_extract_text(proc_node, file_lines)
+            if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
+                pt := ts_node_start_point(proc_node)
+                append(&diagnostics, Diagnostic{
+                    file      = file_path,
+                    line      = int(pt.row) + 1,
+                    column    = int(pt.column) + 1,
+                    rule_id   = "C003",
+                    tier      = "style",
+                    message   = fmt.aprintf(
+                        "Procedure '%s' starts with uppercase — use camelCase or snake_case",
+                        name,
+                    ),
+                    has_fix   = true,
+                    fix       = fmt.aprintf("Rename '%s' to '%c%s'",
+                        name, name[0] + 32, name[1:]),
+                    diag_type = .VIOLATION,
+                })
+            }
+        }
+
+        // C007: struct/enum type names must start uppercase
+        struct_node, has_struct := result.captures["struct_name"]
+        enum_node,   has_enum   := result.captures["enum_name"]
+
+        if has_struct || has_enum {
+            type_node := struct_node if has_struct else enum_node
+            name := naming_extract_text(type_node, file_lines)
+            if len(name) > 0 && name[0] >= 'a' && name[0] <= 'z' {
+                pt := ts_node_start_point(type_node)
+                append(&diagnostics, Diagnostic{
+                    file      = file_path,
+                    line      = int(pt.row) + 1,
+                    column    = int(pt.column) + 1,
+                    rule_id   = "C007",
+                    tier      = "style",
+                    message   = fmt.aprintf(
+                        "Type '%s' starts with lowercase — use PascalCase for type names",
+                        name,
+                    ),
+                    has_fix   = true,
+                    fix       = fmt.aprintf("Rename '%s' to '%c%s'",
+                        name, name[0] - 32, name[1:]),
+                    diag_type = .VIOLATION,
+                })
+            }
         }
     }
-    
-    return Diagnostic{}
+
+    return diagnostics[:]
+}
+
+// naming_extract_text extracts identifier text from a TSNode using file_lines.
+naming_extract_text :: proc(node: TSNode, lines: []string) -> string {
+    type_str := strings.string_from_null_terminated_ptr(ts_node_type(node), 64)
+    if type_str != "identifier" { return "" }
+
+    pt      := ts_node_start_point(node)
+    line_idx := int(pt.row)
+    if line_idx < 0 || line_idx >= len(lines) { return "" }
+
+    line := lines[line_idx]
+    col  := int(pt.column)
+    if col < 0 || col >= len(line) { return "" }
+
+    rest := line[col:]
+    end  := 0
+    for end < len(rest) {
+        c := rest[end]
+        if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') {
+            end += 1
+        } else {
+            break
+        }
+    }
+    return rest[:end]
 }
