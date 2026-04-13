@@ -114,11 +114,14 @@ createInternalError :: proc(file_path: string, line: int, column: int, msg: stri
 // =============================================================================
 
 // analyze_file runs all enabled lint passes on a single .odin file.
+// collector==nil → emit diagnostics immediately (text mode).
+// collector!=nil → append diagnostics for later formatting (json/sarif mode).
 // Returns (violation_count, had_internal_error).
 analyze_file :: proc(
-    file_path: string,
-    ts_parser: ^TreeSitterASTParser,
-    opts:      LintOptions,
+    file_path:  string,
+    ts_parser:  ^TreeSitterASTParser,
+    opts:       LintOptions,
+    collector:  ^[dynamic]Diagnostic,
 ) -> (int, bool) {
     violations := 0
 
@@ -126,12 +129,14 @@ analyze_file :: proc(
     if rule_enabled("C001", "correctness", opts) {
         ast_root, parse_ok := parseFile(ts_parser^, file_path)
         if !parse_ok {
-            emitDiagnostic(createInternalError(file_path, 1, 1,
-                "failed to parse file — syntax error or unsupported Odin syntax"))
+            violations += emit_or_collect(
+                createInternalError(file_path, 1, 1,
+                    "failed to parse file — syntax error or unsupported Odin syntax"),
+                collector)
             return violations, true
         }
         for d in dedupDiagnostics(c001Matcher(file_path, &ast_root)) {
-            if d.message != "" { emitDiagnostic(d); violations += 1 }
+            violations += emit_or_collect(d, collector)
         }
     }
 
@@ -151,7 +156,7 @@ analyze_file :: proc(
                         diags := c002_scm_matcher(file_path, root, lines, &q)
                         unload_query(&q)
                         for d in dedupDiagnostics(diags) {
-                            if d.message != "" { emitDiagnostic(d); violations += 1 }
+                            violations += emit_or_collect(d, collector)
                         }
                     }
                 }
@@ -175,7 +180,7 @@ analyze_file :: proc(
                         diags := naming_scm_run(file_path, root, lines, &q)
                         unload_query(&q)
                         for d in dedupDiagnostics(diags) {
-                            if d.message != "" { emitDiagnostic(d); violations += 1 }
+                            violations += emit_or_collect(d, collector)
                         }
                     }
                 }
@@ -198,12 +203,12 @@ analyze_file :: proc(
                     if q_ok {
                         if rule_enabled("C009", "correctness", opts) {
                             for d in dedupDiagnostics(c009_scm_run(file_path, root, lines, &q)) {
-                                if d.message != "" { emitDiagnostic(d); violations += 1 }
+                                violations += emit_or_collect(d, collector)
                             }
                         }
                         if rule_enabled("C010", "correctness", opts) {
                             for d in dedupDiagnostics(c010_scm_run(file_path, root, lines, &q)) {
-                                if d.message != "" { emitDiagnostic(d); violations += 1 }
+                                violations += emit_or_collect(d, collector)
                             }
                         }
                         unload_query(&q)
@@ -229,7 +234,7 @@ analyze_file :: proc(
                         diags := c011_scm_run(file_path, root, lines, &q)
                         unload_query(&q)
                         for d in dedupDiagnostics(diags) {
-                            if d.message != "" { emitDiagnostic(d); violations += 1 }
+                            violations += emit_or_collect(d, collector)
                         }
                     }
                 }
@@ -253,7 +258,7 @@ analyze_file :: proc(
                         diags := c012_scm_run(file_path, root, lines, &q)
                         unload_query(&q)
                         for d in dedupDiagnostics(diags) {
-                            if d.message != "" { emitDiagnostic(d); violations += 1 }
+                            violations += emit_or_collect(d, collector)
                         }
                     }
                 }
@@ -277,9 +282,20 @@ _main :: proc() -> int {
     opts, parse_ok := parse_args(os.args[1:])
     if !parse_ok { return 2 }
 
-    if opts.show_version { print_version(); return 0 }
-    if opts.show_help    { print_help();    return 0 }
-    if opts.list_rules   { print_list_rules(); return 0 }
+    if opts.show_version  { print_version();    return 0 }
+    if opts.show_help     { print_help();       return 0 }
+    if opts.list_rules    { print_list_rules(); return 0 }
+
+    if opts.explain_rule != "" {
+        docs, found := explain_rule(opts.explain_rule)
+        if !found {
+            fmt.eprintfln("error: unknown rule '%s'. Run 'odin-lint --list-rules' for available rules.",
+                opts.explain_rule)
+            return 2
+        }
+        fmt.print(docs)
+        return 0
+    }
 
     if len(opts.targets) == 0 {
         fmt.eprintln("error: no target specified. Run 'odin-lint --help' for usage.")
@@ -305,12 +321,19 @@ _main :: proc() -> int {
     }
     defer deinitTreeSitterParser(ts_parser)
 
+    // For JSON/SARIF, collect all diagnostics before formatting.
+    // For text, emit immediately (streaming) by passing nil collector.
+    use_collector := opts.format == "json" || opts.format == "sarif"
+    collector     := make([dynamic]Diagnostic)
+    defer delete(collector)
+
     total_violations      := 0
     files_with_violations := 0
     had_error             := false
 
     for file_path in files {
-        v, err := analyze_file(file_path, &ts_parser, opts)
+        coll := &collector if use_collector else nil
+        v, err := analyze_file(file_path, &ts_parser, opts, coll)
         if err { had_error = true; continue }
         if v > 0 {
             total_violations      += v
@@ -320,15 +343,25 @@ _main :: proc() -> int {
 
     if had_error { return 2 }
 
-    if total_violations > 0 {
-        fmt.printf("%d violation(s) in %d file(s)\n", total_violations, files_with_violations)
-        return 1
-    }
-
-    if len(files) == 1 {
-        fmt.println("No diagnostics found")
-    } else {
-        fmt.printf("No violations found in %d file(s)\n", len(files))
+    // Emit output in the requested format
+    switch opts.format {
+    case "", "text":
+        if total_violations > 0 {
+            fmt.printf("%d violation(s) in %d file(s)\n", total_violations, files_with_violations)
+            return 1
+        }
+        if len(files) == 1 {
+            fmt.println("No diagnostics found")
+        } else {
+            fmt.printf("No violations found in %d file(s)\n", len(files))
+        }
+        return 0
+    case "json":
+        emit_json(collector[:])
+        return 1 if total_violations > 0 else 0
+    case "sarif":
+        emit_sarif(collector[:])
+        return 1 if total_violations > 0 else 0
     }
     return 0
 }
