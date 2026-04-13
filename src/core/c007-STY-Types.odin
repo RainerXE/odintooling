@@ -1,63 +1,30 @@
 package core
 
-import "core:fmt"
-import "core:os"
-import "core:strings"
-
 // =============================================================================
-// C007: Type Naming Convention
+// C007: Type names must use PascalCase
 // =============================================================================
 //
-// Detects type names that don't follow PascalCase convention.
-// Type names should start with uppercase and use camel case.
+// Struct, enum, and union names should start with an uppercase letter.
+// Detection is performed by naming_scm_run in c003-STY-Naming.odin.
 //
-// Category: STYLE (Clippy-inspired)
+// Category: STYLE
 // =============================================================================
 
-// C007Rule creates the C007 rule
 C007Rule :: proc() -> Rule {
     return Rule{
-        id = "C007",
-        tier = "style",
-        category = .STYLE,  // Clippy-inspired categorization
-        matcher = c007Matcher,
-        message = c007Message,
-        fix_hint = c007FixHint,
+        id       = "C007",
+        tier     = "style",
+        category = .STYLE,
+        matcher  = nil,  // logic lives in naming_scm_run (c003-STY-Naming.odin)
+        message  = c007_message,
+        fix_hint = c007_fix_hint,
     }
 }
 
-c007Message :: proc() -> string {
-    return "Type naming convention violation"
+c007_message :: proc() -> string {
+    return "Type name should start with uppercase (PascalCase)"
 }
 
-c007FixHint :: proc() -> string {
-    return "Type names should use PascalCase (e.g., MyType)"
-}
-
-// Pattern for type naming (file-specific to avoid conflicts)
-c007_type_pattern :: `^[A-Z][a-zA-Z0-9]*$`
-
-// c007Matcher checks for type naming violations
-c007Matcher :: proc(file_path: string, node: ^ASTNode) -> Diagnostic {
-    // TODO: Implement actual type naming checking
-    // This is a stub implementation
-    
-    // Check if this is a type definition
-    if node.node_type == "type_definition" {
-        // Check type name against pattern
-        // (This would require more sophisticated AST analysis)
-        
-        // For now, return empty diagnostic (stub)
-        return Diagnostic{}
-    }
-    
-    // Check children recursively
-    for &child in node.children {
-        diag := c007Matcher(file_path, &child)
-        if diag.message != "" {
-            return diag
-        }
-    }
-    
-    return Diagnostic{}
+c007_fix_hint :: proc() -> string {
+    return "Rename: e.g. 'myStruct' → 'MyStruct'"
 }

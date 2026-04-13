@@ -183,14 +183,18 @@ main :: proc() {
     }
     
     file_path := args[1]
-    
+
     // Check for special modes
-    ast_mode := false
-    
-    if len(args) > 2 {
-        if args[2] == "--ast" {
+    ast_mode      := false
+    c012_enabled  := false
+
+    for i in 2..<len(args) {
+        switch args[i] {
+        case "--ast":
             ast_mode = true
             fmt.println("Running in AST export mode")
+        case "--enable-c012":
+            c012_enabled = true
         }
     }
     
@@ -233,6 +237,7 @@ main :: proc() {
     registerRule(&registry, C006Rule())  // STYLE category (c006-STY-Public.odin)
     registerRule(&registry, C007Rule())  // STYLE category (c007-STY-Types.odin)
     registerRule(&registry, C008Rule())  // STYLE category (c008-STY-Acronyms.odin)
+    registerRule(&registry, C012Rule())  // STYLE category (c012-SEM-Naming.odin) — opt-in
     
     // Apply all rules
     diagnostics_found := false
@@ -283,6 +288,62 @@ main :: proc() {
                         if d.message != "" {
                             emitDiagnostic(d)
                             diagnostics_found = true
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // C003 + C007: Naming rules via shared SCM pass
+    file_content_naming, naming_read_err := os.read_entire_file_from_path(file_path, context.allocator)
+    if naming_read_err == nil {
+        defer delete(file_content_naming)
+        file_lines_naming := strings.split(string(file_content_naming), "\n")
+
+        naming_tree, naming_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_naming))
+        if naming_tree_ok {
+            defer ts_tree_delete(naming_tree)
+            naming_root := getRootNode(naming_tree)
+            if !ts_node_is_null(naming_root) {
+                naming_query, naming_query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/naming_rules.scm")
+                if naming_query_ok {
+                    naming_diags := naming_scm_run(file_path, naming_root, file_lines_naming, &naming_query)
+                    unload_query(&naming_query)
+                    unique_naming := dedupDiagnostics(naming_diags)
+                    for d in unique_naming {
+                        if d.message != "" {
+                            emitDiagnostic(d)
+                            diagnostics_found = true
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // C012: Semantic ownership naming (opt-in via --enable-c012)
+    if c012_enabled {
+        file_content_c012, c012sem_read_err := os.read_entire_file_from_path(file_path, context.allocator)
+        if c012sem_read_err == nil {
+            defer delete(file_content_c012)
+            file_lines_c012sem := strings.split(string(file_content_c012), "\n")
+
+            c012sem_tree, c012sem_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_c012))
+            if c012sem_tree_ok {
+                defer ts_tree_delete(c012sem_tree)
+                c012sem_root := getRootNode(c012sem_tree)
+                if !ts_node_is_null(c012sem_root) {
+                    c012_query, c012_query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/c012_rules.scm")
+                    if c012_query_ok {
+                        c012_diags := c012_scm_run(file_path, c012sem_root, file_lines_c012sem, &c012_query)
+                        unload_query(&c012_query)
+                        unique_c012 := dedupDiagnostics(c012_diags)
+                        for d in unique_c012 {
+                            if d.message != "" {
+                                emitDiagnostic(d)
+                                diagnostics_found = true
+                            }
                         }
                     }
                 }
