@@ -100,6 +100,7 @@ c011_scm_run :: proc(
         }
     }
 
+    suppressions := collect_suppressions(1, len(file_lines), file_lines)
     diagnostics := make([dynamic]Diagnostic)
 
     for key, pos in alloc_sites {
@@ -110,6 +111,7 @@ c011_scm_run :: proc(
         var_name  := key[colon_idx+1:] if colon_idx >= 0 else key
         // Escape hatch: handle is returned → ownership transferred, no cleanup needed here
         if returned_vars[var_name] { continue }
+        if is_suppressed("C011", pos.line, suppressions) { continue }
         append(&diagnostics, Diagnostic{
             file      = file_path,
             line      = pos.line,

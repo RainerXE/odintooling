@@ -1,10 +1,7 @@
 package core
 
 import "core:fmt"
-import "core:os"
 import "core:strings"
-import "core:c"
-import "base:runtime"
 import "core:mem"
 
 // QueryResult holds one match from a compiled SCM query.
@@ -22,43 +19,30 @@ CompiledQuery :: struct {
     language:      rawptr,
 }
 
-// load_query compiles an SCM file into a CompiledQuery.
-// scm_path: path to a .scm file (e.g. "ffi/tree_sitter/queries/memory_safety.scm")
-// language: the TSLanguage pointer (from initTreeSitter)
+// load_query_src compiles an SCM source string into a CompiledQuery.
+// src: SCM query source (typically from a #load compile-time constant)
+// label: human-readable name used in error messages (e.g. "memory_safety.scm")
 // Returns: (query, true) on success, ({}, false) on error.
-load_query :: proc(language: rawptr, scm_path: string) -> (CompiledQuery, bool) {
-    data, err := os.read_entire_file_from_path(scm_path, context.allocator)
-    if err != nil {
-        fmt.eprintln("[query_engine] Failed to read SCM file:", scm_path)
-        return {}, false
-    }
-    defer delete(data)
+load_query_src :: proc(language: rawptr, src: string, label: string = "<embedded>") -> (CompiledQuery, bool) {
+    source_ptr := cast(^u8)raw_data(src) if len(src) > 0 else nil
 
-    // tree-sitter query API expects raw byte pointer, not cstring
-    source_ptr := (&data[0]) if len(data) > 0 else nil
-    
     error_offset: u32
     error_type:   TSQueryError
-    handle := ts_query_new(language, source_ptr, u32(len(data)), &error_offset, &error_type)
+    handle := ts_query_new(language, source_ptr, u32(len(src)), &error_offset, &error_type) // odin-lint:ignore C011 handle transferred into returned CompiledQuery struct
 
     if handle == nil || error_type != .None {
         fmt.eprintfln("[query_engine] SCM compile error in %s at byte %d: %v",
-            scm_path, error_offset, error_type)
+            label, error_offset, error_type)
         return {}, false
     }
 
-    // Build capture name table (index → string)
-    // IMPORTANT: We must copy the strings because tree-sitter's memory gets freed
-    // when ts_query_delete is called, but we need the names to persist.
     count  := ts_query_capture_count(handle)
     names  := make([]string, count)
     for i in 0..<count {
         length: u32
         raw_ptr := ts_query_capture_name_for_id(handle, i, &length)
         if raw_ptr != nil && length > 0 {
-            // Convert ^u8 to string - tree-sitter returns null-terminated C strings
             cstr := strings.string_from_null_terminated_ptr(cast(^u8)raw_ptr, 1024)
-            // Copy to stable memory to avoid dangling pointers after ts_query_delete
             names[i] = strings.clone(cstr)
         }
     }
@@ -69,6 +53,7 @@ load_query :: proc(language: rawptr, scm_path: string) -> (CompiledQuery, bool) 
         language      = language,
     }, true
 }
+
 
 // unload_query frees all memory owned by the query.
 // Call this at shutdown (once per query, not per file).
