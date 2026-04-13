@@ -2,6 +2,56 @@ package core
 
 import "core:c"
 
+// =============================================================================
+// Odin Grammar Reference — Node Types for SCM Queries
+// =============================================================================
+//
+// Critical grammar facts learned from implementing C002, C003, C007, C012.
+// Check these before writing a new .scm query to avoid silent zero-match bugs.
+//
+// VARIABLE DECLARATIONS
+//   x := value        → assignment_statement  (inside proc bodies)
+//   x := value        → variable_declaration  (at PACKAGE scope only)
+//   x: Type           → var_declaration        (both scopes)
+//   x: Type = value   → var_declaration        (both scopes)
+//   X :: value        → const_declaration
+//
+//   ⚠️  Do NOT use variable_declaration to match := inside procedures.
+//       It only fires at package level. Use assignment_statement instead.
+//       assignment_statement covers both = (reassign) and := (declare).
+//
+// PROCEDURE / TYPE DECLARATIONS
+//   foo :: proc() {}              → procedure_declaration
+//   Foo :: proc() {} | bar :: proc() {} → overloaded_procedure_declaration
+//   Foo :: struct { … }           → struct_declaration
+//   Foo :: enum { … }             → enum_declaration
+//
+// CALL EXPRESSIONS
+//   make(T, n)                    → call_expression  function:(identifier)
+//   mem.free(p)                   → member_expression containing call_expression
+//                                   NOT selector_expression (that is ->)
+//   foo->bar(p)                   → selector_call_expression (-> syntax)
+//
+// DEFER
+//   defer free(p)                 → defer_statement(call_expression)
+//   defer mem.free(p)             → defer_statement(member_expression(call_expression))
+//
+// SLICE / INDEX
+//   buf[a:b]                      → slice_expression  fields: start, end
+//   buf[i]                        → index_expression
+//
+// EXPRESSION SUPERTYPES
+//   expression is a supertype (union) of: identifier, call_expression,
+//   slice_expression, member_expression, binary_expression, etc.
+//   Supertypes are transparent in queries — match the subtype directly.
+//
+// ABI NOTE
+//   TSNode must match C layout exactly:
+//   { uint32_t context[4]; const void *id; const TSTree *tree; } = 32 bytes
+//   ctx must be [4]u32 (16 bytes), NOT [4]rawptr (32 bytes).
+//
+// =============================================================================
+
 // Tree-sitter types (opaque pointers)
 TSParser :: distinct rawptr;
 TSTree :: distinct rawptr;
