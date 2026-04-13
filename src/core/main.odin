@@ -3,8 +3,6 @@ package core
 import "core:fmt"
 import "core:os"
 import "core:strings"
-// LSP integration is handled by OLS (Odin Language Server)
-// C002 rule is now in the same package
 
 // DiagnosticType represents the category of a diagnostic
 DiagnosticType :: enum {
@@ -27,270 +25,133 @@ RuleCategory :: enum {
 
 // Diagnostic represents a linting diagnostic
 Diagnostic :: struct {
-    file:    string,
-    line:    int,
-    column:  int,
-    rule_id: string,
-    tier:    string,
-    message: string,
-    fix:     string,
-    has_fix: bool,
+    file:      string,
+    line:      int,
+    column:    int,
+    rule_id:   string,
+    tier:      string,
+    message:   string,
+    fix:       string,
+    has_fix:   bool,
     diag_type: DiagnosticType,
 }
 
 // Rule represents a linting rule
 Rule :: struct {
-    id: string,
-    tier: string,
-    category: RuleCategory,  // Clippy-inspired categorization
-    matcher: proc(file_path: string, node: ^ASTNode) -> Diagnostic,
-    message: proc() -> string,
+    id:       string,
+    tier:     string,
+    category: RuleCategory,
+    matcher:  proc(file_path: string, node: ^ASTNode) -> Diagnostic,
+    message:  proc() -> string,
     fix_hint: proc() -> string,
 }
 
 // RuleRegistry manages all linting rules
 RuleRegistry :: struct {
-    rules: map[string] Rule,
+    rules: map[string]Rule,
 }
 
-// initRuleRegistry creates a new rule registry
 initRuleRegistry :: proc() -> RuleRegistry {
-    return RuleRegistry{
-        rules = make(map[string] Rule),
-    }
+    return RuleRegistry{rules = make(map[string]Rule)}
 }
 
-// registerRule adds a rule to the registry
-registerRule :: proc(registry: ^RuleRegistry, rule:  Rule) {
+registerRule :: proc(registry: ^RuleRegistry, rule: Rule) {
     registry.rules[rule.id] = rule
 }
 
-// getRule gets a rule by ID
-getRule :: proc(registry: RuleRegistry, id: string) -> ( Rule, bool) {
+getRule :: proc(registry: RuleRegistry, id: string) -> (Rule, bool) {
     rule, ok := registry.rules[id]
-    if !ok {
-        return  Rule{}, false
-    }
-    return rule, true
+    return rule, ok
 }
 
-// emitDiagnostic emits a diagnostic with appropriate formatting based on type
-emitDiagnostic :: proc(diag:  Diagnostic) {
-    // Format diagnostic output based on type
+// emitDiagnostic prints a diagnostic with appropriate formatting.
+emitDiagnostic :: proc(diag: Diagnostic) {
     switch diag.diag_type {
-        case .INTERNAL_ERROR:
-            fmt.printf("🟣 %s:%d:%d: INTERNAL ERROR - %s",
-                       diag.file, diag.line, diag.column, diag.message)
-        case .CONTEXTUAL:
-            fmt.printf("🟡 %s:%d:%d: %s [%s] %s",
-                       diag.file, diag.line, diag.column,
-                       diag.rule_id, diag.tier, diag.message)
-        case .INFO:
-            fmt.printf("🔵 %s:%d:%d: INFO - %s",
-                       diag.file, diag.line, diag.column, diag.message)
-        case .VIOLATION, .NONE:  // NONE shouldn't normally be emitted
-            fmt.printf("🔴 %s:%d:%d: %s [%s] %s",
-                       diag.file, diag.line, diag.column,
-                       diag.rule_id, diag.tier, diag.message)
+    case .INTERNAL_ERROR:
+        fmt.printf("🟣 %s:%d:%d: INTERNAL ERROR - %s", diag.file, diag.line, diag.column, diag.message)
+    case .CONTEXTUAL:
+        fmt.printf("🟡 %s:%d:%d: %s [%s] %s", diag.file, diag.line, diag.column, diag.rule_id, diag.tier, diag.message)
+    case .INFO:
+        fmt.printf("🔵 %s:%d:%d: INFO - %s", diag.file, diag.line, diag.column, diag.message)
+    case .VIOLATION, .NONE:
+        fmt.printf("🔴 %s:%d:%d: %s [%s] %s", diag.file, diag.line, diag.column, diag.rule_id, diag.tier, diag.message)
     }
-    
-    if diag.has_fix {
-        fmt.printf("\nFix: %s", diag.fix)
-    }
-    
+    if diag.has_fix { fmt.printf("\nFix: %s", diag.fix) }
     fmt.println()
 }
 
-// dedupDiagnostics removes duplicate diagnostics
-// Key: (file, line, column, rule_id) - same violation at same location
+// dedupDiagnostics removes exact duplicate diagnostics (same file:line:col:rule).
 dedupDiagnostics :: proc(diags: []Diagnostic) -> []Diagnostic {
-    seen := make(map[string]bool)
-    result: [dynamic]Diagnostic
-    
+    seen   := make(map[string]bool)
+    result := make([dynamic]Diagnostic)
     for d in diags {
-        // Create unique key for this diagnostic
         key := fmt.tprintf("%s:%d:%d:%s", d.file, d.line, d.column, d.rule_id)
-        
-        // Only add if we haven't seen this exact violation before
         if key not_in seen {
             seen[key] = true
             append(&result, d)
         }
     }
-    
     return result[:]
 }
 
-// createInternalError creates an internal error diagnostic
-createInternalError :: proc(file_path: string, line: int, column: int, error_msg: string) -> Diagnostic {
+// createInternalError creates an internal error diagnostic.
+createInternalError :: proc(file_path: string, line: int, column: int, msg: string) -> Diagnostic {
     return Diagnostic{
-        file = file_path,
-        line = line,
-        column = column,
-        rule_id = "INTERNAL",
-        tier = "error",
-        message = error_msg,
-        fix = "This is a linter internal error - please report to developers",
-        has_fix = false,
+        file      = file_path,
+        line      = line,
+        column    = column,
+        rule_id   = "INTERNAL",
+        tier      = "error",
+        message   = msg,
+        fix       = "This is a linter internal error — please report at https://github.com/anthropics/claude-code/issues",
+        has_fix   = false,
         diag_type = DiagnosticType.INTERNAL_ERROR,
     }
 }
 
-// stubRule is a stub rule for pipeline validation
-stubRule :: proc(file_path: string) -> (Diagnostic, bool) {
-    // Check if file contains "TODO_FIXME" pattern
-    // This is a placeholder - actual implementation will use tree-sitter
-    
-    when ODIN_DEBUG { fmt.println("Checking stub rule for:", file_path) }
-    
-    // Simple file content check for now
-    content, err := os.read_entire_file_from_path(file_path, context.allocator)
-    if err != nil {
-        return Diagnostic{}, false
-    }
-    defer delete(content)
-    
-    content_str := string(content)
-    if strings.contains(content_str, "TODO_FIXME") {
-        return  Diagnostic{
-            file = file_path,
-            line = 1,
-            column = 1,
-            rule_id = "STUB001",
-            tier = "correctness",
-            message = "Found TODO_FIXME procedure",
-            fix = "Rename or remove TODO_FIXME procedure",
-            has_fix = true,
-            diag_type = DiagnosticType.VIOLATION,
-        }, true
-    }
-    
-    return  Diagnostic{}, false
-}
+// =============================================================================
+// Per-file analysis
+// =============================================================================
 
-// main entry point
-main :: proc() {
-    fmt.println("Starting odin-lint")
-    
-    // Parse command line arguments
-    args := os.args
-    if len(args) < 2 {
-        fmt.println("Usage: odin-lint <file> [--lsp|--ast] [--server]")
-        fmt.println("  --lsp: Run in LSP mode for editor integration")
-        fmt.println("  --lsp --server: Run as standalone LSP server")
-        fmt.println("  --ast: Export AST in JSON format")
-        os.exit(1)
-    }
-    
-    file_path := args[1]
+// analyze_file runs all enabled lint passes on a single .odin file.
+// Returns (violation_count, had_internal_error).
+analyze_file :: proc(
+    file_path: string,
+    ts_parser: ^TreeSitterASTParser,
+    opts:      LintOptions,
+) -> (int, bool) {
+    violations := 0
 
-    // Check for special modes
-    ast_mode      := false
-    c012_enabled  := false
-
-    for i in 2..<len(args) {
-        switch args[i] {
-        case "--ast":
-            ast_mode = true
-            fmt.println("Running in AST export mode")
-        case "--enable-c012":
-            c012_enabled = true
+    // C001: Memory allocation without defer free (OdinLint AST walker)
+    if rule_enabled("C001", "correctness", opts) {
+        ast_root, parse_ok := parseFile(ts_parser^, file_path)
+        if !parse_ok {
+            emitDiagnostic(createInternalError(file_path, 1, 1,
+                "failed to parse file — syntax error or unsupported Odin syntax"))
+            return violations, true
+        }
+        for d in dedupDiagnostics(c001Matcher(file_path, &ast_root)) {
+            if d.message != "" { emitDiagnostic(d); violations += 1 }
         }
     }
-    
-    if ast_mode {
-        // runASTExport(file_path)  // TODO: Implement
-        fmt.println("AST export not implemented yet")
-        return
-    }
-    
-    fmt.println("Processing file:", file_path)
-    
-    // Initialize tree-sitter AST parser
-    ts_parser, ts_ok := initTreeSitterParser()
-    if !ts_ok {
-        internal_error := createInternalError(file_path, 1, 1, "Failed to initialize tree-sitter parser")
-        emitDiagnostic(internal_error)
-        deinitTreeSitterParser(ts_parser)
-        os.exit(1)
-    }
-    
-    // Parse file to get AST
-    ast_root, parse_ok := parseFile(ts_parser, file_path)
-    if !parse_ok {
-        internal_error := createInternalError(file_path, 1, 1, "Failed to parse file - syntax error or unsupported Odin syntax")
-        emitDiagnostic(internal_error)
-        deinitTreeSitterParser(ts_parser)
-        os.exit(1)
-    }
-    
-    // Initialize rule registry
-    registry := initRuleRegistry()
-    
-    // Register rules with Clippy-inspired categorization
-    // Rule files now use descriptive naming: Cnnn-CAT-Description.odin
-    registerRule(&registry, C001Rule())  // CORRECTNESS category (c001-COR-Memory.odin)
-    registerRule(&registry, C002Rule())  // CORRECTNESS category (c002-COR-Pointer.odin)
-    registerRule(&registry, C003Rule())  // STYLE category (c003-STY-Naming.odin)
-    registerRule(&registry, C004Rule())  // STYLE category (c004-STY-Private.odin)
-    registerRule(&registry, C005Rule())  // STYLE category (c005-STY-Internal.odin)
-    registerRule(&registry, C006Rule())  // STYLE category (c006-STY-Public.odin)
-    registerRule(&registry, C007Rule())  // STYLE category (c007-STY-Types.odin)
-    registerRule(&registry, C008Rule())  // STYLE category (c008-STY-Acronyms.odin)
-    registerRule(&registry, C009Rule())  // CORRECTNESS (c009-MIG-OsOld.odin)
-    registerRule(&registry, C010Rule())  // CORRECTNESS (c010-MIG-SmallArray.odin)
-    registerRule(&registry, C011Rule())  // CORRECTNESS (c011-FFI-Safety.odin)
-    registerRule(&registry, C012Rule())  // STYLE category (c012-SEM-Naming.odin) — opt-in
-    
-    // Apply all rules
-    diagnostics_found := false
-    // Apply C001 rule with parsed AST
-    c001_rule := C001Rule()
-    // Special handling for C001 which can return multiple diagnostics
-    if c001_rule.id == "C001" {
-        // Use the multi-diagnostic version for C001
-        c001_diagnostics := c001Matcher(file_path, &ast_root)  // Import this from c001.odin
-        
-        // Remove duplicates before emitting
-        unique_diagnostics := dedupDiagnostics(c001_diagnostics)
-        
-        for diag in unique_diagnostics {
-            if diag.message != "" {
-                emitDiagnostic(diag)
-                diagnostics_found = true
-            }
-        }
-    } else {
-        // Add nil guard for rules that don't use Rule.matcher (like C002)
-        if c001_rule.matcher != nil {
-            diag := c001_rule.matcher(file_path, &ast_root)
-            if diag.message != "" {
-                emitDiagnostic(diag)
-                diagnostics_found = true
-            }
-        }
-    }
-    
-    // C002: Double-free detection via SCM query engine (replaced manual walker in M3.2)
-    file_content_c002, c002_read_err := os.read_entire_file_from_path(file_path, context.allocator)
-    if c002_read_err == nil {
-        defer delete(file_content_c002)
-        file_lines_c002 := strings.split(string(file_content_c002), "\n")
 
-        c002_tree, c002_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_c002))
-        if c002_tree_ok {
-            defer ts_tree_delete(c002_tree)
-            c002_root := getRootNode(c002_tree)
-            if !ts_node_is_null(c002_root) {
-                memory_query, query_ok := load_query_src(ts_parser.adapter.language, MEMORY_SAFETY_SCM, "memory_safety.scm")
-                if query_ok {
-                    c002_diags := c002_scm_matcher(file_path, c002_root, file_lines_c002, &memory_query)
-                    unload_query(&memory_query)
-                    unique_c002 := dedupDiagnostics(c002_diags)
-                    for d in unique_c002 {
-                        if d.message != "" {
-                            emitDiagnostic(d)
-                            diagnostics_found = true
+    // C002: Double-free detection (tree-sitter SCM)
+    if rule_enabled("C002", "correctness", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            lines := strings.split(string(content), "\n")
+            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+            if tree_ok {
+                defer ts_tree_delete(tree)
+                root := getRootNode(tree)
+                if !ts_node_is_null(root) {
+                    q, q_ok := load_query_src(ts_parser.adapter.language, MEMORY_SAFETY_SCM, "memory_safety.scm")
+                    if q_ok {
+                        diags := c002_scm_matcher(file_path, root, lines, &q)
+                        unload_query(&q)
+                        for d in dedupDiagnostics(diags) {
+                            if d.message != "" { emitDiagnostic(d); violations += 1 }
                         }
                     }
                 }
@@ -298,26 +159,23 @@ main :: proc() {
         }
     }
 
-    // C003 + C007: Naming rules via shared SCM pass
-    file_content_naming, naming_read_err := os.read_entire_file_from_path(file_path, context.allocator)
-    if naming_read_err == nil {
-        defer delete(file_content_naming)
-        file_lines_naming := strings.split(string(file_content_naming), "\n")
-
-        naming_tree, naming_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_naming))
-        if naming_tree_ok {
-            defer ts_tree_delete(naming_tree)
-            naming_root := getRootNode(naming_tree)
-            if !ts_node_is_null(naming_root) {
-                naming_query, naming_query_ok := load_query_src(ts_parser.adapter.language, NAMING_RULES_SCM, "naming_rules.scm")
-                if naming_query_ok {
-                    naming_diags := naming_scm_run(file_path, naming_root, file_lines_naming, &naming_query)
-                    unload_query(&naming_query)
-                    unique_naming := dedupDiagnostics(naming_diags)
-                    for d in unique_naming {
-                        if d.message != "" {
-                            emitDiagnostic(d)
-                            diagnostics_found = true
+    // C003 + C007: Naming rules (shared SCM pass)
+    if rule_enabled("C003", "style", opts) || rule_enabled("C007", "style", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            lines := strings.split(string(content), "\n")
+            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+            if tree_ok {
+                defer ts_tree_delete(tree)
+                root := getRootNode(tree)
+                if !ts_node_is_null(root) {
+                    q, q_ok := load_query_src(ts_parser.adapter.language, NAMING_RULES_SCM, "naming_rules.scm")
+                    if q_ok {
+                        diags := naming_scm_run(file_path, root, lines, &q)
+                        unload_query(&q)
+                        for d in dedupDiagnostics(diags) {
+                            if d.message != "" { emitDiagnostic(d); violations += 1 }
                         }
                     }
                 }
@@ -325,71 +183,53 @@ main :: proc() {
         }
     }
 
-    // C009: Deprecated core:os/old import
-    // C010: Small_Array superseded by [dynamic; N]T
-    file_content_mig, mig_read_err := os.read_entire_file_from_path(file_path, context.allocator)
-    if mig_read_err == nil {
-        defer delete(file_content_mig)
-        file_lines_mig := strings.split(string(file_content_mig), "\n")
-        mig_tree, mig_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_mig))
-        if mig_tree_ok {
-            defer ts_tree_delete(mig_tree)
-            mig_root := getRootNode(mig_tree)
-            if !ts_node_is_null(mig_root) {
-                mig_query, mig_query_ok := load_query_src(ts_parser.adapter.language, ODIN2026_SCM, "odin2026_migration.scm")
-                if mig_query_ok {
-                    c009_diags := c009_scm_run(file_path, mig_root, file_lines_mig, &mig_query)
-                    c010_diags := c010_scm_run(file_path, mig_root, file_lines_mig, &mig_query)
-                    unload_query(&mig_query)
-                    for d in dedupDiagnostics(c009_diags) { if d.message != "" { emitDiagnostic(d); diagnostics_found = true } }
-                    for d in dedupDiagnostics(c010_diags) { if d.message != "" { emitDiagnostic(d); diagnostics_found = true } }
+    // C009 + C010: Odin 2026 migration (shared SCM pass)
+    if rule_enabled("C009", "correctness", opts) || rule_enabled("C010", "correctness", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            lines := strings.split(string(content), "\n")
+            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+            if tree_ok {
+                defer ts_tree_delete(tree)
+                root := getRootNode(tree)
+                if !ts_node_is_null(root) {
+                    q, q_ok := load_query_src(ts_parser.adapter.language, ODIN2026_SCM, "odin2026_migration.scm")
+                    if q_ok {
+                        if rule_enabled("C009", "correctness", opts) {
+                            for d in dedupDiagnostics(c009_scm_run(file_path, root, lines, &q)) {
+                                if d.message != "" { emitDiagnostic(d); violations += 1 }
+                            }
+                        }
+                        if rule_enabled("C010", "correctness", opts) {
+                            for d in dedupDiagnostics(c010_scm_run(file_path, root, lines, &q)) {
+                                if d.message != "" { emitDiagnostic(d); violations += 1 }
+                            }
+                        }
+                        unload_query(&q)
+                    }
                 }
             }
         }
     }
 
     // C011: FFI safety — ts_*_new without defer ts_*_delete
-    file_content_ffi, ffi_read_err := os.read_entire_file_from_path(file_path, context.allocator)
-    if ffi_read_err == nil {
-        defer delete(file_content_ffi)
-        file_lines_ffi := strings.split(string(file_content_ffi), "\n")
-        ffi_tree, ffi_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_ffi))
-        if ffi_tree_ok {
-            defer ts_tree_delete(ffi_tree)
-            ffi_root := getRootNode(ffi_tree)
-            if !ts_node_is_null(ffi_root) {
-                ffi_query, ffi_query_ok := load_query_src(ts_parser.adapter.language, FFI_SAFETY_SCM, "ffi_safety.scm")
-                if ffi_query_ok {
-                    c011_diags := c011_scm_run(file_path, ffi_root, file_lines_ffi, &ffi_query)
-                    unload_query(&ffi_query)
-                    for d in dedupDiagnostics(c011_diags) { if d.message != "" { emitDiagnostic(d); diagnostics_found = true } }
-                }
-            }
-        }
-    }
-
-    // C012: Semantic ownership naming (opt-in via --enable-c012)
-    if c012_enabled {
-        file_content_c012, c012sem_read_err := os.read_entire_file_from_path(file_path, context.allocator)
-        if c012sem_read_err == nil {
-            defer delete(file_content_c012)
-            file_lines_c012sem := strings.split(string(file_content_c012), "\n")
-
-            c012sem_tree, c012sem_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_c012))
-            if c012sem_tree_ok {
-                defer ts_tree_delete(c012sem_tree)
-                c012sem_root := getRootNode(c012sem_tree)
-                if !ts_node_is_null(c012sem_root) {
-                    c012_query, c012_query_ok := load_query_src(ts_parser.adapter.language, C012_RULES_SCM, "c012_rules.scm")
-                    if c012_query_ok {
-                        c012_diags := c012_scm_run(file_path, c012sem_root, file_lines_c012sem, &c012_query)
-                        unload_query(&c012_query)
-                        unique_c012 := dedupDiagnostics(c012_diags)
-                        for d in unique_c012 {
-                            if d.message != "" {
-                                emitDiagnostic(d)
-                                diagnostics_found = true
-                            }
+    if rule_enabled("C011", "correctness", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            lines := strings.split(string(content), "\n")
+            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+            if tree_ok {
+                defer ts_tree_delete(tree)
+                root := getRootNode(tree)
+                if !ts_node_is_null(root) {
+                    q, q_ok := load_query_src(ts_parser.adapter.language, FFI_SAFETY_SCM, "ffi_safety.scm")
+                    if q_ok {
+                        diags := c011_scm_run(file_path, root, lines, &q)
+                        unload_query(&q)
+                        for d in dedupDiagnostics(diags) {
+                            if d.message != "" { emitDiagnostic(d); violations += 1 }
                         }
                     }
                 }
@@ -397,19 +237,98 @@ main :: proc() {
         }
     }
 
-    // Also run stub rule for now
-    stub_diag, stub_found := stubRule(file_path)
-    if stub_found {
-        emitDiagnostic(stub_diag)
-        diagnostics_found = true
+    // C012: Semantic ownership naming (opt-in)
+    if rule_enabled("C012", "style", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            lines := strings.split(string(content), "\n")
+            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+            if tree_ok {
+                defer ts_tree_delete(tree)
+                root := getRootNode(tree)
+                if !ts_node_is_null(root) {
+                    q, q_ok := load_query_src(ts_parser.adapter.language, C012_RULES_SCM, "c012_rules.scm")
+                    if q_ok {
+                        diags := c012_scm_run(file_path, root, lines, &q)
+                        unload_query(&q)
+                        for d in dedupDiagnostics(diags) {
+                            if d.message != "" { emitDiagnostic(d); violations += 1 }
+                        }
+                    }
+                }
+            }
+        }
     }
-    
-    if diagnostics_found {
-        deinitTreeSitterParser(ts_parser)
-        os.exit(1)  // Exit with error code for findings
+
+    return violations, false
+}
+
+// =============================================================================
+// Entry point
+// =============================================================================
+
+// main delegates to _main so that defers run cleanly before os.exit.
+main :: proc() {
+    os.exit(_main())
+}
+
+_main :: proc() -> int {
+    opts, parse_ok := parse_args(os.args[1:])
+    if !parse_ok { return 2 }
+
+    if opts.show_version { print_version(); return 0 }
+    if opts.show_help    { print_help();    return 0 }
+    if opts.list_rules   { print_list_rules(); return 0 }
+
+    if len(opts.targets) == 0 {
+        fmt.eprintln("error: no target specified. Run 'odin-lint --help' for usage.")
+        return 2
     }
-    
-    deinitTreeSitterParser(ts_parser)
-    fmt.println("No diagnostics found")
-    os.exit(0)
+
+    // Collect all .odin files from targets
+    files := collect_odin_files(opts.targets[:], opts.recursive, opts.include_vendor)
+    defer {
+        for f in files { delete(f) }
+        delete(files)
+    }
+
+    if len(files) == 0 {
+        fmt.eprintln("warning: no .odin files found in specified targets")
+        return 0
+    }
+
+    ts_parser, ts_ok := initTreeSitterParser()
+    if !ts_ok {
+        fmt.eprintln("error: failed to initialize tree-sitter parser")
+        return 2
+    }
+    defer deinitTreeSitterParser(ts_parser)
+
+    total_violations      := 0
+    files_with_violations := 0
+    had_error             := false
+
+    for file_path in files {
+        v, err := analyze_file(file_path, &ts_parser, opts)
+        if err { had_error = true; continue }
+        if v > 0 {
+            total_violations      += v
+            files_with_violations += 1
+        }
+    }
+
+    if had_error { return 2 }
+
+    if total_violations > 0 {
+        fmt.printf("%d violation(s) in %d file(s)\n", total_violations, files_with_violations)
+        return 1
+    }
+
+    if len(files) == 1 {
+        fmt.println("No diagnostics found")
+    } else {
+        fmt.printf("No violations found in %d file(s)\n", len(files))
+    }
+    return 0
 }
