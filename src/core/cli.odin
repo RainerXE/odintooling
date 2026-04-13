@@ -23,11 +23,13 @@ ODIN_GRAMMAR_VERSION :: "dev-2026-04"
 
 LintOptions :: struct {
     targets:        [dynamic]string,
-    recursive:      bool,       // default true
-    include_vendor: bool,       // default false
+    recursive:      bool,            // default true
+    include_vendor: bool,            // default false
     rule_filter:    [dynamic]string, // empty = all rules
-    tier_filter:    string,     // "" = all tiers
+    tier_filter:    string,          // "" = all tiers
     c012_enabled:   bool,
+    format:         string,          // "text" (default), "json", "sarif"
+    explain_rule:   string,          // rule ID for --explain, or ""
     show_help:      bool,
     show_version:   bool,
     list_rules:     bool,
@@ -56,6 +58,32 @@ parse_args :: proc(args: []string) -> (LintOptions, bool) {
             opts.c012_enabled = true
         case arg == "--ast":
             // legacy flag, silently ignored
+        case strings.has_prefix(arg, "--format="):
+            val := arg[len("--format="):]
+            if val != "text" && val != "json" && val != "sarif" {
+                fmt.eprintfln("error: unknown format '%s'. Valid formats: text, json, sarif", val)
+                return opts, false
+            }
+            opts.format = val
+        case arg == "--format":
+            if i+1 >= len(args) {
+                fmt.eprintln("error: --format requires a value (text, json, sarif)")
+                return opts, false
+            }
+            i += 1
+            val := args[i]
+            if val != "text" && val != "json" && val != "sarif" {
+                fmt.eprintfln("error: unknown format '%s'. Valid formats: text, json, sarif", val)
+                return opts, false
+            }
+            opts.format = val
+        case arg == "--explain":
+            if i+1 >= len(args) {
+                fmt.eprintln("error: --explain requires a rule ID (e.g. --explain C001)")
+                return opts, false
+            }
+            i += 1
+            opts.explain_rule = args[i]
         case strings.has_prefix(arg, "--rule="):
             append_rule_list(arg[len("--rule="):], &opts.rule_filter)
         case arg == "--rule":
@@ -127,8 +155,10 @@ print_help :: proc() {
     fmt.println("  --version              Print version and grammar info")
     fmt.println("  --help                 Show this help message")
     fmt.println("  --list-rules           List all rules (tab-separated: id, tier, message)")
+    fmt.println("  --explain C001         Show detailed documentation for a rule")
     fmt.println("  --rule C001,C002       Run only the specified rules")
     fmt.println("  --tier correctness     Run only rules of the given tier (correctness|style)")
+    fmt.println("  --format text|json|sarif  Output format (default: text)")
     fmt.println("  --non-recursive        Scan directories without recursing into subdirectories")
     fmt.println("  --include-vendor       Include vendor/ directories in scan")
     fmt.println("  --enable-c012          Enable C012 semantic ownership naming hints")
