@@ -624,6 +624,7 @@ M3   C002 + C003-C008 Rules              ✅ COMPLETE
   M3.2  C002 via SCM                     ✅ COMPLETE (April 12 2026)
   M3.3  C003-C008 + C012 Naming Rules    ✅ COMPLETE (April 13 2026)
   M3.4  Odin 2026 Migration + FFI Safety Rules ⬜ PLANNED
+  M3.5  Embed SCM files at compile time       ⬜ PLANNED
 M4   CLI Enhancements                    ⬜ PLANNED
 M4.5 Autofix Layer                       ⬜ PLANNED
 M5   OLS Plugin Integration              ⬜ PLANNED
@@ -862,10 +863,40 @@ promote to VIOLATION once false positive rate is confirmed below 5%.
 - [ ] C002 FP rate < 5% documented
 - [ ] C003-C008 implemented and tested
 - [ ] C009-C010 Odin 2026 migration rules implemented
-- [ ] C011 FFI safety rules implemented (P1, P2 at VIOLATION; P3 at CONTEXTUAL)
+- [ ] C011 FFI safety rules implemented (P2 at VIOLATION; P1/P3 deferred to M6)
 - [ ] All rules: 3 pass + 3 fail fixtures
 - [ ] Manual walker retired for C001 and C002 (Phase C complete)
 - [ ] Rule documentation template applied to all rules
+- [ ] SCM files embedded at compile time (M3.5) — binary is self-contained
+
+---
+
+#### ⬜ M3.5 — Embed SCM files at compile time
+
+**Rationale:** Every new rule requires new Odin handler code alongside the SCM
+pattern — recompile is unavoidable. Runtime-loading `.scm` files from relative
+paths adds deployment complexity (binary only works from repo root) with zero
+benefit over compile-time embedding.
+
+**Implementation:**
+1. Add `load_query_src` variant to `query_engine.odin` — takes SCM content as
+   `string` instead of a file path
+2. Create `src/core/embedded_queries.odin` — one `#load` constant per SCM file:
+   ```odin
+   MEMORY_SAFETY_SCM :: #load("../../ffi/tree_sitter/queries/memory_safety.scm", string)
+   NAMING_RULES_SCM  :: #load("../../ffi/tree_sitter/queries/naming_rules.scm",  string)
+   C012_RULES_SCM    :: #load("../../ffi/tree_sitter/queries/c012_rules.scm",     string)
+   ODIN2026_SCM      :: #load("../../ffi/tree_sitter/queries/odin2026_migration.scm", string)
+   FFI_SAFETY_SCM    :: #load("../../ffi/tree_sitter/queries/ffi_safety.scm",     string)
+   ```
+3. Update all `load_query(lang, "path/...")` call sites in `main.odin` to
+   `load_query_src(lang, CONSTANT_NAME)`
+4. Remove the file-path variant — no half-measures
+
+**Gate M3.5:**
+- [ ] `./artifacts/odin-lint <file>` works from any directory
+- [ ] No `.scm` files required at runtime
+- [ ] Build succeeds; all existing rule tests still pass
 
 ---
 
