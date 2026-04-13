@@ -623,8 +623,8 @@ M3   C002 + C003-C008 Rules              ✅ COMPLETE
   M3.1  Query Engine Integration         ✅ COMPLETE (April 12 2026)
   M3.2  C002 via SCM                     ✅ COMPLETE (April 12 2026)
   M3.3  C003-C008 + C012 Naming Rules    ✅ COMPLETE (April 13 2026)
-  M3.4  Odin 2026 Migration + FFI Safety Rules ⬜ PLANNED
-  M3.5  Embed SCM files at compile time       ⬜ PLANNED
+  M3.4  Odin 2026 Migration + FFI Safety Rules ✅ COMPLETE (April 13 2026)
+  M3.5  Embed SCM files at compile time       ✅ COMPLETE (April 13 2026)
 M4   CLI Enhancements                    ⬜ PLANNED
 M4.5 Autofix Layer                       ⬜ PLANNED
 M5   OLS Plugin Integration              ⬜ PLANNED
@@ -637,13 +637,14 @@ M6   Extended Rules (C101, C201, C202)   ⬜ PLANNED
 
 ### Current State Assessment — April 13 2026
 
-**Last reviewed:** April 13 2026. M3.1, M3.2, M3.3 complete. Starting M3.4.
+**Last reviewed:** April 13 2026. M3.1–M3.5 complete. All SCM rules embedded; binary is self-contained. Starting M4.
 
 #### What exists and compiles
 
 | File | Status | Notes |
 |------|--------|-------|
-| `src/core/query_engine.odin` | ✅ Complete | `load_query`, `run_query`, `free_query_results`, `unload_query` |
+| `src/core/query_engine.odin` | ✅ Complete | `load_query_src`, `run_query`, `free_query_results`, `unload_query` |
+| `src/core/embedded_queries.odin` | ✅ Complete | `#load` constants for all 5 SCM files (M3.5) |
 | `src/core/tree_sitter_bindings.odin` | ✅ Complete | Full query API + `ts_node_parent` for scope walking |
 | `ffi/tree_sitter/queries/memory_safety.scm` | ✅ Complete | Captures `@freed_var` + `@cleanup_fn` for both plain and qualified calls |
 | `ffi/tree_sitter/queries/naming_rules.scm` | ✅ Complete | C003 `@proc_name`, C007 `@struct_name`/`@enum_name` captures |
@@ -736,7 +737,7 @@ Gate M3.3 results:
 - C007: 2 violations detected on fixture; clean code silent; 67 violations in RuiShin
 - C012: 5 INFO hits on violations fixture; clean fixture silent; default-off confirmed
 
-#### ⬜ M3.4 — Odin 2026 Migration Rules + FFI Safety (NEW in V7.1/V7.2)
+#### ✅ M3.4 — Odin 2026 Migration Rules + FFI Safety — COMPLETE (April 13 2026)
 
 **Context: three concrete rules that deliver immediate value in the April 2026
 Odin landscape, all implementable with the SCM query engine and no type-system
@@ -871,7 +872,7 @@ promote to VIOLATION once false positive rate is confirmed below 5%.
 
 ---
 
-#### ⬜ M3.5 — Embed SCM files at compile time
+#### ✅ M3.5 — Embed SCM files at compile time — COMPLETE (April 13 2026)
 
 **Rationale:** Every new rule requires new Odin handler code alongside the SCM
 pattern — recompile is unavoidable. Runtime-loading `.scm` files from relative
@@ -893,10 +894,10 @@ benefit over compile-time embedding.
    `load_query_src(lang, CONSTANT_NAME)`
 4. Remove the file-path variant — no half-measures
 
-**Gate M3.5:**
-- [ ] `./artifacts/odin-lint <file>` works from any directory
-- [ ] No `.scm` files required at runtime
-- [ ] Build succeeds; all existing rule tests still pass
+**Gate M3.5:** ✅ ALL PASSED
+- [x] `./artifacts/odin-lint <file>` works from any directory
+- [x] No `.scm` files required at runtime
+- [x] Build succeeds; all existing rule tests still pass
 
 ---
 
