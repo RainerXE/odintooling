@@ -237,6 +237,9 @@ main :: proc() {
     registerRule(&registry, C006Rule())  // STYLE category (c006-STY-Public.odin)
     registerRule(&registry, C007Rule())  // STYLE category (c007-STY-Types.odin)
     registerRule(&registry, C008Rule())  // STYLE category (c008-STY-Acronyms.odin)
+    registerRule(&registry, C009Rule())  // CORRECTNESS (c009-MIG-OsOld.odin)
+    registerRule(&registry, C010Rule())  // CORRECTNESS (c010-MIG-SmallArray.odin)
+    registerRule(&registry, C011Rule())  // CORRECTNESS (c011-FFI-Safety.odin)
     registerRule(&registry, C012Rule())  // STYLE category (c012-SEM-Naming.odin) — opt-in
     
     // Apply all rules
@@ -317,6 +320,49 @@ main :: proc() {
                             diagnostics_found = true
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // C009: Deprecated core:os/old import
+    // C010: Small_Array superseded by [dynamic; N]T
+    file_content_mig, mig_read_err := os.read_entire_file_from_path(file_path, context.allocator)
+    if mig_read_err == nil {
+        defer delete(file_content_mig)
+        file_lines_mig := strings.split(string(file_content_mig), "\n")
+        mig_tree, mig_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_mig))
+        if mig_tree_ok {
+            defer ts_tree_delete(mig_tree)
+            mig_root := getRootNode(mig_tree)
+            if !ts_node_is_null(mig_root) {
+                mig_query, mig_query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/odin2026_migration.scm")
+                if mig_query_ok {
+                    c009_diags := c009_scm_run(file_path, mig_root, file_lines_mig, &mig_query)
+                    c010_diags := c010_scm_run(file_path, mig_root, file_lines_mig, &mig_query)
+                    unload_query(&mig_query)
+                    for d in dedupDiagnostics(c009_diags) { if d.message != "" { emitDiagnostic(d); diagnostics_found = true } }
+                    for d in dedupDiagnostics(c010_diags) { if d.message != "" { emitDiagnostic(d); diagnostics_found = true } }
+                }
+            }
+        }
+    }
+
+    // C011: FFI safety — ts_*_new without defer ts_*_delete
+    file_content_ffi, ffi_read_err := os.read_entire_file_from_path(file_path, context.allocator)
+    if ffi_read_err == nil {
+        defer delete(file_content_ffi)
+        file_lines_ffi := strings.split(string(file_content_ffi), "\n")
+        ffi_tree, ffi_tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(file_content_ffi))
+        if ffi_tree_ok {
+            defer ts_tree_delete(ffi_tree)
+            ffi_root := getRootNode(ffi_tree)
+            if !ts_node_is_null(ffi_root) {
+                ffi_query, ffi_query_ok := load_query(ts_parser.adapter.language, "ffi/tree_sitter/queries/ffi_safety.scm")
+                if ffi_query_ok {
+                    c011_diags := c011_scm_run(file_path, ffi_root, file_lines_ffi, &ffi_query)
+                    unload_query(&ffi_query)
+                    for d in dedupDiagnostics(c011_diags) { if d.message != "" { emitDiagnostic(d); diagnostics_found = true } }
                 }
             }
         }
