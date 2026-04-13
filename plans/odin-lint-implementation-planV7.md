@@ -642,9 +642,9 @@ M3   C002 + C003-C008 Rules              ✅ COMPLETE
   M3.4  Odin 2026 Migration + FFI Safety Rules ✅ COMPLETE (April 13 2026)
   M3.5  Embed SCM files at compile time       ✅ COMPLETE (April 13 2026)
 M4   CLI Enhancements                    ✅ COMPLETE (April 13 2026)
-  M4.0  Targets + Core CLI              ✅ COMPLETE (April 13 2026)
+  M4.0  Targets + Core CLI + odin-lint.toml domains ✅ COMPLETE (April 13 2026)
   M4.1  Output Formats + Explain        ✅ COMPLETE (April 13 2026)
-M4.5 Autofix Layer                       ⬜ PLANNED
+M4.5 Autofix Layer                       ✅ COMPLETE (April 13 2026)
 M5   OLS Plugin Integration              ⬜ PLANNED
 M5.5 MCP Gateway                         ⬜ PLANNED
 M5.6 DNA Impact Analysis                 ⬜ PLANNED
@@ -940,10 +940,31 @@ Split into two sub-milestones to keep scope manageable.
 - `--rule C001,C002`: run only the specified rules (comma-separated)
 - `--tier correctness|style`: run only rules of the given tier
 
+**odin-lint.toml — Linter Domains (inspired by Biome v2)**
+
+Rather than always-on rules that generate noise, project-specific rule sets are
+activated via `[domains]` in `odin-lint.toml`. This pattern comes from Biome's
+"linter domains" feature (shipped June 2025) and eliminates the need to manually
+enable/disable groups of related rules.
+
+```toml
+[domains]
+ffi        = true   # enables C011 FFI safety rules (auto if ffi/ dir detected)
+odin_2026  = true   # enables C009 (os/old), C010 (Small_Array) migration rules
+semantic_naming = false  # enables C012 (opt-in, default off)
+
+[target]
+odin_version = "dev-2026-04"   # suppresses migration rules for older targets
+```
+
+Domain detection heuristics (when `odin-lint.toml` is absent or has no `[domains]`):
+- If `ffi/` directory exists at project root: `ffi = true` automatically
+- If `odin_version` is unset: migration rules fire with a CONTEXTUAL note
+
 **Output:**
 - Exit codes: `0` = clean, `1` = violations found, `2` = internal error
 - Summary line at end: `X violation(s) in Y file(s)`
-- `"Starting odin-lint"` banner removed from normal output (kept only in verbose/debug)
+- `"Starting odin-lint"` banner removed from normal output
 
 **Gate M4.0:**
 - [ ] `odin-lint ./src/` scans all `.odin` files recursively with warning
@@ -952,6 +973,8 @@ Split into two sub-milestones to keep scope manageable.
 - [ ] `--version` prints version + grammar info
 - [ ] `--rule C001` runs only C001; `--tier style` runs only style rules
 - [ ] Exit code `1` when violations found, `0` when clean
+- [ ] `[domains]` config activates/suppresses correct rule groups
+- [ ] `ffi` domain auto-detected from `ffi/` directory presence
 - [ ] Summary line printed after all files processed
 - [ ] Our codebase: `0` violations, exit code `0`
 
@@ -988,7 +1011,10 @@ FixEdit :: struct {
 }
 ```
 
-- `--fix`: apply fixes in-place (writes files)
+- `--fix`: apply fixes in-place (writes files) — safe mechanical transforms only
+- `--unsafe-fix`: apply fixes that change API surface (e.g. C009 os2 migration
+  where the new `core:os` API differs from `core:os/old`). Requires explicit
+  opt-in; inspired by Ruff's `--unsafe-fix` distinction.
 - `--propose`: dry-run — prints before/after diff for each fixable violation without writing
 - C001 fix: insert `defer free(var)` after allocation
 - SCM captures provide exact source range (Phase D binding)
@@ -1415,6 +1441,40 @@ cases against the enum's member list.
     and has solved incremental sync and embedding storage cleanly. Its MIT license makes
     it freely referenceable. Always check what the ecosystem has already solved before
     designing from scratch.
+
+### From the April 2026 Ecosystem Survey
+
+*Full research document: `plans/clippy-lessons.md`*
+
+15. **Linter domains beat global config** — Biome v2's "linter domains" auto-enable
+    rule groups based on project context (detected dependencies, directories, declared
+    version). odin-lint adopts this as `[domains]` in `odin-lint.toml`: `ffi = true`
+    enables C011 automatically; `odin_2026 = true` enables migration rules C009/C010.
+    Auto-detect `ffi = true` when `ffi/` directory exists. This eliminates noise for
+    projects that don't need specific rule groups.
+
+16. **`--unsafe-fix` is a distinct tier from `--fix`** — Ruff distinguishes safe
+    mechanical fixes (rename, insert defer) from fixes that change API surface
+    (migration to a different API). C009 (`core:os/old` → `core:os`) is unsafe
+    because the new os API has different calling conventions. Never apply API-surface
+    changes silently.
+
+17. **Quality over quantity is the Clippy lesson** — Clippy entered a 12-week feature
+    freeze in mid-2025 because 750+ rules became unmaintainable. Every rule needs
+    indefinite maintenance as the language evolves. Our ~12 high-quality, well-tested
+    rules are healthier than racing to a large count.
+
+18. **The type-awareness problem has one practical solution for us** — Every major
+    ecosystem (Biome building its own type inference, Oxlint integrating typescript-go,
+    us integrating OLS) is solving the same problem: type-aware rules without compiler
+    cost. Our M6 approach — delegate to OLS which already has the full type-resolved
+    AST — is the right call. Do not build type inference from scratch.
+
+19. **Annotation-driven ownership semantics are mainstream** — Java's JSpecify +
+    NullAway is now standard in Spring Framework 7. The concept (opt-in annotations
+    that signal ownership/nullability to the linter) is the same as our C012 naming
+    conventions. The validation: this pattern is worth enough to major production
+    codebases that Google, Uber, and Spring all invested heavily in it.
 
 ---
 

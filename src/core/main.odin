@@ -302,6 +302,9 @@ _main :: proc() -> int {
         return 2
     }
 
+    // Load project config (odin-lint.toml or auto-detection).
+    opts.config = load_project_config(opts.targets[:])
+
     // Collect all .odin files from targets
     files := collect_odin_files(opts.targets[:], opts.recursive, opts.include_vendor)
     defer {
@@ -321,9 +324,10 @@ _main :: proc() -> int {
     }
     defer deinitTreeSitterParser(ts_parser)
 
-    // For JSON/SARIF, collect all diagnostics before formatting.
+    // For JSON/SARIF/fix/propose, collect all diagnostics before formatting.
     // For text, emit immediately (streaming) by passing nil collector.
-    use_collector := opts.format == "json" || opts.format == "sarif"
+    use_collector := opts.format == "json" || opts.format == "sarif" ||
+                     opts.fix_mode || opts.propose_mode
     collector     := make([dynamic]Diagnostic)
     defer delete(collector)
 
@@ -342,6 +346,19 @@ _main :: proc() -> int {
     }
 
     if had_error { return 2 }
+
+    // Autofix / propose mode: generate and apply/show fixes, then exit.
+    if opts.fix_mode || opts.propose_mode {
+        edits := generate_fixes(collector[:], opts.unsafe_fix_mode)
+        defer delete(edits)
+        if opts.propose_mode {
+            propose_fixes(edits[:])
+        } else {
+            _, fix_err := apply_fixes(edits[:])
+            if fix_err { return 2 }
+        }
+        return 1 if total_violations > 0 else 0
+    }
 
     // Emit output in the requested format
     switch opts.format {
