@@ -537,6 +537,22 @@ DiagnosticType :: enum {
 | INTERNAL_ERROR | 🟣 | Report to developers |
 | INFO | 🔵 | FYI only |
 
+### Rule Tiers
+
+| Tier | Rules | Default | Notes |
+|------|-------|---------|-------|
+| `correctness` | C001, C002, C011 | always-on | Definite bugs |
+| `migration` | C009, C010 | always-on (warn) | Deprecation migrations — matches Ruff's `pyupgrade` category |
+| `style` | C003-C008 | always-on | Naming conventions |
+| `semantic` | C012, C101, C201, C202 | opt-in | Type-gated, requires OLS or flag |
+
+The `migration` tier is new in V7.2. Rules like C009 (`core:os/old`) and C010
+(`Small_Array`) are not style violations and not correctness bugs — they are
+time-bounded deprecation migrations. Treating them as a distinct tier allows:
+- Suppressing them for projects intentionally targeting older Odin versions
+- CI pipelines that want to error on `correctness` but only warn on `migration`
+- Clear documentation: "this code will stop compiling in Q3 2026"
+
 ---
 
 ## 10. Future Vision: odintooling Suite
@@ -625,12 +641,14 @@ M3   C002 + C003-C008 Rules              ✅ COMPLETE
   M3.3  C003-C008 + C012 Naming Rules    ✅ COMPLETE (April 13 2026)
   M3.4  Odin 2026 Migration + FFI Safety Rules ✅ COMPLETE (April 13 2026)
   M3.5  Embed SCM files at compile time       ✅ COMPLETE (April 13 2026)
-M4   CLI Enhancements                    ⬜ PLANNED
+M4   CLI Enhancements                    ✅ COMPLETE (April 13 2026)
+  M4.0  Targets + Core CLI              ✅ COMPLETE (April 13 2026)
+  M4.1  Output Formats + Explain        ✅ COMPLETE (April 13 2026)
 M4.5 Autofix Layer                       ⬜ PLANNED
 M5   OLS Plugin Integration              ⬜ PLANNED
 M5.5 MCP Gateway                         ⬜ PLANNED
 M5.6 DNA Impact Analysis                 ⬜ PLANNED
-M6   Extended Rules (C101, C201, C202)   ⬜ PLANNED
+M6   Extended Rules + C012 Type-Gated   ⬜ PLANNED (C101, C201, C202 + C012-T1/T2/T3)
 ```
 
 ---
@@ -903,14 +921,59 @@ benefit over compile-time embedding.
 
 ### ⬜ Milestone 4 — CLI Enhancements
 
-- `--help` and `--list-rules` flags
-- `--rule C001,C002` filter
-- JSON output (`--format json`)
+Split into two sub-milestones to keep scope manageable.
 
-**Gate 4:**
-- [ ] All flags working
-- [ ] JSON output valid against schema
-- [ ] [ ] `--explain` produces human-readable output for every rule in M3
+#### ⬜ M4.0 — Targets + Core CLI
+
+**Targets:**
+- Single file: `odin-lint file.odin`
+- Directory (recursive by default): `odin-lint ./src/`
+  - Prints a warning when scanning recursively: `"Warning: scanning recursively — use --non-recursive to scan top-level only"`
+  - `--non-recursive`: scan only the top-level directory, no subdirectories
+  - Skips `vendor/` directories by default
+  - `--include-vendor`: opt-in to include `vendor/` in the scan
+
+**Flags:**
+- `--version`: prints `odin-lint <version>` + `supports Odin dev-2026-04 (grammar: <hash>)`
+- `--help`: full usage text listing all rules, flags, and examples
+- `--list-rules`: machine-readable rule list (id, tier, message, one per line or JSON)
+- `--rule C001,C002`: run only the specified rules (comma-separated)
+- `--tier correctness|style`: run only rules of the given tier
+
+**Output:**
+- Exit codes: `0` = clean, `1` = violations found, `2` = internal error
+- Summary line at end: `X violation(s) in Y file(s)`
+- `"Starting odin-lint"` banner removed from normal output (kept only in verbose/debug)
+
+**Gate M4.0:**
+- [ ] `odin-lint ./src/` scans all `.odin` files recursively with warning
+- [ ] `--non-recursive` limits scan to top level
+- [ ] `vendor/` skipped by default; `--include-vendor` re-enables it
+- [ ] `--version` prints version + grammar info
+- [ ] `--rule C001` runs only C001; `--tier style` runs only style rules
+- [ ] Exit code `1` when violations found, `0` when clean
+- [ ] Summary line printed after all files processed
+- [ ] Our codebase: `0` violations, exit code `0`
+
+---
+
+#### ⬜ M4.1 — Output Formats + Explain
+
+- `--format text` (default, current behaviour)
+- `--format json`: JSON array of diagnostics — schema:
+  ```json
+  [{"file":"...","line":1,"column":1,"rule":"C001","tier":"correctness","message":"...","fix":"..."}]
+  ```
+- `--format sarif`: SARIF 2.1.0 for GitHub Actions / VS Code Problems panel
+- `--explain C011`: static rule documentation — rationale, what triggers it,
+  annotated code examples (pass + fail), how to fix
+
+**Gate M4.1:**
+- [ ] `--format json` output is valid JSON, passes schema check
+- [ ] `--format sarif` output is SARIF 2.1.0 — accepted by GitHub Actions problem matcher
+- [ ] `--format sarif` accepted by VS Code Problems panel
+- [ ] `--explain <rule_id>` works for every rule in C001–C012
+- [ ] `--explain` for unknown rule prints clear error, exits `2`
 
 ---
 
@@ -925,14 +988,15 @@ FixEdit :: struct {
 }
 ```
 
-- `--fix` and `--fix-dry-run` flags
+- `--fix`: apply fixes in-place (writes files)
+- `--propose`: dry-run — prints before/after diff for each fixable violation without writing
 - C001 fix: insert `defer free(var)` after allocation
 - SCM captures provide exact source range (Phase D binding)
-- Fix generation tested: correct position, correct content
 
 **Gate 4.5:**
 - [ ] `FixEdit` generation layer working for C001
 - [ ] `--fix` flag applies correct edit verified by re-lint
+- [ ] `--propose` shows before/after diff, no files written
 - [ ] SCM capture used for range — no text scanning
 
 ---
@@ -944,7 +1008,15 @@ FixEdit :: struct {
 - `textDocument/codeAction` for FixEdit
 - LSP integration test
 
+**Pre-implementation design task (before any M5 rule code):**
+Design a `SemanticContext` struct built once per file from `^ast.File` and
+passed to all rules — mirroring Oxlint's `LintContext → Semantic` pattern.
+Rules query the context; they do not re-walk the AST. This is a design document
+task, not a coding task, and must be done first. See
+`plans/linting-ecosystem-research-2026.md` → Oxlint section for rationale.
+
 **Gate 5:**
+- [ ] `SemanticContext` struct designed and reviewed before first rule written
 - [ ] Diagnostics appear in editor for all M3 rules
 - [ ] Quick fixes available for C001 and C002
 - [ ] LSP integration test passing
@@ -1092,6 +1164,55 @@ run_lint_denoise(code_snippet)  -> structured lint errors for AI to fix
 The `run_lint_denoise` tool is the foundation of the Incremental Denoising
 workflow (see Section 13).
 
+#### Reference: CodeGraph Schema
+
+Before finalising the SQLite schema, review the CodeGraph project
+(https://github.com/colbymchenry/codegraph) as a reference implementation.
+It is MIT-licensed, uses tree-sitter + SQLite + MCP — the same stack — and
+has solved several problems worth studying:
+
+- **Incremental sync via git hooks** — `codegraph sync` only re-indexes
+  changed files. The git hook approach is clean and zero-friction for
+  developers. Consider adopting the same pattern for `odin_lint_graph.db`.
+
+- **Schema design** — their `nodes`/`edges`/`files` table separation is
+  worth comparing to our `functions`/`calls`/`variables`/`usages` split.
+  Key question: do we need a separate `variables` table or can variable
+  usage be folded into `edges` with a kind discriminator?
+
+- **`node_vectors` / `vector_map` tables** — their approach to storing
+  embeddings alongside the graph in the same SQLite file (using sqlite-vss)
+  is cleaner than a separate `symbols.vec` file. Worth adopting.
+
+- **What CodeGraph does NOT have that we do** — memory roles, lint
+  violations, C012 ownership tags, `_owned`/`_borrowed` inference. These
+  are our differentiators. The call graph is infrastructure; the semantic
+  enrichment is the value.
+
+CodeGraph does not support Odin. Adding Odin would require writing
+`.scm` query files and registering the grammar — work already done in
+odin-lint. If a contribution to CodeGraph is ever appropriate, this would
+be the natural path.
+
+#### LSP Call Hierarchy (Long-term Architecture Note)
+
+LSP 3.16 (2020) already defines `callHierarchy/incomingCalls` and
+`callHierarchy/outgoingCalls` — exactly "who calls this proc" and "what
+does this proc call." This is the architecturally correct home for call
+graph data: every language server author knows their language best and can
+implement it with full type resolution.
+
+When M5 OLS integration is complete, investigate implementing proper
+`callHierarchy` support in OLS. If successful, the `get_dna_context` MCP
+tool can delegate to OLS for call graph data instead of the SQLite store —
+giving type-accurate results with zero additional indexing overhead, and
+making the call graph available to every LSP-compatible editor for free.
+
+This is the long-term answer. The SQLite graph in M5.6 is the pragmatic
+short-term answer while OLS `callHierarchy` does not yet exist. Both can
+coexist: SQLite for offline/batch queries and AI export; OLS delegation
+for real-time editor queries once available.
+
 **Gate 5.6:**
 - [ ] Call radius (callers + callees) exported for all symbols
 - [ ] Memory origin role tagged for all procedures
@@ -1099,15 +1220,58 @@ workflow (see Section 13).
 - [ ] `run_lint_denoise` MCP tool runs linter on a snippet, returns JSON errors
 - [ ] Optional `--embed` flag generates vector embeddings
 - [ ] Tested: AI agent can navigate call graph without reading source files
+- [ ] CodeGraph schema reviewed; schema decisions documented in `src/db/call_graph.odin`
+- [ ] Git hook for incremental sync evaluated and decision recorded
 
 ---
 
-### ⬜ Milestone 6 — Extended Rules (NEW in V7)
+### ⬜ Milestone 6 — Extended Rules + C012 Type-Gated Phase
 
-*Prerequisite: Gate 5 (OLS type information available)*
+*Prerequisite: Gate 5 (OLS plugin + type resolution working)*
+*Full C012 M6 spec: `plans/C012-SEMANTIC-NAMING-TODO.md` → M6 Implementation Detail*
 
-These rules require more than tree-sitter can provide alone.
-They depend on OLS type resolution.
+M6 has two categories of work that share the same prerequisite — OLS type
+resolution — so they are batched together:
+
+1. **New correctness rules** (C101, C201, C202) that require control-flow
+   and type analysis beyond what tree-sitter alone provides
+2. **C012 Phase 2** — the type-gated sub-rules that complete the Semantic
+   Ownership Naming system started in M3.3
+
+All C012 Phase 2 rules live on the **OLS plugin path** (`src/rules/correctness/`),
+not the tree-sitter CLI path. They use `^ast.File` + OLS type resolution.
+The implementation file is `src/rules/correctness/c012-OLS-Naming.odin` (new).
+
+---
+
+#### C012 Phase 2 — Type-Gated Ownership Naming
+
+*Full spec in `plans/C012-SEMANTIC-NAMING-TODO.md`. Summary:*
+
+| Sub-rule | Fires when | Requires |
+|----------|-----------|----------|
+| C012-T1 | `mem.Allocator`-typed var has no `alloc`/`allocator` in name | OLS type resolution |
+| C012-T2 | `mem.Arena`/`virtual.Arena`-typed var has no `arena` in name | OLS type resolution |
+| C012-T3 | Return of allocator-role proc not named `_owned` | OLS + DNA export |
+| C012-S4 | Arena type declarations (promoted from M3.3 heuristic) | OLS type resolution |
+
+All fire INFO tier. All require `--enable-c012`. All silent by default.
+
+The `dna_exporter.odin` `infer_memory_role_from_name` proc is updated in M6
+to use `_owned` return variable names as the primary signal for
+`"memory_role": "allocator"` — making C012 adoption directly improve the
+quality of the AI export layer.
+
+**Gate C012-T (part of Gate 6):**
+- [ ] C012-T1 fires on `mem.Allocator`-typed variable with opaque name
+- [ ] C012-T2 fires on `mem.Arena`-typed variable without `arena` in name
+- [ ] C012-T3 fires when callee has `memory_role == "allocator"` and LHS has no `_owned`
+- [ ] All T sub-rules silent when C012 disabled (default)
+- [ ] `symbols.json` `memory_role` populated for 100% of procedures
+- [ ] 3 pass + 3 fail fixtures for each T sub-rule
+- [ ] False positive rate on RuiShin < 5%
+
+---
 
 #### C101: Context Integrity
 
@@ -1151,10 +1315,12 @@ Analytic step: OLS resolves the switched type to an enum, compares covered
 cases against the enum's member list.
 
 **Gate 6:**
+- [ ] C012-T1, T2, T3 implemented and tested (see C012-T gate above)
+- [ ] `dna_exporter.odin` populates `memory_role` for all procedures
 - [ ] C101 false positive rate < 5% on RuiShin
 - [ ] C201 fires on unchecked error returns, silent on intentional ignores
 - [ ] C202 fires on incomplete enum switches
-- [ ] All rules: 3 pass + 3 fail fixtures
+- [ ] All new rules: 3 pass + 3 fail fixtures
 
 ---
 
@@ -1235,6 +1401,21 @@ cases against the enum's member list.
     correct code is already written), and they encode hard-won knowledge about a
     class of bugs that is genuinely hard to reason about without the rule.
 
+13. **Call graph intelligence architecturally belongs in the LSP, not in individual
+    tools** — LSP 3.16 already defines `callHierarchy/incomingCalls` and
+    `callHierarchy/outgoingCalls`. Every language server author knows their language
+    best and already has the type-resolved AST. The right long-term solution is OLS
+    implementing `callHierarchy` properly; the right short-term solution is the SQLite
+    graph in M5.6. Build the SQLite layer now; plan to delegate to OLS once it's ready.
+    The two can coexist indefinitely — SQLite for batch/AI export, OLS for live editor
+    queries.
+
+14. **Study reference implementations before designing storage schemas** — CodeGraph
+    (github.com/colbymchenry/codegraph) uses the same tree-sitter + SQLite + MCP stack
+    and has solved incremental sync and embedding storage cleanly. Its MIT license makes
+    it freely referenceable. Always check what the ecosystem has already solved before
+    designing from scratch.
+
 ---
 
 ## Gate Summary
@@ -1253,7 +1434,7 @@ cases against the enum's member list.
 | 5 | OLS plugin | Editor diagnostics + code actions | ⬜ |
 | 5.5 | MCP gateway | Agent-driven semantic editing + symbol export | ⬜ |
 | 5.6 | DNA Impact Analysis | Call radius + memory roles + hybrid graph-RAG | ⬜ |
-| 6 | Extended rules | C101, C201, C202 via OLS type info | ⬜ |
+| 6 | Extended rules + C012-T | C101, C201, C202 via OLS + C012 type-gated phase | ⬜ |
 
 ---
 
