@@ -645,7 +645,7 @@ M4   CLI Enhancements                    ✅ COMPLETE (April 13 2026)
   M4.0  Targets + Core CLI + odin-lint.toml domains ✅ COMPLETE (April 13 2026)
   M4.1  Output Formats + Explain        ✅ COMPLETE (April 13 2026)
 M4.5 Autofix Layer                       ✅ COMPLETE (April 13 2026)
-M5   OLS Plugin Integration              ⬜ PLANNED
+M5   OLS Plugin Integration              🔧 IN PROGRESS (April 17 2026)
 M5.5 MCP Gateway                         ⬜ PLANNED
 M5.6 DNA Impact Analysis                 ⬜ PLANNED
 M6   Extended Rules + C012 Type-Gated   ⬜ PLANNED (C101, C201, C202 + C012-T1/T2/T3)
@@ -1027,25 +1027,45 @@ FixEdit :: struct {
 
 ---
 
-### ⬜ Milestone 5 — OLS Plugin Integration
+### 🔧 Milestone 5 — OLS Plugin Integration
 
-- Rules via `^ast.File` path
-- `publishDiagnostics` LSP notification
-- `textDocument/codeAction` for FixEdit
-- LSP integration test
+**Architecture decision (April 17 2026):** Rather than building a second AST-based
+pipeline using `^ast.File`, M5 reuses the existing tree-sitter rule matchers (C001–C011)
+via the in-memory document text provided by OLS. This avoids duplicating all rules,
+ships faster, and keeps the linting behaviour identical between CLI and editor.
 
-**Pre-implementation design task (before any M5 rule code):**
-Design a `SemanticContext` struct built once per file from `^ast.File` and
-passed to all rules — mirroring Oxlint's `LintContext → Semantic` pattern.
-Rules query the context; they do not re-walk the AST. This is a design document
-task, not a coding task, and must be done first. See
-`plans/linting-ecosystem-research-2026.md` → Oxlint section for rationale.
+The `SemanticContext` / `^ast.File` path originally planned here is deferred to M6
+for type-gated rules (C012) which genuinely need OLS type resolution.
+
+#### What was built (April 17 2026)
+
+**OLS plugin system** (`vendor/ols/src/server/plugin.odin` — new, all changes in OLS fork):
+- `OLSPlugin` C-ABI interface with capability flags, lifecycle, and merge-all hooks
+- Plugin registry: `plugin_registry_init` / `plugin_registry_shutdown`
+- `plugin_run_diagnostics` — called on file open and save; zero cost when no plugins loaded
+- `plugin_run_code_actions` — appended to `get_code_actions` result
+- 6 OLS files modified; full changelog in `plans/plugin-interface-spec.md`
+
+**odin-lint plugin** (`src/core/plugin_main.odin` — replaced):
+- Exports `ols_plugin_get :: proc "c" () -> ^OLSPluginDescriptor`
+- `init`: initialises tree-sitter parser once; refuses load on API version mismatch
+- `on_diagnostics`: runs all rules (C001–C011) against in-memory editor text
+- `free_result`: heap-frees list, items array, and all message cstrings
+- Build: `./scripts/build_plugin.sh` → `artifacts/odin-lint-plugin.dylib`
+
+#### Remaining M5 work
+
+- [ ] **Build and smoke-test**: `./scripts/build_plugin.sh` succeeds; no linker errors
+- [ ] **Editor integration**: register plugin in `ols.json`; verify diagnostics appear in VS Code / Zed
+- [ ] **Code actions (M5.5)**: wire `on_code_actions` to the autofix layer (`generate_fixes`)
+- [ ] **Suppression in plugin context**: ensure `// odin-lint:ignore=C001` is respected using in-memory lines
+- [ ] **LSP integration test**: script that starts OLS, sends didOpen, checks publishDiagnostics
 
 **Gate 5:**
-- [ ] `SemanticContext` struct designed and reviewed before first rule written
-- [ ] Diagnostics appear in editor for all M3 rules
-- [ ] Quick fixes available for C001 and C002
-- [ ] LSP integration test passing
+- [ ] Plugin builds without errors: `./scripts/build_plugin.sh`
+- [ ] Diagnostics appear in editor for all C001–C011 rules on file save/open
+- [ ] No false positives on `// odin-lint:ignore` suppressed lines
+- [ ] Zero violations on our own codebase when loaded as plugin
 
 ---
 

@@ -90,7 +90,7 @@ convertToASTNode :: proc(ts_node: TSNode, source: string) -> ASTNode {
     node_type := "unknown" // Default value
     if node_type_ptr != nil {
         // Convert ^u8 to string - tree-sitter returns null-terminated C strings
-        node_type = strings.string_from_null_terminated_ptr(node_type_ptr, 1024)
+        node_type = string(node_type_ptr)
     }
     
     // Get node position
