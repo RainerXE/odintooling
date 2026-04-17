@@ -1,21 +1,42 @@
 #!/bin/bash
+# Build odin-lint as an OLS plugin shared library.
+# Output: artifacts/odin-lint-plugin.dylib  (macOS)
+#         artifacts/odin-lint-plugin.so      (Linux)
+#         artifacts/odin-lint-plugin.dll     (Windows)
 
-echo "Building odin-lint plugin as shared library..."
+set -e
 
-# Create artifacts directory if it doesn't exist
+echo "Building odin-lint OLS plugin..."
+
 mkdir -p artifacts
 
-# Build the plugin as a shared library
-odin build src/integrations/ols \
-    -out:artifacts/odin_lint_plugin \
+odin build src/core \
+    -out:artifacts/odin-lint-plugin \
     -build-mode:shared \
-    -define:DEBUG=true
+    -extra-linker-flags:"ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
+    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a"
 
-if [ $? -eq 0 ]; then
-    echo "Plugin build successful!"
-    echo "Shared library created at: artifacts/odin_lint_plugin.so (or .dll/.dylib)"
-    ls -la artifacts/odin_lint_plugin*
-else
-    echo "Plugin build failed with exit code: $?"
-    exit 1
-fi
+# Rename to canonical .dylib/.so extension for clarity
+case "$(uname -s)" in
+    Darwin)
+        # Odin emits .dylib on macOS
+        PLUGIN_OUT="artifacts/odin-lint-plugin.dylib"
+        ;;
+    Linux)
+        PLUGIN_OUT="artifacts/odin-lint-plugin.so"
+        ;;
+    *)
+        PLUGIN_OUT="artifacts/odin-lint-plugin"
+        ;;
+esac
+
+echo ""
+echo "✅ Plugin build successful!"
+echo "   Output: ${PLUGIN_OUT}"
+echo ""
+echo "Register in ols.json:"
+echo '  {'
+echo '    "plugins": ['
+echo "      { \"name\": \"odin-lint\", \"path\": \"$(pwd)/${PLUGIN_OUT}\", \"enabled\": true }"
+echo '    ]'
+echo '  }'
