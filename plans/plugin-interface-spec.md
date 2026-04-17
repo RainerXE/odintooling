@@ -330,13 +330,20 @@ All changes to OLS code are documented here for the upstream PR reviewer.
 
 | Date | File | Change | Reason |
 |------|------|--------|--------|
-| — | `src/server/plugin.odin` | New file: plugin interface types + registry | Core of the plugin system |
-| — | `src/server/diagnostics.odin` | Add `Plugin` to `DiagnosticType` enum | Separate plugin diagnostics from checker diagnostics |
-| — | `src/server/check.odin` | Call `plugin_run_diagnostics` after check completes | Trigger plugin diagnostic refresh on save |
-| — | `src/server/action.odin` | Call `plugin_run_code_actions` in `get_code_actions` | Merge plugin fixes into editor action menu |
-| — | `src/common/config.odin` | Add `plugins: []PluginConfig` to `Config` | Allow plugins to be listed in `ols.json` |
+| 2026-04-17 | `src/server/plugin.odin` | **New file**: all types (§3), registry, `plugin_registry_init`, `plugin_run_diagnostics`, `plugin_run_code_actions`, `plugin_registry_shutdown` | Core of the plugin system |
+| 2026-04-17 | `src/server/diagnostics.odin` | Add `Plugin` to `DiagnosticType` enum | Separate plugin diagnostics from Syntax/Unused/Check |
+| 2026-04-17 | `src/common/config.odin` | Add `PluginConfig` struct; add `plugins: []PluginConfig` to `Config` | Runtime plugin list populated from ols.json |
+| 2026-04-17 | `src/server/types.odin` | Add `OlsPluginConfig` struct; add `plugins: [dynamic]OlsPluginConfig` to `OlsConfig` | JSON schema for ols.json plugin entries |
+| 2026-04-17 | `src/server/requests.odin` | `read_ols_initialize_options`: copy `ols_config.plugins` → `config.plugins`; `request_initialize`: call `plugin_registry_init` after config is loaded; `notification_did_open` / `notification_did_save`: call `plugin_run_diagnostics` before `push_diagnostics` | Wire up config loading and per-file diagnostic triggering |
+| 2026-04-17 | `src/server/action.odin` | Call `plugin_run_code_actions` at end of `get_code_actions` before return | Merge plugin quick-fixes into the editor's action menu |
+| 2026-04-17 | `src/main.odin` | Add `defer server.plugin_registry_shutdown()` after check worker start | Ensure plugins are unloaded cleanly on exit |
 
-*Dates will be filled in as changes are implemented.*
+### Implementation notes
+
+- `plugin_registry_init` is called at the end of `request_initialize` (not at process start) because `config.plugins` is only populated after `read_ols_initialize_options` runs.
+- `plugin_run_diagnostics` is **nil-safe** and a no-op when no plugins are loaded, so there is zero overhead in the common case.
+- Plugin diagnostics are cleared and re-added on every open/save so stale results never linger.
+- The `check.odin` worker is deliberately **not** wired to plugins: `odin check` is directory-scoped while `on_diagnostics` is file-scoped. Plugins get fresh results on the next save.
 
 ---
 
