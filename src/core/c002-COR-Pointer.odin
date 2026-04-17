@@ -62,7 +62,7 @@ Position :: struct {
 c002_scm_block_scope :: proc(node: TSNode) -> u32 {
     current := ts_node_parent(node)
     for !ts_node_is_null(current) {
-        type_str := strings.string_from_null_terminated_ptr(ts_node_type(current), 64)
+        type_str := string(ts_node_type(current))
         if type_str == "block" {
             return ts_node_start_byte(current)
         }
@@ -144,7 +144,7 @@ c002_scm_matcher :: proc(
 // c002_extract_ident_text_from_tsnode extracts identifier text from a TSNode
 // using file_lines for reliable byte-offset-free extraction.
 c002_extract_ident_text_from_tsnode :: proc(node: TSNode, lines: []string) -> string {
-    type_str := strings.string_from_null_terminated_ptr(ts_node_type(node), 64)
+    type_str := string(ts_node_type(node))
     if type_str != "identifier" { return "" }
 
     pt      := ts_node_start_point(node)

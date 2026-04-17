@@ -110,7 +110,7 @@ naming_scm_run :: proc(
 
 // naming_extract_text extracts identifier text from a TSNode using file_lines.
 naming_extract_text :: proc(node: TSNode, lines: []string) -> string {
-    type_str := strings.string_from_null_terminated_ptr(ts_node_type(node), 64)
+    type_str := string(ts_node_type(node))
     if type_str != "identifier" { return "" }
 
     pt      := ts_node_start_point(node)

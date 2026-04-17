@@ -24,7 +24,7 @@ CompiledQuery :: struct {
 // label: human-readable name used in error messages (e.g. "memory_safety.scm")
 // Returns: (query, true) on success, ({}, false) on error.
 load_query_src :: proc(language: rawptr, src: string, label: string = "<embedded>") -> (CompiledQuery, bool) {
-    source_ptr := cast(^u8)raw_data(src) if len(src) > 0 else nil
+    source_ptr := cstring(cast(^u8)raw_data(src)) if len(src) > 0 else nil
 
     error_offset: u32
     error_type:   TSQueryError
