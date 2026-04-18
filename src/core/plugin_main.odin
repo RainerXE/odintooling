@@ -210,86 +210,10 @@ _ols_on_diagnostics :: proc "c" (doc: ^OLSPluginDocument) -> ^OLSPluginDiagnosti
 	return _diags_to_ols_list(diags[:])
 }
 
-// _plugin_run_rules runs all enabled rules against in-memory content.
-// This mirrors analyze_file in main.odin but uses provided content instead
-// of reading from disk, so linting reflects the editor's current buffer.
+// _plugin_run_rules delegates to analyze_content (src/core/analyze_content.odin).
 @(private = "file")
 _plugin_run_rules :: proc(file_path: string, content: string, diags: ^[dynamic]Diagnostic) {
-	// Split lines once; shared across all rule passes.
-	lines := strings.split(content, "\n")
-	defer delete(lines)
-
-	// ── C001: Memory allocation without defer free (AST walker) ──────────────
-	ast_root, ast_ok := parseToAST(_ts_parser.adapter, content)
-	if ast_ok {
-		for d in dedupDiagnostics(c001_matcher(file_path, &ast_root, lines)) {
-			if d.diag_type != .NONE && d.diag_type != .INTERNAL_ERROR {
-				append(diags, d)
-			}
-		}
-	}
-
-	// ── SCM-based rules: parse tree-sitter tree once, run multiple queries ────
-	tree, tree_ok := parseSource(_ts_parser.adapter.parser, _ts_parser.adapter.language, content)
-	if !tree_ok {
-		return
-	}
-	defer ts_tree_delete(tree)
-
-	root := getRootNode(tree)
-	if ts_node_is_null(root) {
-		return
-	}
-
-	// C002: Double-free / use-after-free detection
-	{
-		q, q_ok := load_query_src(_ts_parser.adapter.language, MEMORY_SAFETY_SCM, "memory_safety.scm")
-		if q_ok {
-			for d in dedupDiagnostics(c002_scm_matcher(file_path, root, lines, &q)) {
-				append(diags, d)
-			}
-			unload_query(&q)
-		}
-	}
-
-	// C003 + C007: Naming conventions (shared SCM pass)
-	{
-		q, q_ok := load_query_src(_ts_parser.adapter.language, NAMING_RULES_SCM, "naming_rules.scm")
-		if q_ok {
-			for d in dedupDiagnostics(naming_scm_run(file_path, root, lines, &q)) {
-				append(diags, d)
-			}
-			unload_query(&q)
-		}
-	}
-
-	// C009 + C010: Odin 2026 migration helpers
-	{
-		q, q_ok := load_query_src(_ts_parser.adapter.language, ODIN2026_SCM, "odin2026_migration.scm")
-		if q_ok {
-			for d in dedupDiagnostics(c009_scm_run(file_path, root, lines, &q)) {
-				append(diags, d)
-			}
-			for d in dedupDiagnostics(c010_scm_run(file_path, root, lines, &q)) {
-				append(diags, d)
-			}
-			unload_query(&q)
-		}
-	}
-
-	// C011: FFI resource safety (ts_*_new without defer ts_*_delete)
-	{
-		q, q_ok := load_query_src(_ts_parser.adapter.language, FFI_SAFETY_SCM, "ffi_safety.scm")
-		if q_ok {
-			for d in dedupDiagnostics(c011_scm_run(file_path, root, lines, &q)) {
-				append(diags, d)
-			}
-			unload_query(&q)
-		}
-	}
-
-	// C012: Semantic ownership naming (disabled by default; enabled by domain config)
-	// Not included in the plugin by default; can be opt-in via future config hook.
+	analyze_content(file_path, content, &_ts_parser, diags)
 }
 
 
