@@ -646,8 +646,8 @@ M4   CLI Enhancements                    ✅ COMPLETE (April 13 2026)
   M4.1  Output Formats + Explain        ✅ COMPLETE (April 13 2026)
 M4.5 Autofix Layer                       ✅ COMPLETE (April 13 2026)
 M5   OLS Plugin Integration              ✅ COMPLETE (April 18 2026)
-M5.5 MCP Gateway                         🔧 IN PROGRESS (April 18 2026)
-M5.6 DNA Impact Analysis                 ⬜ PLANNED
+M5.5 MCP Gateway                         ✅ COMPLETE (April 18 2026)
+M5.6 DNA Impact Analysis                 🔧 IN PROGRESS
 M6   Extended Rules + C012 Type-Gated   ⬜ PLANNED (C101, C201, C202 + C012-T1/T2/T3)
 ```
 
@@ -1076,7 +1076,7 @@ for type-gated rules (C012) which genuinely need OLS type resolution.
 
 ---
 
-### ⬜ Milestone 5.5 — MCP Gateway
+### ✅ Milestone 5.5 — MCP Gateway — COMPLETE (April 18 2026)
 
 Pure Odin MCP server exposing odin-lint analysis to Claude Code and other
 MCP clients. No Node.js or external runtime — the MCP protocol (JSON-RPC 2.0
@@ -1171,14 +1171,14 @@ Same tree-sitter linker flags as `build.sh` (src/mcp imports src/core which uses
 }
 ```
 
-**Gate 5.5:**
-- [ ] `./scripts/build_mcp.sh` exits 0
-- [ ] `initialize` + `tools/list` respond correctly (5 tools listed)
-- [ ] `lint_file` returns real C001 diagnostics for `tests/C001_COR_MEMORY/c001_basic.odin`
-- [ ] `lint_snippet` returns diagnostics for in-memory source with violations
-- [ ] `lint_fix` returns proposed fix edits as JSON
-- [ ] `./scripts/test_our_codebase.sh` still passes (no regressions)
-- [ ] `vendor/odin-mcp` has no imports from `src/core` (verified by grep)
+**Gate 5.5:** ✅ PASSED (April 18 2026)
+- [x] `./scripts/build_mcp.sh` exits 0
+- [x] `initialize` + `tools/list` respond correctly (5 tools listed)
+- [x] `lint_file` returns real C001 diagnostics for `tests/C001_COR_MEMORY/c001_basic.odin`
+- [x] `lint_snippet` returns diagnostics for in-memory source with violations
+- [x] `lint_fix` returns proposed fix edits as JSON
+- [x] `./scripts/test_our_codebase.sh` still passes (no regressions)
+- [x] `vendor/odin-mcp` has no imports from `src/core` (verified by grep)
 
 ---
 
@@ -1644,9 +1644,9 @@ cases against the enum's member list.
 | 3.4 | C009-C011 | Migration + FFI safety rules | ⬜ |
 | 4 | CLI enhancements | --help, --list-rules, JSON output, --explain | ⬜ |
 | 4.5 | Autofix | --fix flag, FixEdit + SCM capture binding | ⬜ |
-| 5 | OLS plugin | Editor diagnostics + code actions | ⬜ |
-| 5.5 | MCP gateway | Agent-driven semantic editing + symbol export | ⬜ |
-| 5.6 | DNA Impact Analysis | Call radius + memory roles + hybrid graph-RAG | ⬜ |
+| 5 | OLS plugin | Editor diagnostics + code actions | ✅ |
+| 5.5 | MCP gateway | Agent-driven semantic editing + symbol export | ✅ |
+| 5.6 | DNA Impact Analysis | Call radius + memory roles + hybrid graph-RAG | 🔧 |
 | 6 | Extended rules + C012-T | C101, C201, C202 via OLS + C012 type-gated phase | ⬜ |
 
 ---
@@ -1875,5 +1875,5 @@ codebase structurally, execute lint analysis, and apply verified fixes.
 ---
 
 *Version: 7.2*
-*Last status review: April 11 2026*
+*Last status review: April 18 2026*
 *Previous version: odin-lint-implementation-planV6.md (V7.0 was the internal draft)*
