@@ -647,8 +647,8 @@ M4   CLI Enhancements                    ✅ COMPLETE (April 13 2026)
 M4.5 Autofix Layer                       ✅ COMPLETE (April 13 2026)
 M5   OLS Plugin Integration              ✅ COMPLETE (April 18 2026)
 M5.5 MCP Gateway                         ✅ COMPLETE (April 18 2026)
-M5.6 DNA Impact Analysis                 🔧 IN PROGRESS
-M6   Extended Rules + C012 Type-Gated   ⬜ PLANNED (C101, C201, C202 + C012-T1/T2/T3)
+M5.6 DNA Impact Analysis + Code Graph    🔧 IN PROGRESS
+M6   Extended Rules + Refactoring        ⬜ PLANNED (C013-C015, C101/C201/C202, C012-T, rename, LSP call hierarchy)
 ```
 
 ---
@@ -1182,244 +1182,265 @@ Same tree-sitter linker flags as `build.sh` (src/mcp imports src/core which uses
 
 ---
 
-### ⬜ Milestone 5.6 — DNA Impact Analysis (NEW in V7.1)
+### 🔧 Milestone 5.6 — DNA Impact Analysis + Code Graph
 
-*Prerequisite: Gate 5.5 (MCP gateway + symbols.json working)*
+*Prerequisite: Gate 5.5 — PASSED*
 
-This milestone extends the DNA export layer from a flat structural graph into
-a full hybrid graph-RAG index. Research consensus (Oct 2025): combining AST
-structural graphs with vector embeddings improves factual correctness ~8% over
-either approach alone.
+This milestone builds the Odin code graph: a native, SQLite-backed semantic
+index that gives AI agents and future lint rules instant structural access to
+the codebase without scanning files. It is the Odin-native answer to
+CodeGraph (github.com/colbymchenry/codegraph), which has no Odin support,
+runs on Node.js (reliability issues in practice), and has no memory ownership
+semantics. Our differentiators: native binary, Odin-specific memory roles,
+lint violations on nodes, and cross-FFI awareness.
 
-#### What M5.6 Adds to `dna_exporter.odin`
+#### Architecture decisions (April 18 2026)
 
-**0. SQLite Call Graph Store**
+**Decision 1 — SQLite is required, not optional.**
+CodeGraph's entire MCP tool surface runs on SQL queries. Without it, graph
+tools degrade to in-memory JSON lookups. We write SQLite C FFI bindings
+(`src/db/sqlite_bindings.odin`) using the same pattern as tree-sitter — native
+`.a` static library, no WASM, no Node. Stored in `.codegraph/odin_lint_graph.db`.
 
-The call graph is persisted to SQLite (`odin_lint_graph.db`) rather than
-kept solely in `symbols.json`. This makes the graph queryable without loading
-everything into memory — critical for large codebases.
+**Decision 2 — `nodes` + `edges` schema, not 4 separate tables.**
+CodeGraph's `nodes`/`edges` model with kind discriminators is more general and
+maintainable than our originally planned `functions`/`calls`/`variables`/`usages`
+split. We extend it with Odin-specific columns that CodeGraph lacks entirely.
 
-```sql
-CREATE TABLE functions (
-    id      INTEGER PRIMARY KEY,
-    name    TEXT NOT NULL,
-    file    TEXT NOT NULL,
-    line    INTEGER,
-    role    TEXT   -- "allocator" | "deallocator" | "borrower" | "neutral"
-);
-CREATE TABLE calls (
-    caller_id  INTEGER REFERENCES functions(id),
-    callee_id  INTEGER REFERENCES functions(id),
-    line       INTEGER
-);
-CREATE TABLE variables (
-    id           INTEGER PRIMARY KEY,
-    name         TEXT,
-    type         TEXT,
-    function_id  INTEGER REFERENCES functions(id)
-);
-CREATE TABLE usages (
-    variable_id  INTEGER REFERENCES variables(id),
-    line         INTEGER,
-    kind         TEXT   -- "declare" | "read" | "write" | "free"
-);
-```
+**Decision 3 — Track `references` edges, not just `calls`.**
+To enable unused symbol detection (C013+) in M6, every edge kind must be
+captured: calls, type references, constant/variable references, imports. A
+symbol with zero incoming `references` edges and `is_exported = false` is dead
+code. Getting this right now makes C013+ free queries later.
 
-SQL enables queries that `symbols.json` cannot serve efficiently:
-```sql
--- Dangling pointer candidates: freed then used after free
-SELECT v.name, f.name as in_function
-FROM variables v
-JOIN usages free_use ON v.id = free_use.variable_id AND free_use.kind = 'free'
-JOIN usages after_use ON v.id = after_use.variable_id
-    AND after_use.line > free_use.line
-    AND after_use.kind = 'read'
-JOIN functions f ON v.function_id = f.id;
-```
+**Decision 4 — Two-pass extraction.**
+Pass 1: index all symbol declarations (proc, type, constant, variable) into
+`nodes`. Pass 2: resolve all call sites and references against the node index,
+writing `edges`. Unresolved references (cross-package, foreign imports) are
+stored as `unresolved_refs` for best-effort later resolution. Odin's explicit
+`import` declarations make cross-package resolution more reliable than JS/TS.
 
-`symbols.json` remains the portable export format for AI tooling.
-SQLite is the local query engine. Both are produced by `--export-symbols`.
+**Decision 5 — `language` column future-proofs C interop.**
+A `language TEXT DEFAULT 'odin'` column on `nodes` costs nothing now and
+enables C nodes (via tree-sitter-c grammar) in a future milestone. The FFI
+boundary is captured as `ffi_call` edges. C parsing deferred to M7+.
 
-**1. Call Radius Extraction**
+**Decision 6 — On-demand export, no file watcher.**
+CodeGraph uses filesystem watching (FSEvents/inotify). For M5.6, `--export-symbols`
+on-demand rebuild is sufficient. File watching is a later quality-of-life feature.
+Note: CodeGraph also does not use git hooks despite earlier speculation — filesystem
+watching is their approach, and on-demand beats both for an analysis tool.
 
-For every exported symbol, compute:
-- `callers`: list of procedures that call this symbol (impact radius)
-- `callees`: list of procedures this symbol calls (dependency set)
-- `call_depth`: shortest call chain from `main` to this symbol
+**Decision 7 — LSP Call Hierarchy deferred to M6.**
+The MCP tools (`get_dna_context`, `get_impact_radius`) fully cover the AI agent
+use case. LSP call hierarchy is editor polish on the same data. Deferring keeps
+M5.6 focused and avoids another OLS fork change cycle.
 
-This is the "Impact Radius" pattern from CodeGraph. It allows an AI agent to
-answer "if I change `check_block_for_c001`, what else breaks?" without scanning
-source code.
-
-```json
-{
-  "name": "check_block_for_c001",
-  "callers": ["analyze_file_c001", "run_all_rules"],
-  "callees": ["is_allocation_assignment", "extract_lhs_name", "emit_diagnostic"],
-  "call_depth": 2,
-  "allocates": ["file_lines"],
-  "frees": ["file_lines"],
-  "lint_violations": []
-}
-```
-
-**2. Memory Origin Tagging**
-
-Tag each procedure with its allocator role:
-- `"role": "allocator"` — the procedure creates and returns owned memory
-- `"role": "deallocator"` — the procedure frees memory passed to it
-- `"role": "borrower"` — uses memory without owning it
-- `"role": "neutral"` — no memory involvement
-
-This feeds C001 classification and teaches the AI model the ownership semantics
-of each procedure before it writes code.
-
-**3. Vector Embedding Generation (Optional, `--embed` flag)**
-
-Generate a text embedding for each procedure's signature + doc comment + lint
-results. Store in the `symbols.json` alongside structural data, or in a
-companion `symbols.vec` file (sqlite-vec format).
-
-This enables hybrid queries: `get_dna_context("procedures that allocate and are
-called from main")` can be answered structurally; `get_dna_context("procedures
-similar to this description")` uses vector similarity. Both are needed.
-
-#### New MCP Tools for M5.6
-
-```
-get_dna_context(proc_name)      -> subgraph: callers + callees + memory role
-get_impact_radius(proc_name)    -> all symbols transitively affected by change
-find_allocators()               -> all procedures tagged "allocator" role
-run_lint_denoise(code_snippet)  -> structured lint errors for AI to fix
-```
-
-The `run_lint_denoise` tool is the foundation of the Incremental Denoising
-workflow (see Section 13).
-
-#### Reference: CodeGraph Schema
-
-Before finalising the SQLite schema, review the CodeGraph project
-(https://github.com/colbymchenry/codegraph) as a reference implementation.
-It is MIT-licensed, uses tree-sitter + SQLite + MCP — the same stack — and
-has solved several problems worth studying:
-
-- **Incremental sync via git hooks** — `codegraph sync` only re-indexes
-  changed files. The git hook approach is clean and zero-friction for
-  developers. Consider adopting the same pattern for `odin_lint_graph.db`.
-
-- **Schema design** — their `nodes`/`edges`/`files` table separation is
-  worth comparing to our `functions`/`calls`/`variables`/`usages` split.
-  Key question: do we need a separate `variables` table or can variable
-  usage be folded into `edges` with a kind discriminator?
-
-- **`node_vectors` / `vector_map` tables** — their approach to storing
-  embeddings alongside the graph in the same SQLite file (using sqlite-vss)
-  is cleaner than a separate `symbols.vec` file. Worth adopting.
-
-- **What CodeGraph does NOT have that we do** — memory roles, lint
-  violations, C012 ownership tags, `_owned`/`_borrowed` inference. These
-  are our differentiators. The call graph is infrastructure; the semantic
-  enrichment is the value.
-
-CodeGraph does not support Odin. Adding Odin would require writing
-`.scm` query files and registering the grammar — work already done in
-odin-lint. If a contribution to CodeGraph is ever appropriate, this would
-be the natural path.
-
-#### LSP Call Hierarchy — M5.6 Deliverable
-
-LSP 3.16 defines `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`,
-and `callHierarchy/outgoingCalls`. This is exactly "who calls this proc" and "what
-does this proc call" — the same data as `get_dna_context`, served to the editor via
-the standard LSP protocol so VS Code, Zed, Neovim and any other LSP client gets
-"Show Call Hierarchy" for free.
-
-**What to build in M5.6:**
-
-1. **Add `CallHierarchy` to the plugin capability flags** (`vendor/ols/src/server/plugin.odin`):
-```odin
-PluginCapability :: enum u32 {
-    Diagnostics   = 0,
-    CodeActions   = 1,
-    Hover         = 2,
-    Completions   = 3,
-    Format        = 4,
-    Rename        = 5,
-    CallHierarchy = 6,   // NEW — incomingCalls + outgoingCalls from SQLite graph
-}
-```
-
-2. **Three new hooks on `OLSPlugin`**:
-```odin
-OLSCallHierarchyItem :: struct #packed {
-    name:           cstring,
-    kind:           i32,       // LSP SymbolKind (12 = Function)
-    uri:            cstring,
-    range_start_line, range_start_char: i32,
-    range_end_line,   range_end_char:   i32,
-}
-OLSCallHierarchyList :: struct #packed {
-    items: [^]OLSCallHierarchyItem,
-    count: i32,
-}
-
-// Hooks on OLSPlugin:
-on_prepare_call_hierarchy: proc "c" (doc: ^OLSDocument, pos: OLSPosition) -> ^OLSCallHierarchyList,
-on_incoming_calls:         proc "c" (item: ^OLSCallHierarchyItem) -> ^OLSCallHierarchyList,
-on_outgoing_calls:         proc "c" (item: ^OLSCallHierarchyItem) -> ^OLSCallHierarchyList,
-```
-
-3. **Wire the three new LSP request handlers in OLS** (`requests.odin`):
-   - `textDocument/prepareCallHierarchy` → `plugin_run_prepare_call_hierarchy`
-   - `callHierarchy/incomingCalls` → `plugin_run_incoming_calls`
-   - `callHierarchy/outgoingCalls` → `plugin_run_outgoing_calls`
-
-4. **Implement in `plugin_main.odin`**: query the SQLite graph for the symbol at
-   the requested position, return its callers/callees as `OLSCallHierarchyItem` lists.
-
-**Relationship between the two surfaces:**
-
-| Feature | MCP (AI agents) | OLS/LSP (editor) |
-|---|---|---|
-| Callers | `get_dna_context(name).callers` | `callHierarchy/incomingCalls` |
-| Callees | `get_dna_context(name).callees` | `callHierarchy/outgoingCalls` |
-| Impact radius | `get_impact_radius(name)` | (transitive call hierarchy in editor) |
-
-Both read from the same `odin_lint_graph.db` SQLite store. The MCP tools serve
-AI agents; the LSP hooks serve the editor. One index, two consumers.
-
-**Gate 5.6:**
-- [ ] Call radius (callers + callees) exported for all symbols
-- [ ] Memory origin role tagged for all procedures
-- [ ] `get_dna_context` MCP tool returns valid subgraph
-- [ ] `run_lint_denoise` MCP tool runs linter on a snippet, returns JSON errors
-- [ ] Optional `--embed` flag generates vector embeddings
-- [ ] Tested: AI agent can navigate call graph without reading source files
-- [ ] CodeGraph schema reviewed; schema decisions documented in `src/db/call_graph.odin`
-- [ ] Git hook for incremental sync evaluated and decision recorded
-- [ ] `CallHierarchy` capability added to OLS plugin interface
-- [ ] `textDocument/prepareCallHierarchy` wired in OLS `requests.odin`
-- [ ] `callHierarchy/incomingCalls` and `outgoingCalls` return results from SQLite graph
-- [ ] VS Code "Show Call Hierarchy" works on an Odin proc in the test workspace
+**Decision 8 — `run_lint_denoise` is a distinct tool, not an alias.**
+CodeGraph has no equivalent. This is the lint-grounded fix loop: structured JSON
+violations optimised for AI consumption (includes fix hints, source ranges).
+It is our primary differentiator over CodeGraph and worth the dedicated tool slot.
 
 ---
 
-### ⬜ Milestone 6 — Extended Rules + C012 Type-Gated Phase
+#### SQLite Schema (`src/db/`)
 
-*Prerequisite: Gate 5 (OLS plugin + type resolution working)*
+```sql
+-- nodes: every named symbol in the codebase
+CREATE TABLE nodes (
+    id            INTEGER PRIMARY KEY,
+    name          TEXT NOT NULL,
+    qualified_name TEXT,             -- "package.name" for cross-package resolution
+    kind          TEXT NOT NULL,     -- "proc" | "type" | "constant" | "variable" | "import"
+    language      TEXT DEFAULT 'odin', -- future: "c" for cross-FFI nodes
+    file          TEXT NOT NULL,
+    line          INTEGER,
+    signature     TEXT,              -- proc signature string
+    is_exported   INTEGER DEFAULT 0, -- 1 if accessible outside package
+    memory_role   TEXT,              -- "allocator"|"deallocator"|"borrower"|"neutral"
+    lint_violations TEXT             -- JSON array of rule IDs that fired on this node
+);
+
+-- edges: all relationships between nodes
+CREATE TABLE edges (
+    id          INTEGER PRIMARY KEY,
+    source_id   INTEGER NOT NULL REFERENCES nodes(id),
+    target_id   INTEGER NOT NULL REFERENCES nodes(id),
+    kind        TEXT NOT NULL,  -- "calls"|"references"|"imports"|"returns"|"ffi_call"
+    line        INTEGER         -- line in source where the edge originates
+);
+
+-- files: indexed source files with content hash for incremental re-index
+CREATE TABLE files (
+    path         TEXT PRIMARY KEY,
+    content_hash TEXT NOT NULL,
+    indexed_at   INTEGER         -- unix timestamp
+);
+
+-- unresolved_refs: call sites / references that couldn't be matched to a node in pass 2
+CREATE TABLE unresolved_refs (
+    id          INTEGER PRIMARY KEY,
+    source_id   INTEGER REFERENCES nodes(id),
+    target_name TEXT NOT NULL,
+    kind        TEXT NOT NULL,
+    file        TEXT,
+    line        INTEGER
+);
+
+-- FTS5 for fast symbol search (codegraph_search equivalent)
+CREATE VIRTUAL TABLE nodes_fts USING fts5(name, qualified_name, content='nodes', content_rowid='id');
+```
+
+Key queries enabled:
+
+```sql
+-- Impact radius: everything that calls proc X (direct)
+SELECT n.name, n.file, n.line FROM nodes n
+JOIN edges e ON e.source_id = n.id
+WHERE e.target_id = ? AND e.kind = 'calls';
+
+-- Dead code candidates: non-exported symbols with no incoming references
+SELECT name, kind, file, line FROM nodes
+WHERE is_exported = 0
+AND id NOT IN (SELECT target_id FROM edges WHERE kind IN ('calls','references'));
+
+-- All allocators
+SELECT name, file, line FROM nodes
+WHERE memory_role = 'allocator';
+```
+
+#### `dna_exporter.odin` — extraction pipeline
+
+```
+src/core/dna_exporter.odin
+  export_symbols(paths []string, db_path string)
+    Pass 1 — index_declarations():
+      For each .odin file: run SCM query for proc/type/constant/variable declarations
+      INSERT INTO nodes; INSERT INTO files with content hash
+    Pass 2 — resolve_references():
+      For each .odin file: run SCM query for call_expression + selector_expression
+      Match callee name against nodes table (qualified_name first, name fallback)
+      INSERT INTO edges (kind='calls'|'references'|'imports')
+      Unmatched → INSERT INTO unresolved_refs
+    Pass 3 — tag_memory_roles():
+      For each proc node: inspect its outgoing 'calls' edges
+      Heuristic: calls make/new + returns pointer/slice → "allocator"
+      Heuristic: calls free/delete on parameter → "deallocator"
+      C012 _owned suffix on return var → "allocator" (if present)
+      Otherwise "borrower" or "neutral"
+    Pass 4 — attach_lint_violations():
+      Run analyze_content on each file; map violation line→node
+      UPDATE nodes SET lint_violations = '["C001"]' where matched
+    Pass 5 — write_symbols_json():
+      Export nodes + edges as symbols.json (portable AI format)
+      Rebuild FTS5 index
+```
+
+SCM queries needed (new files in `ffi/tree_sitter/queries/`):
+- `declarations.scm` — captures proc/type/constant/variable declarations
+- `references.scm` — captures call_expression, selector_expression, import_declaration
+
+#### MCP tool surface for M5.6
+
+| Tool | Status | Notes |
+|------|--------|-------|
+| `get_dna_context(proc_name)` | New | callers + callees + memory_role + lint_violations |
+| `get_impact_radius(proc_name, depth?)` | New | transitive callers up to depth (default 3) |
+| `find_allocators()` | New | all nodes with memory_role = "allocator" |
+| `find_all_references(symbol)` | New | all edges targeting symbol — foundation for rename |
+| `run_lint_denoise(source)` | New | lint_snippet output optimised for AI fix loop |
+| `get_symbol(file, symbol)` | Promote stub | query nodes table by name + file |
+| `export_symbols(path?)` | Promote stub | trigger export_symbols pipeline, return db path |
+
+`run_lint_denoise` differs from `lint_snippet` in output shape: it returns
+structured fix objects (rule_id, line, col, fix_text, source_range) rather than
+the flat diagnostic array, making it directly consumable by an AI fix agent.
+
+`find_all_references` is the prerequisite for `rename_symbol` (M6). Exposing it
+now as a standalone MCP tool lets it be validated before refactoring is built on top.
+
+#### Future milestones prepared by M5.6
+
+| Feature | Milestone | How M5.6 enables it |
+|---------|-----------|---------------------|
+| Unused symbol rules (C013+) | M6 | `references` edges + `is_exported` → SQL query |
+| Rename refactoring | M6 | `find_all_references` → bulk FixEdits |
+| LSP Call Hierarchy | M6 | same SQLite graph, new OLS hooks |
+| C cross-FFI call graph | M7+ | `language` column already in schema |
+| Vector embeddings (`--embed`) | M7+ | `node_vectors` table already planned in schema |
+
+**Gate 5.6:**
+- [ ] SQLite C FFI bindings compile and link (`src/db/sqlite_bindings.odin`)
+- [ ] `nodes` + `edges` + `files` + `unresolved_refs` schema created in `.codegraph/odin_lint_graph.db`
+- [ ] FTS5 virtual table built and synced on export
+- [ ] `--export-symbols` CLI flag runs all 5 passes; exits 0 on our codebase
+- [ ] `symbols.json` produced alongside the SQLite db
+- [ ] Memory roles tagged for all proc nodes in our codebase
+- [ ] Lint violations attached to nodes where C001–C011 fire
+- [ ] `get_dna_context` returns callers + callees + memory_role
+- [ ] `get_impact_radius` returns correct transitive callers (depth=2 verified by hand)
+- [ ] `find_allocators` returns only nodes with memory_role="allocator"
+- [ ] `find_all_references` returns all edge targets for a named symbol
+- [ ] `run_lint_denoise` returns structured fix objects (not just diagnostic array)
+- [ ] `get_symbol` stub promoted — queries nodes table, returns signature + location
+- [ ] `export_symbols` stub promoted — triggers pipeline, returns db path
+- [ ] Dead code query demonstrated: non-exported proc with 0 incoming references found
+- [ ] `./scripts/test_our_codebase.sh` still passes (no regressions)
+
+---
+
+### ⬜ Milestone 6 — Extended Rules + Refactoring Foundation
+
+*Prerequisite: Gate 5.6 (code graph + SQLite working)*
 *Full C012 M6 spec: `plans/C012-SEMANTIC-NAMING-TODO.md` → M6 Implementation Detail*
 
-M6 has two categories of work that share the same prerequisite — OLS type
-resolution — so they are batched together:
+M6 has three categories of work, all enabled by the M5.6 code graph:
 
-1. **New correctness rules** (C101, C201, C202) that require control-flow
-   and type analysis beyond what tree-sitter alone provides
-2. **C012 Phase 2** — the type-gated sub-rules that complete the Semantic
-   Ownership Naming system started in M3.3
+1. **Dead code rules** (C013+) — graph queries over `nodes`/`edges`
+2. **Type-gated correctness rules** (C012 Phase 2, C101, C201, C202) — require OLS type resolution
+3. **Refactoring foundation** — rename + LSP Call Hierarchy, built on `find_all_references`
 
 All C012 Phase 2 rules live on the **OLS plugin path** (`src/rules/correctness/`),
 not the tree-sitter CLI path. They use `^ast.File` + OLS type resolution.
 The implementation file is `src/rules/correctness/c012-OLS-Naming.odin` (new).
+
+---
+
+#### C013+: Dead Code Rules (graph-query tier)
+
+These rules are free queries over the M5.6 graph. No new AST analysis needed.
+
+| Rule | Fires when | Query |
+|------|-----------|-------|
+| C013 | Import declared but never referenced | `imports` edge from file with no outgoing `references` edges using that package |
+| C014 | Proc declared, not exported, zero callers | `is_exported=0` + no incoming `calls` edges |
+| C015 | Constant/variable declared, never referenced | `is_exported=0` + no incoming `references` edges |
+
+All fire INFO tier. All configurable via `[domains] dead_code = true` in `odin-lint.toml`.
+
+These are the "import not used" / "symbol never used" diagnostics the Java
+Language Server provides. With the code graph built in M5.6, implementing them
+is a matter of writing the lint rule handlers that issue SQL queries — no new
+tree-sitter work required.
+
+---
+
+#### Refactoring Foundation
+
+**`rename_symbol` MCP tool** — built directly on `find_all_references` (M5.6):
+1. Query all incoming `calls` + `references` edges for the target node
+2. Generate a `FixEdit` per location (file, line, col, old_name → new_name)
+3. Return the edit set; client applies via `workspace/applyEdit` or `--fix`
+
+Safe rename: does not touch string literals, comments, or doc strings.
+Unsafe rename (`--unsafe-fix`): includes string literals (e.g. reflection-based code).
+
+**LSP Call Hierarchy** — deferred from M5.6:
+- Add `CallHierarchy` capability to OLS plugin interface
+- Wire `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`,
+  `callHierarchy/outgoingCalls` in `requests.odin`
+- Implement in `plugin_main.odin`: query SQLite graph for callers/callees
+- VS Code "Show Call Hierarchy" works on any Odin proc
 
 ---
 
@@ -1494,11 +1515,18 @@ Analytic step: OLS resolves the switched type to an enum, compares covered
 cases against the enum's member list.
 
 **Gate 6:**
+- [ ] C013 fires on unused imports, silent when import is used
+- [ ] C014 fires on non-exported proc with zero callers
+- [ ] C015 fires on non-exported constant/variable with zero references
+- [ ] `dead_code` domain in `odin-lint.toml` enables/suppresses C013–C015
 - [ ] C012-T1, T2, T3 implemented and tested (see C012-T gate above)
-- [ ] `dna_exporter.odin` populates `memory_role` for all procedures
+- [ ] `dna_exporter.odin` populates `memory_role` for all procedures (improves on M5.6 heuristics via OLS types)
 - [ ] C101 false positive rate < 5% on RuiShin
 - [ ] C201 fires on unchecked error returns, silent on intentional ignores
 - [ ] C202 fires on incomplete enum switches
+- [ ] `rename_symbol` MCP tool generates correct FixEdit set for a proc rename
+- [ ] Rename does not touch string literals (safe mode)
+- [ ] LSP Call Hierarchy: VS Code "Show Call Hierarchy" works on an Odin proc
 - [ ] All new rules: 3 pass + 3 fail fixtures
 
 ---
@@ -1595,6 +1623,36 @@ cases against the enum's member list.
     it freely referenceable. Always check what the ecosystem has already solved before
     designing from scratch.
 
+### New for V7.3: Code Graph Architecture (April 18 2026)
+
+20. **CodeGraph analysis confirmed `nodes`/`edges` over 4-table split** — CodeGraph
+    (github.com/colbymchenry/codegraph) uses `nodes`/`edges` with kind discriminators
+    (22 node kinds, 12 edge kinds). This is more general and maintainable than a fixed
+    `functions`/`calls`/`variables`/`usages` schema. We extend it with Odin-specific
+    columns (`memory_role`, `lint_violations`) that CodeGraph lacks entirely.
+
+21. **Track `references` edges from day one** — if you only track `calls`, unused
+    import/type/constant detection requires a full rescan later. Capturing all
+    reference kinds at index time makes C013-C015 (dead code rules) free SQL queries
+    in M6. Schema decisions made once; rules added incrementally.
+
+22. **The C FFI boundary is naturally represented as `ffi_call` edges with a `language`
+    column** — Odin's `foreign` declarations are explicit and tree-sitter-parseable.
+    Adding `language TEXT DEFAULT 'odin'` now costs nothing and future-proofs for
+    cross-FFI call graph analysis (M7+). C macros remain a known limitation of
+    tree-sitter-c: macro-generated functions are invisible to the graph.
+
+23. **`find_all_references` is the prerequisite for safe rename** — every refactoring
+    operation that renames a symbol decomposes to: find all references + generate a
+    FixEdit per location. Building this as a standalone MCP tool in M5.6 lets it be
+    validated before `rename_symbol` is layered on top in M6.
+
+24. **Dead code detection is a graph query, not a lint rule** — "unused import" and
+    "symbol never used" diagnostics (C013-C015) are `SELECT` statements over the
+    `nodes`/`edges` tables. They require no new tree-sitter patterns and no new rule
+    infrastructure — just the graph from M5.6. Deferring them to M6 is the correct
+    sequencing; they fall out naturally once the graph exists.
+
 ### From the April 2026 Ecosystem Survey
 
 *Full research document: `plans/clippy-lessons.md`*
@@ -1646,8 +1704,8 @@ cases against the enum's member list.
 | 4.5 | Autofix | --fix flag, FixEdit + SCM capture binding | ⬜ |
 | 5 | OLS plugin | Editor diagnostics + code actions | ✅ |
 | 5.5 | MCP gateway | Agent-driven semantic editing + symbol export | ✅ |
-| 5.6 | DNA Impact Analysis | Call radius + memory roles + hybrid graph-RAG | 🔧 |
-| 6 | Extended rules + C012-T | C101, C201, C202 via OLS + C012 type-gated phase | ⬜ |
+| 5.6 | DNA Impact Analysis + Code Graph | SQLite graph, MCP tools, memory roles, find_all_references | 🔧 |
+| 6 | Extended rules + Refactoring | C013-C015 dead code, C101/C201/C202, rename, LSP call hierarchy | ⬜ |
 
 ---
 
