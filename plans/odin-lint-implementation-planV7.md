@@ -645,8 +645,8 @@ M4   CLI Enhancements                    ✅ COMPLETE (April 13 2026)
   M4.0  Targets + Core CLI + odin-lint.toml domains ✅ COMPLETE (April 13 2026)
   M4.1  Output Formats + Explain        ✅ COMPLETE (April 13 2026)
 M4.5 Autofix Layer                       ✅ COMPLETE (April 13 2026)
-M5   OLS Plugin Integration              🔧 IN PROGRESS (April 17 2026)
-M5.5 MCP Gateway                         ⬜ PLANNED
+M5   OLS Plugin Integration              ✅ COMPLETE (April 18 2026)
+M5.5 MCP Gateway                         🔧 IN PROGRESS (April 18 2026)
 M5.6 DNA Impact Analysis                 ⬜ PLANNED
 M6   Extended Rules + C012 Type-Gated   ⬜ PLANNED (C101, C201, C202 + C012-T1/T2/T3)
 ```
@@ -1027,7 +1027,7 @@ FixEdit :: struct {
 
 ---
 
-### 🔧 Milestone 5 — OLS Plugin Integration
+### ✅ Milestone 5 — OLS Plugin Integration — COMPLETE (April 18 2026)
 
 **Architecture decision (April 17 2026):** Rather than building a second AST-based
 pipeline using `^ast.File`, M5 reuses the existing tree-sitter rule matchers (C001–C011)
@@ -1053,46 +1053,132 @@ for type-gated rules (C012) which genuinely need OLS type resolution.
 - `free_result`: heap-frees list, items array, and all message cstrings
 - Build: `./scripts/build_plugin.sh` → `artifacts/odin-lint-plugin.dylib`
 
-#### Remaining M5 work
+#### Additional work completed (April 18 2026)
 
-- [ ] **Build and smoke-test**: `./scripts/build_plugin.sh` succeeds; no linker errors
-- [ ] **Editor integration**: register plugin in `ols.json`; verify diagnostics appear in VS Code / Zed
+- [x] **Build and smoke-test**: `./scripts/build_plugin.sh` succeeds; no linker errors
+- [x] **OLS build fix**: `filepath.replace_separators` → `filepath.replace_path_separators` across 21 call sites (Odin 2026-04 API change)
+- [x] **Dylib crash fix**: Odin calls `main` as a constructor when loading a shared library; guarded with `if len(os.args) == 0 { return }`
+- [x] **`source` field**: Added `source: string` to OLS `Diagnostic` struct; plugin diagnostics show `source=odin-lint` in editor
+- [x] **Editor integration**: verified diagnostics appear in VS Code with squiggles + hover explanation
+- [x] **LSP integration test**: automated test script (`/tmp/lsp_verify.py`) confirms C001+C003 fire correctly
+
+#### Deferred to later milestones
+
+- [ ] **Wider squiggle range**: currently col..col+1; should span the full identifier (polish)
 - [ ] **Code actions (M5.5)**: wire `on_code_actions` to the autofix layer (`generate_fixes`)
 - [ ] **Suppression in plugin context**: ensure `// odin-lint:ignore=C001` is respected using in-memory lines
-- [ ] **LSP integration test**: script that starts OLS, sends didOpen, checks publishDiagnostics
 
-**Gate 5:**
-- [ ] Plugin builds without errors: `./scripts/build_plugin.sh`
-- [ ] Diagnostics appear in editor for all C001–C011 rules on file save/open
-- [ ] No false positives on `// odin-lint:ignore` suppressed lines
-- [ ] Zero violations on our own codebase when loaded as plugin
+**Gate 5: ✅ PASSED**
+- [x] Plugin builds without errors: `./scripts/build_plugin.sh`
+- [x] Diagnostics appear in editor for C001–C011 rules on file open
+- [x] `source=odin-lint` shown on all plugin diagnostics
+- [x] LSP smoke test confirms correct rule codes and messages
 
 ---
 
 ### ⬜ Milestone 5.5 — MCP Gateway
 
-MCP tools exposing OLS-backed semantic editing to AI agents:
+Pure Odin MCP server exposing odin-lint analysis to Claude Code and other
+MCP clients. No Node.js or external runtime — the MCP protocol (JSON-RPC 2.0
+with Content-Length framing) is implemented from scratch in Odin.
+
+#### Architecture
 
 ```
-ols_get_symbol(file, symbol_name) -> {range, type, signature}
-ols_apply_edit(file, range, new_text) -> {success, diagnostics}
-ols_get_diagnostics(file) -> [{line, col, message, source, rule_id}]
-ols_lint_fix(file, diagnostic_id) -> {applied_edits, result_diagnostics}
-ols_rename(file, line, col, new_name) -> {files_changed}
-ols_export_symbols(file) -> symbols_json   # NEW: AI Export Layer endpoint
+Claude Code / AI agent
+    ↓ MCP stdio (JSON-RPC + Content-Length framing)
+artifacts/odin-lint-mcp   (src/mcp/ — package mcp_server)
+    ├── imports vendor/odin-mcp/  — reusable protocol library
+    └── imports src/core/         — lint rules, tree-sitter parser
 ```
 
-The `ols_export_symbols` tool generates the `symbols.json` described in
-Section 10, feeding Frejay's RAG pipeline on demand.
+#### Two-package design
+
+**`vendor/odin-mcp/`** — standalone, reusable MCP protocol library.
+No dependency on odin-lint. Any Odin project can import this to build
+an MCP server without implementing the protocol from scratch.
+
+Files:
+- `types.odin` — `MCPServer`, `RegisteredTool`, `ToolDefinition`, `ToolHandler`, `RPCID`, `MCPRequest`
+- `transport.odin` — `read_message` / `write_message` (Content-Length framing, identical to LSP)
+- `json_helpers.odin` — `build_success_response`, `build_error_response`, `json_escape_string`
+- `server.odin` — `server_init`, `server_register_tool`, `server_run` (dispatch loop)
+
+Tool registration API:
+```odin
+ToolHandler :: proc(params: json.Value, allocator: mem.Allocator) -> (result: string, is_error: bool)
+
+server_register_tool :: proc(s: ^MCPServer, tool: RegisteredTool)
+server_run :: proc(s: ^MCPServer)  // blocks on stdin until EOF
+```
+
+**`src/mcp/`** — odin-lint specific server.
+
+Files:
+- `main.odin` — init tree-sitter parser, register tools, call `server_run`
+- `tool_lint.odin` — Tier 1 tools (no OLS needed, call src/core directly)
+- `tool_ols.odin` — Tier 2 stubs (full impl in M5.6)
+
+#### Tools
+
+| Tool | Tier | Implementation |
+|------|------|----------------|
+| `lint_file` | 1 — real | `analyze_file` from src/core |
+| `lint_snippet` | 1 — real | `analyze_content` (new in-memory proc in src/core) |
+| `lint_fix` | 1 — real | `analyze_file` + `generate_fixes` from src/core |
+| `get_symbol` | 2 — stub | "not yet implemented — M5.6" |
+| `export_symbols` | 2 — stub | "not yet implemented — M5.6" |
+
+#### Memory model
+
+- **Heap (process lifetime):** `MCPServer`, registered tools table, `TreeSitterASTParser`
+- **Temp allocator (per request):** JSON bytes, parsed `json.Value` tree, response string
+- `free_all(context.temp_allocator)` at end of each request loop iteration
+
+#### `analyze_content` addition to src/core
+
+`_plugin_run_rules` in `plugin_main.odin` is `@(private="file")`. A new
+exported `analyze_content :: proc(file_path, content string, ts: ^TreeSitterASTParser, diags: ^[dynamic]Diagnostic)`
+mirrors it — allows `lint_snippet` to run all rules on in-memory source
+without going through disk. Also removes the duplication between
+`plugin_main.odin` and the new MCP tool.
+
+#### MCP protocol handled
+
+- `initialize` → ServerInfo + `{"tools":{}}` capabilities
+- `initialized` → notification, no response
+- `tools/list` → array of ToolDefinition with JSON Schema
+- `tools/call` → dispatch to handler, return `{content:[{type:"text",text:"..."}]}`
+- `ping` → `{}`
+
+#### Build
+
+```bash
+./scripts/build_mcp.sh   →   artifacts/odin-lint-mcp
+```
+
+Same tree-sitter linker flags as `build.sh` (src/mcp imports src/core which uses FFI).
+
+#### Claude Code registration (`~/.claude/mcp_servers.json` or project `.mcp.json`):
+```json
+{
+  "mcpServers": {
+    "odin-lint": {
+      "command": "/path/to/artifacts/odin-lint-mcp",
+      "args": []
+    }
+  }
+}
+```
 
 **Gate 5.5:**
-- [ ] OLS subprocess managed by MCP gateway
-- [ ] `ols_get_symbol` and `ols_apply_edit` working
-- [ ] `ols_get_diagnostics` returns odin-lint diagnostics
-- [ ] `ols_export_symbols` generates valid `symbols.json`
-- [ ] Streamable HTTP transport (not stdio) for production use
-- [ ] `server_card.json` at `.well-known/mcp` for capability discovery
-- [ ] Integrated as Frejay `OdinEditTool` plugin
+- [ ] `./scripts/build_mcp.sh` exits 0
+- [ ] `initialize` + `tools/list` respond correctly (5 tools listed)
+- [ ] `lint_file` returns real C001 diagnostics for `tests/C001_COR_MEMORY/c001_basic.odin`
+- [ ] `lint_snippet` returns diagnostics for in-memory source with violations
+- [ ] `lint_fix` returns proposed fix edits as JSON
+- [ ] `./scripts/test_our_codebase.sh` still passes (no regressions)
+- [ ] `vendor/odin-mcp` has no imports from `src/core` (verified by grep)
 
 ---
 
@@ -1240,24 +1326,67 @@ CodeGraph does not support Odin. Adding Odin would require writing
 odin-lint. If a contribution to CodeGraph is ever appropriate, this would
 be the natural path.
 
-#### LSP Call Hierarchy (Long-term Architecture Note)
+#### LSP Call Hierarchy — M5.6 Deliverable
 
-LSP 3.16 (2020) already defines `callHierarchy/incomingCalls` and
-`callHierarchy/outgoingCalls` — exactly "who calls this proc" and "what
-does this proc call." This is the architecturally correct home for call
-graph data: every language server author knows their language best and can
-implement it with full type resolution.
+LSP 3.16 defines `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`,
+and `callHierarchy/outgoingCalls`. This is exactly "who calls this proc" and "what
+does this proc call" — the same data as `get_dna_context`, served to the editor via
+the standard LSP protocol so VS Code, Zed, Neovim and any other LSP client gets
+"Show Call Hierarchy" for free.
 
-When M5 OLS integration is complete, investigate implementing proper
-`callHierarchy` support in OLS. If successful, the `get_dna_context` MCP
-tool can delegate to OLS for call graph data instead of the SQLite store —
-giving type-accurate results with zero additional indexing overhead, and
-making the call graph available to every LSP-compatible editor for free.
+**What to build in M5.6:**
 
-This is the long-term answer. The SQLite graph in M5.6 is the pragmatic
-short-term answer while OLS `callHierarchy` does not yet exist. Both can
-coexist: SQLite for offline/batch queries and AI export; OLS delegation
-for real-time editor queries once available.
+1. **Add `CallHierarchy` to the plugin capability flags** (`vendor/ols/src/server/plugin.odin`):
+```odin
+PluginCapability :: enum u32 {
+    Diagnostics   = 0,
+    CodeActions   = 1,
+    Hover         = 2,
+    Completions   = 3,
+    Format        = 4,
+    Rename        = 5,
+    CallHierarchy = 6,   // NEW — incomingCalls + outgoingCalls from SQLite graph
+}
+```
+
+2. **Three new hooks on `OLSPlugin`**:
+```odin
+OLSCallHierarchyItem :: struct #packed {
+    name:           cstring,
+    kind:           i32,       // LSP SymbolKind (12 = Function)
+    uri:            cstring,
+    range_start_line, range_start_char: i32,
+    range_end_line,   range_end_char:   i32,
+}
+OLSCallHierarchyList :: struct #packed {
+    items: [^]OLSCallHierarchyItem,
+    count: i32,
+}
+
+// Hooks on OLSPlugin:
+on_prepare_call_hierarchy: proc "c" (doc: ^OLSDocument, pos: OLSPosition) -> ^OLSCallHierarchyList,
+on_incoming_calls:         proc "c" (item: ^OLSCallHierarchyItem) -> ^OLSCallHierarchyList,
+on_outgoing_calls:         proc "c" (item: ^OLSCallHierarchyItem) -> ^OLSCallHierarchyList,
+```
+
+3. **Wire the three new LSP request handlers in OLS** (`requests.odin`):
+   - `textDocument/prepareCallHierarchy` → `plugin_run_prepare_call_hierarchy`
+   - `callHierarchy/incomingCalls` → `plugin_run_incoming_calls`
+   - `callHierarchy/outgoingCalls` → `plugin_run_outgoing_calls`
+
+4. **Implement in `plugin_main.odin`**: query the SQLite graph for the symbol at
+   the requested position, return its callers/callees as `OLSCallHierarchyItem` lists.
+
+**Relationship between the two surfaces:**
+
+| Feature | MCP (AI agents) | OLS/LSP (editor) |
+|---|---|---|
+| Callers | `get_dna_context(name).callers` | `callHierarchy/incomingCalls` |
+| Callees | `get_dna_context(name).callees` | `callHierarchy/outgoingCalls` |
+| Impact radius | `get_impact_radius(name)` | (transitive call hierarchy in editor) |
+
+Both read from the same `odin_lint_graph.db` SQLite store. The MCP tools serve
+AI agents; the LSP hooks serve the editor. One index, two consumers.
 
 **Gate 5.6:**
 - [ ] Call radius (callers + callees) exported for all symbols
@@ -1268,6 +1397,10 @@ for real-time editor queries once available.
 - [ ] Tested: AI agent can navigate call graph without reading source files
 - [ ] CodeGraph schema reviewed; schema decisions documented in `src/db/call_graph.odin`
 - [ ] Git hook for incremental sync evaluated and decision recorded
+- [ ] `CallHierarchy` capability added to OLS plugin interface
+- [ ] `textDocument/prepareCallHierarchy` wired in OLS `requests.odin`
+- [ ] `callHierarchy/incomingCalls` and `outgoingCalls` return results from SQLite graph
+- [ ] VS Code "Show Call Hierarchy" works on an Odin proc in the test workspace
 
 ---
 

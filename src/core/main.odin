@@ -274,7 +274,12 @@ analyze_file :: proc(
 // =============================================================================
 
 // main delegates to _main so that defers run cleanly before os.exit.
+// Guard: when loaded as a shared library (plugin), os.args is empty.
+// Return immediately so the dylib constructor does not crash.
 main :: proc() {
+    if len(os.args) == 0 {
+        return
+    }
     os.exit(_main())
 }
 
