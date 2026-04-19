@@ -200,7 +200,7 @@ _fixes_to_json :: proc(fixes: []core.FixEdit, allocator: runtime.Allocator) -> s
 
 // _extract_string_param pulls a string field from the tool params json.Value.
 // Returns ("", "") on success; ("", error_message) on failure.
-@(private="file")
+@(private)
 _extract_string_param :: proc(params: json.Value, key: string) -> (value: string, err: string) {
     obj, is_obj := params.(json.Object)
     if !is_obj { return "", "params must be a JSON object" }

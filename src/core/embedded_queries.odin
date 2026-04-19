@@ -9,3 +9,5 @@ NAMING_RULES_SCM  :: #load("../../ffi/tree_sitter/queries/naming_rules.scm",    
 C012_RULES_SCM    :: #load("../../ffi/tree_sitter/queries/c012_rules.scm",        string)
 ODIN2026_SCM      :: #load("../../ffi/tree_sitter/queries/odin2026_migration.scm", string)
 FFI_SAFETY_SCM    :: #load("../../ffi/tree_sitter/queries/ffi_safety.scm",        string)
+DECLARATIONS_SCM  :: #load("../../ffi/tree_sitter/queries/declarations.scm",      string)
+REFERENCES_SCM    :: #load("../../ffi/tree_sitter/queries/references.scm",        string)

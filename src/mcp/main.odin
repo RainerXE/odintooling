@@ -19,12 +19,19 @@
 	      }
 	    }
 
-	Tools exposed:
-	    lint_file      — run all rules on a file, return diagnostics JSON
-	    lint_snippet   — run all rules on in-memory source text
-	    lint_fix       — return proposed fixes for a file (no disk writes)
-	    get_symbol     — [stub] symbol lookup via OLS (M5.6)
-	    export_symbols — [stub] symbols.json export (M5.6)
+	Tools exposed (Tier 1 — lint):
+	    lint_file            — run all rules on a file, return diagnostics JSON
+	    lint_snippet         — run all rules on in-memory source text
+	    lint_fix             — return proposed fixes for a file (no disk writes)
+	    run_lint_denoise     — structured fix objects for AI fix loop
+
+	Tools exposed (Tier 2 — code graph, requires --export-symbols first):
+	    get_symbol           — symbol lookup in code graph
+	    export_symbols       — run DNA export pipeline, write graph db + symbols.json
+	    get_dna_context      — callers + callees + memory role for a proc
+	    get_impact_radius    — transitive impact analysis
+	    find_allocators      — all allocator-role procedures
+	    find_all_references  — all call sites for a symbol (rename foundation)
 */
 package mcp_server
 
@@ -50,11 +57,19 @@ main :: proc() {
     s: mcp.MCPServer
     mcp.server_init(&s, "odin-lint", core.ODIN_LINT_VERSION)
 
+    // Tier 1 — lint tools
     mcp.server_register_tool(&s, make_lint_file_tool())
     mcp.server_register_tool(&s, make_lint_snippet_tool())
     mcp.server_register_tool(&s, make_lint_fix_tool())
+    mcp.server_register_tool(&s, make_run_lint_denoise_tool())
+
+    // Tier 2 — code graph tools (require --export-symbols first)
     mcp.server_register_tool(&s, make_get_symbol_tool())
     mcp.server_register_tool(&s, make_export_symbols_tool())
+    mcp.server_register_tool(&s, make_get_dna_context_tool())
+    mcp.server_register_tool(&s, make_get_impact_radius_tool())
+    mcp.server_register_tool(&s, make_find_allocators_tool())
+    mcp.server_register_tool(&s, make_find_all_references_tool())
 
     mcp.server_run(&s) // blocks until stdin EOF
 }
