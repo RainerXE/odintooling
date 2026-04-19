@@ -33,6 +33,8 @@ LintOptions :: struct {
     fix_mode:         bool,            // --fix: apply safe machine-applicable fixes in-place
     unsafe_fix_mode:  bool,            // --unsafe-fix: apply fixes that change API surface
     propose_mode:     bool,            // --propose: show proposed fixes without writing
+    export_symbols:   bool,            // --export-symbols: build code graph + symbols.json
+    graph_db_path:    string,          // --db: output path for graph db (default GRAPH_DB_PATH)
     show_help:        bool,
     show_version:     bool,
     list_rules:       bool,
@@ -67,6 +69,17 @@ parse_args :: proc(args: []string) -> (LintOptions, bool) {
             opts.fix_mode        = true  // unsafe-fix implies fix
         case arg == "--propose":
             opts.propose_mode = true
+        case arg == "--export-symbols":
+            opts.export_symbols = true
+        case strings.has_prefix(arg, "--db="):
+            opts.graph_db_path = arg[len("--db="):]
+        case arg == "--db":
+            if i+1 >= len(args) {
+                fmt.eprintln("error: --db requires a path argument")
+                return opts, false
+            }
+            i += 1
+            opts.graph_db_path = args[i]
         case arg == "--ast":
             // legacy flag, silently ignored
         case strings.has_prefix(arg, "--format="):

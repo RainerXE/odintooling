@@ -13,7 +13,8 @@ mkdir -p artifacts
 odin build src/mcp \
     -out:artifacts/odin-lint-mcp \
     -extra-linker-flags:"ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
-    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a"
+    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
+    ffi/sqlite/libsqlite3.a"
 
 echo ""
 echo "✅ MCP server build successful!"

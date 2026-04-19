@@ -1,0 +1,13 @@
+# Build artifacts
+artifacts/odin-lint
+artifacts/odin-lint-mcp
+artifacts/odin-lint-plugin.dylib
+artifacts/odin-lint-plugin.so
+artifacts/odin-lint-debug2
+artifacts/odin-lint-debug2.dSYM/
+
+# Generated code graph (created by --export-symbols)
+.codegraph/
+
+# Stray binary at project root
+odin-lint

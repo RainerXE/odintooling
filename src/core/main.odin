@@ -310,6 +310,28 @@ _main :: proc() -> int {
     // Load project config (odin-lint.toml or auto-detection).
     opts.config = load_project_config(opts.targets[:])
 
+    // --export-symbols: build code graph and write symbols.json, then exit.
+    if opts.export_symbols {
+        ts_parser, ts_ok := initTreeSitterParser()
+        if !ts_ok {
+            fmt.eprintln("error: failed to initialize tree-sitter parser")
+            return 2
+        }
+        defer deinitTreeSitterParser(ts_parser)
+
+        db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
+        r := export_symbols(opts.targets[:], &ts_parser, db_path)
+        if !r.ok {
+            fmt.eprintln("error: export-symbols failed")
+            return 2
+        }
+        fmt.printfln("export-symbols: %d files, %d nodes, %d edges, %d unresolved",
+            r.files_indexed, r.nodes_written, r.edges_written, r.unresolved)
+        fmt.printfln("  graph db:    %s", r.db_path)
+        fmt.printfln("  symbols.json: %s", r.symbols_path)
+        return 0
+    }
+
     // Collect all .odin files from targets
     files := collect_odin_files(opts.targets[:], opts.recursive, opts.include_vendor)
     defer {
