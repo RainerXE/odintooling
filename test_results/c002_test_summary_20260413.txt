@@ -1,0 +1,250 @@
+=== C002 Rule Test Summary ===
+Generated: Mon Apr 13 10:43:22 CEST 2026
+Test directory: ./tests/C002_COR_POINTER
+
+./tests/C002_COR_POINTER/c002_explicit_violation.odin - 3 violations
+
+=== DETAILED OUTPUT FOR c002_explicit_violation.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_explicit_violation.odin
+🔴 ./tests/C002_COR_POINTER/c002_explicit_violation.odin:16:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_explicit_violation.odin:20:16: C002 [correctness] Double-free: 'data1' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(data1)'
+🔴 ./tests/C002_COR_POINTER/c002_explicit_violation.odin:12:16: C002 [correctness] Double-free: 'ptr' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(ptr)'
+
+./tests/C002_COR_POINTER/c002_fixture_fail.odin - 3 violations
+
+=== DETAILED OUTPUT FOR c002_fixture_fail.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_fixture_fail.odin
+🔴 ./tests/C002_COR_POINTER/c002_fixture_fail.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_fixture_fail.odin:32:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_fixture_fail.odin:18:16: C002 [correctness] Double-free: 'data1' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(data1)'
+
+./tests/C002_COR_POINTER/c002_edge_case_complex.odin - 2 violations
+
+=== DETAILED OUTPUT FOR c002_edge_case_complex.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_edge_case_complex.odin
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_complex.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_complex.odin:15:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+
+./tests/C002_COR_POINTER/c002_potential_violations.odin - No violations
+./tests/C002_COR_POINTER/c002_false_positive_allocators.odin - 2 violations
+
+=== DETAILED OUTPUT FOR c002_false_positive_allocators.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_false_positive_allocators.odin
+🔴 ./tests/C002_COR_POINTER/c002_false_positive_allocators.odin:13:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_false_positive_allocators.odin:18:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+
+./tests/C002_COR_POINTER/c002_false_positive_complex.odin - 2 violations
+
+=== DETAILED OUTPUT FOR c002_false_positive_complex.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_false_positive_complex.odin
+🔴 ./tests/C002_COR_POINTER/c002_false_positive_complex.odin:11:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_false_positive_complex.odin:18:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+
+./tests/C002_COR_POINTER/c002_scm_test_simple.odin - 1 violations
+
+=== DETAILED OUTPUT FOR c002_scm_test_simple.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_scm_test_simple.odin
+🔴 ./tests/C002_COR_POINTER/c002_scm_test_simple.odin:8:16: C002 [correctness] Double-free: 'buf' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(buf)'
+
+./tests/C002_COR_POINTER/c002_multiple_allocations.odin - 5 violations
+
+=== DETAILED OUTPUT FOR c002_multiple_allocations.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_multiple_allocations.odin
+🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:6:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:7:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:8:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:15:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_multiple_allocations.odin:16:16: C002 [correctness] Double-free: 'ptr2' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(ptr2)'
+
+./tests/C002_COR_POINTER/c002_false_positive_conditional.odin - 3 violations
+
+=== DETAILED OUTPUT FOR c002_false_positive_conditional.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_false_positive_conditional.odin
+🔴 ./tests/C002_COR_POINTER/c002_false_positive_conditional.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_false_positive_conditional.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_false_positive_conditional.odin:19:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+
+./tests/C002_COR_POINTER/c002_edge_case_scope.odin - No violations
+./tests/C002_COR_POINTER/c002_all.odin - No violations
+./tests/C002_COR_POINTER/c002_fixture_pass.odin - 1 violations
+
+=== DETAILED OUTPUT FOR c002_fixture_pass.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_fixture_pass.odin
+🔴 ./tests/C002_COR_POINTER/c002_fixture_pass.odin:5:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+
+./tests/C002_COR_POINTER/c002_delete_support.odin - 2 violations
+
+=== DETAILED OUTPUT FOR c002_delete_support.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_delete_support.odin
+🔴 ./tests/C002_COR_POINTER/c002_delete_support.odin:6:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_delete_support.odin:12:18: C002 [correctness] Double-free: 'slice' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(slice)'
+
+./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin - 11 violations
+
+=== DETAILED OUTPUT FOR c002_edge_case_comprehensive.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:98:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:50:16: C002 [correctness] Double-free: 'very_long_variable_name123' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(very_long_variable_name123)'
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:83:16: C002 [correctness] Double-free: '__another_var' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(__another_var)'
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:34:16: C002 [correctness] Double-free: 'buf' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(buf)'
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:146:16: C002 [correctness] Double-free: 'buf' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(buf)'
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:90:16: C002 [correctness] Double-free: 'slice1' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(slice1)'
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:117:16: C002 [correctness] Double-free: 'buf' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(buf)'
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:60:16: C002 [correctness] Double-free: 'buf2' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(buf2)'
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:72:16: C002 [correctness] Double-free: 'ptr' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(ptr)'
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:73:16: C002 [correctness] Double-free: 'ptr' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(ptr)'
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_comprehensive.odin:79:16: C002 [correctness] Double-free: '_test_var' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(_test_var)'
+
+./tests/C002_COR_POINTER/c002_definite_violations.odin - 8 violations
+
+=== DETAILED OUTPUT FOR c002_definite_violations.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_definite_violations.odin
+🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:7:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:12:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:13:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:18:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:20:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:24:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:25:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_definite_violations.odin:9:16: C002 [correctness] Double-free: 'ptr' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(ptr)'
+
+./tests/C002_COR_POINTER/c002_nested_scopes.odin - 2 violations
+
+=== DETAILED OUTPUT FOR c002_nested_scopes.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_nested_scopes.odin
+🔴 ./tests/C002_COR_POINTER/c002_nested_scopes.odin:6:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_nested_scopes.odin:11:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+
+./tests/C002_COR_POINTER/c002_simple_double_free.odin - 2 violations
+
+=== DETAILED OUTPUT FOR c002_simple_double_free.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_simple_double_free.odin
+🔴 ./tests/C002_COR_POINTER/c002_simple_double_free.odin:6:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_simple_double_free.odin:8:16: C002 [correctness] Double-free: 'data' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(data)'
+
+./tests/C002_COR_POINTER/c002_safe_patterns.odin - 1 violations
+
+=== DETAILED OUTPUT FOR c002_safe_patterns.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_safe_patterns.odin
+🔴 ./tests/C002_COR_POINTER/c002_safe_patterns.odin:11:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+
+./tests/C002_COR_POINTER/c002_shadow_memory_bug.odin - 1 violations
+
+=== DETAILED OUTPUT FOR c002_shadow_memory_bug.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_shadow_memory_bug.odin
+🔴 ./tests/C002_COR_POINTER/c002_shadow_memory_bug.odin:15:16: C002 [correctness] Double-free: 'buf' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(buf)'
+
+./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin - 2 violations
+
+=== DETAILED OUTPUT FOR c002_edge_case_reassignment.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin:11:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_reassignment.odin:19:13: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+
+./tests/C002_COR_POINTER/c002_double_free_comprehensive.odin - 5 violations
+
+=== DETAILED OUTPUT FOR c002_double_free_comprehensive.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_double_free_comprehensive.odin
+🔴 ./tests/C002_COR_POINTER/c002_double_free_comprehensive.odin:61:18: C002 [correctness] Double-free: 'ptr' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(ptr)'
+🔴 ./tests/C002_COR_POINTER/c002_double_free_comprehensive.odin:38:20: C002 [correctness] Double-free: 'ptr' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(ptr)'
+🔴 ./tests/C002_COR_POINTER/c002_double_free_comprehensive.odin:12:16: C002 [correctness] Double-free: 'data' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(data)'
+🔴 ./tests/C002_COR_POINTER/c002_double_free_comprehensive.odin:19:16: C002 [correctness] Double-free: 'buf' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(buf)'
+🔴 ./tests/C002_COR_POINTER/c002_double_free_comprehensive.odin:72:20: C002 [correctness] Double-free: 'inner' is already freed by a defer in this scope
+Fix: Remove the duplicate 'defer free(inner)'
+
+./tests/C002_COR_POINTER/c002_complex_arithmetic.odin - No violations
+./tests/C002_COR_POINTER/c002_edge_case_conditional.odin - 3 violations
+
+=== DETAILED OUTPUT FOR c002_edge_case_conditional.odin ===
+Starting odin-lint
+Processing file: ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin:13:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin:22:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 ./tests/C002_COR_POINTER/c002_edge_case_conditional.odin:24:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+
+=== SUMMARY ===
+Total test files: 23
+Files with violations: 19
+Files without violations: 4
+Internal errors: 0
+Total C002 violations found: 59
+
+✅ TESTING COMPLETE
+The C002 rule is working and finding pointer safety issues
+Files with violations should be reviewed for proper pointer usage
