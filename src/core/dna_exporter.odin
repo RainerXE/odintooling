@@ -127,7 +127,6 @@ export_symbols :: proc(
     // Pass 5 — Write symbols.json.
     // -----------------------------------------------------------------------
     _pass5_write_symbols_json(db, SYMBOLS_JSON_PATH)
-
     result.nodes_written = _count_table(db, "nodes")
     result.edges_written = _count_table(db, "edges")
     result.unresolved    = _count_table(db, "unresolved_refs")
@@ -297,12 +296,72 @@ _pass4_attach_violations :: proc(
     ts_parser: ^TreeSitterASTParser,
     opts:      LintOptions,
 ) {
-    for file_path in files {
-        collector := make([dynamic]Diagnostic)
-        defer delete(collector)
+    // Compile SCM queries once; reuse across all files.
+    lang := ts_parser.adapter.language
+    q_c002, q_c002_ok := load_query_src(lang, MEMORY_SAFETY_SCM,  "memory_safety.scm")
+    q_c003, q_c003_ok := load_query_src(lang, NAMING_RULES_SCM,   "naming_rules.scm")
+    q_c009, q_c009_ok := load_query_src(lang, ODIN2026_SCM,       "odin2026_migration.scm")
+    q_c011, q_c011_ok := load_query_src(lang, FFI_SAFETY_SCM,     "ffi_safety.scm")
+    defer if q_c002_ok { unload_query(&q_c002) }
+    defer if q_c003_ok { unload_query(&q_c003) }
+    defer if q_c009_ok { unload_query(&q_c009) }
+    defer if q_c011_ok { unload_query(&q_c011) }
 
-        analyze_file(file_path, ts_parser, opts, &collector)
-        if len(collector) == 0 { continue }
+    for file_path in files {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err != nil { continue }
+        src := string(content)
+
+        collector := make([dynamic]Diagnostic)
+
+        // C001 — AST walker (needs its own parse via parseToAST)
+        ast_root, ast_ok := parseToAST(ts_parser.adapter, src)
+        if ast_ok {
+            lines := strings.split(src, "\n")
+            for d in dedupDiagnostics(c001_matcher(file_path, &ast_root, lines)) {
+                if d.diag_type != .NONE && d.diag_type != .INTERNAL_ERROR {
+                    append(&collector, d)
+                }
+            }
+            delete(lines)
+        }
+
+        // SCM rules — parse tree-sitter once, run all queries
+        tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, src)
+        if tree_ok {
+            root  := getRootNode(tree)
+            lines := strings.split(src, "\n")
+            if !ts_node_is_null(root) {
+                if q_c002_ok {
+                    for d in dedupDiagnostics(c002_scm_matcher(file_path, root, lines, &q_c002)) {
+                        append(&collector, d)
+                    }
+                }
+                if q_c003_ok {
+                    for d in dedupDiagnostics(naming_scm_run(file_path, root, lines, &q_c003)) {
+                        append(&collector, d)
+                    }
+                }
+                if q_c009_ok {
+                    for d in dedupDiagnostics(c009_scm_run(file_path, root, lines, &q_c009)) {
+                        append(&collector, d)
+                    }
+                    for d in dedupDiagnostics(c010_scm_run(file_path, root, lines, &q_c009)) {
+                        append(&collector, d)
+                    }
+                }
+                if q_c011_ok {
+                    for d in dedupDiagnostics(c011_scm_run(file_path, root, lines, &q_c011)) {
+                        append(&collector, d)
+                    }
+                }
+            }
+            delete(lines)
+            ts_tree_delete(tree)
+        }
+        delete(content)
+
+        if len(collector) == 0 { delete(collector); continue }
 
         for d in collector {
             node_id := _find_enclosing_proc(db, file_path, d.line)
@@ -323,7 +382,9 @@ _pass4_attach_violations :: proc(
                 new_json = fmt.tprintf(`%s,"%s"]`, trimmed, d.rule_id)
             }
             graph_update_violations(db, node_id, new_json)
+            delete(existing)
         }
+        delete(collector)
     }
 }
 
