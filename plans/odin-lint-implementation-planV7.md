@@ -647,8 +647,8 @@ M4   CLI Enhancements                    ✅ COMPLETE (April 13 2026)
 M4.5 Autofix Layer                       ✅ COMPLETE (April 13 2026)
 M5   OLS Plugin Integration              ✅ COMPLETE (April 18 2026)
 M5.5 MCP Gateway                         ✅ COMPLETE (April 18 2026)
-M5.6 DNA Impact Analysis + Code Graph    🔧 IN PROGRESS
-M6   Extended Rules + Refactoring        ⬜ PLANNED (C013-C015, C101/C201/C202, C012-T, rename, LSP call hierarchy)
+M5.6 DNA Impact Analysis + Code Graph    ✅ COMPLETE (April 19 2026)
+M6   Extended Rules + Refactoring        ⬜ PLANNED (C016-C018 naming, C013-C015 dead code, C012-T, C019 type markers, rename, LSP call hierarchy)
 ```
 
 ---
@@ -1394,15 +1394,80 @@ now as a standalone MCP tool lets it be validated before refactoring is built on
 *Prerequisite: Gate 5.6 (code graph + SQLite working)*
 *Full C012 M6 spec: `plans/C012-SEMANTIC-NAMING-TODO.md` → M6 Implementation Detail*
 
-M6 has three categories of work, all enabled by the M5.6 code graph:
+M6 has four categories of work:
 
-1. **Dead code rules** (C013+) — graph queries over `nodes`/`edges`
-2. **Type-gated correctness rules** (C012 Phase 2, C101, C201, C202) — require OLS type resolution
-3. **Refactoring foundation** — rename + LSP Call Hierarchy, built on `find_all_references`
+1. **Scope-aware naming rules** (C016–C018) — pure tree-sitter, no type inference needed
+2. **Dead code rules** (C013–C015) — graph queries over `nodes`/`edges`
+3. **Type-gated correctness rules** (C012 Phase 2, C101, C201, C202) — require OLS type resolution
+4. **Refactoring foundation** — rename + LSP Call Hierarchy, built on `find_all_references`
+
+> **C019 (type marker suffixes) is planned after C012 Phase 2** — it needs type
+> inference to catch inferred `:=` declarations, not just explicit type annotations.
+> **⚠️ Conventions for C019 must be discussed with the user before implementation.**
 
 All C012 Phase 2 rules live on the **OLS plugin path** (`src/rules/correctness/`),
 not the tree-sitter CLI path. They use `^ast.File` + OLS type resolution.
 The implementation file is `src/rules/correctness/c012-OLS-Naming.odin` (new).
+
+---
+
+#### C016–C018: Scope-Aware Naming Rules (tree-sitter tier)
+
+Extends C003/C007 with scope and visibility awareness. All optional, configurable
+via `odin-lint.toml`. All fire `warn` tier.
+
+**M6 implementation order:**
+1. Explore Odin tree-sitter grammar — confirm node types for variable declarations
+   and `@(private)` attributes
+2. C016 — local variable naming
+3. C017 — package-level variable naming
+4. C018 — proc visibility naming split
+5. Wire all three into `odin-lint.toml` with configurable patterns
+
+| Rule | Scope | Convention | Check |
+|------|-------|-----------|-------|
+| C016 | local variable (inside proc body) | `snake_case` | all lowercase + underscores, no uppercase |
+| C017 | package-level variable | `camelCase` | starts lowercase, contains at least one uppercase OR is single word |
+| C018 | proc with `@(private)` / `@(private="file")` | `snake_case` | starts lowercase, no uppercase run at start |
+| C018 | proc without `@(private)` (API surface) | `PascalCase` | starts uppercase |
+
+**Notes:**
+- C016/C017 only apply to explicitly typed declarations — `:=` inferred vars are
+  out of scope for tree-sitter (no type info). Inferred var naming deferred to C019.
+- C018 replaces/supersedes C003 for projects that adopt the visibility convention.
+  C003 remains active by default; C018 is opt-in.
+- `allowed_acronyms` list in toml (e.g. `["HTTP","URL","JSON"]`) exempts names
+  that are all-uppercase acronyms from the PascalCase check.
+
+**Gate C016–C018:**
+- [ ] Grammar exploration complete — node types documented
+- [ ] C016 fires on uppercase local variable, silent on snake_case
+- [ ] C017 fires on snake_case package-level variable, silent on camelCase
+- [ ] C018 fires on `@(private)` proc with PascalCase name
+- [ ] C018 fires on public proc with snake_case name (opt-in, off by default)
+- [ ] All three configurable via `odin-lint.toml` patterns
+- [ ] 3 pass + 3 fail fixtures for each rule
+- [ ] Clean on our own codebase
+
+---
+
+#### C019: Type Marker Suffixes (post-C012, requires type inference)
+
+> **⚠️ Conventions must be discussed with the user before implementation.**
+> Do not implement C019 until suffix conventions are agreed and documented here.
+
+Enforces suffix conventions on variables based on their type. Requires C012 Phase 2
+type infrastructure to catch inferred `:=` declarations.
+
+Planned suffix table (to be finalised with user):
+
+| Type | Suggested suffix | Example |
+|------|-----------------|---------|
+| pointer (`^T`) | `_ptr` | `player_ptr` |
+| dynamic array (`[dynamic]T`) | `_arr` or `s` suffix | `players_arr` |
+| map (`map[K]V`) | `_map` or `_by_key` | `name_map`, `player_by_id` |
+| slice (`[]T`) | `_slice` or `s` suffix | `players_slice` |
+| maybe/optional | `_opt` | `player_opt` |
 
 ---
 
@@ -1515,6 +1580,11 @@ Analytic step: OLS resolves the switched type to an enum, compares covered
 cases against the enum's member list.
 
 **Gate 6:**
+- [ ] C016–C018 grammar exploration complete
+- [ ] C016 fires on uppercase local variable name
+- [ ] C017 fires on snake_case package-level variable name
+- [ ] C018 fires on visibility/naming mismatch (opt-in)
+- [ ] C016–C018 patterns configurable via `odin-lint.toml`
 - [ ] C013 fires on unused imports, silent when import is used
 - [ ] C014 fires on non-exported proc with zero callers
 - [ ] C015 fires on non-exported constant/variable with zero references
@@ -1526,6 +1596,7 @@ cases against the enum's member list.
 - [ ] C202 fires on incomplete enum switches
 - [ ] `rename_symbol` MCP tool generates correct FixEdit set for a proc rename
 - [ ] Rename does not touch string literals (safe mode)
+- [ ] C019 conventions agreed with user — implementation deferred until then
 - [ ] LSP Call Hierarchy: VS Code "Show Call Hierarchy" works on an Odin proc
 - [ ] All new rules: 3 pass + 3 fail fixtures
 
