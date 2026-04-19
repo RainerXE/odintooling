@@ -5,7 +5,8 @@ echo "Building odin-lint with tree-sitter integration..."
 # Build the main application with tree-sitter static library linking
 odin build src/core -out:artifacts/odin-lint \
     -extra-linker-flags:"ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
-    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a"
+    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
+    ffi/sqlite/libsqlite3.a"
 
 if [ $? -eq 0 ]; then
     echo "✅ Build successful!"

@@ -14,7 +14,8 @@ odin build src/core \
     -out:artifacts/odin-lint-plugin \
     -build-mode:shared \
     -extra-linker-flags:"ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
-    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a"
+    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
+    ffi/sqlite/libsqlite3.a"
 
 # Rename to canonical .dylib/.so extension for clarity
 case "$(uname -s)" in
