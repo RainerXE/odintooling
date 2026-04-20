@@ -113,6 +113,11 @@ naming_scm_run :: proc(
         if d, ok := c017_scm_run(file_path, result.captures, file_lines); ok {
             append(&diagnostics, d)
         }
+
+        // C018: proc naming must reflect @(private) visibility (opt-in)
+        if d, ok := c018_scm_run(file_path, result.captures, file_lines); ok {
+            append(&diagnostics, d)
+        }
     }
 
     return diagnostics[:]
