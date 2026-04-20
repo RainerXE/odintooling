@@ -26,13 +26,12 @@ import "core:strings"
 // Category: STYLE (opt-in, warn tier)
 // =============================================================================
 
-// proc_node_is_private returns true if the procedure_declaration node that
-// owns proc_name_node has an @(private) or @(private="file") attribute.
-// Package-level so dna_exporter and other rules can reuse this check.
-proc_node_is_private :: proc(proc_name_node: TSNode, file_lines: []string) -> bool {
-    decl := ts_node_parent(proc_name_node)
+// decl_node_is_private returns true if the declaration node that owns name_node
+// has an @(private) or @(private="file") attribute. Works for any declaration
+// kind (proc, const, var) — does not check the parent node type.
+decl_node_is_private :: proc(name_node: TSNode, file_lines: []string) -> bool {
+    decl := ts_node_parent(name_node)
     if ts_node_is_null(decl) { return false }
-    if string(ts_node_type(decl)) != "procedure_declaration" { return false }
 
     child_count := int(ts_node_child_count(decl))
     for i in 0..<child_count {
@@ -54,6 +53,11 @@ proc_node_is_private :: proc(proc_name_node: TSNode, file_lines: []string) -> bo
         }
     }
     return false
+}
+
+// proc_node_is_private is a convenience alias kept for backward compatibility.
+proc_node_is_private :: proc(proc_name_node: TSNode, file_lines: []string) -> bool {
+    return decl_node_is_private(proc_name_node, file_lines)
 }
 
 // c018_scm_run processes @proc_name captures from naming_rules.scm.

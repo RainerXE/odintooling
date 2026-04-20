@@ -137,7 +137,17 @@ export_symbols :: proc(
             fmt.printfln("%s:%d:%d: %s [%s] %s",
                 d.file, d.line, d.column, d.rule_id, d.tier, d.message)
         }
-        result.dead_code_count = len(dead_diags)
+        result.dead_code_count += len(dead_diags)
+    }
+
+    if config_domain_enabled("C015", cfg) {
+        dead_diags := c015_query_dead_consts(db, files[:])
+        defer delete(dead_diags)
+        for d in dead_diags {
+            fmt.printfln("%s:%d:%d: %s [%s] %s",
+                d.file, d.line, d.column, d.rule_id, d.tier, d.message)
+        }
+        result.dead_code_count += len(dead_diags)
     }
 
     // -----------------------------------------------------------------------
@@ -201,6 +211,58 @@ _pass1_index_declarations :: proc(
             pt   := ts_node_start_point(path_node)
             line := int(pt.row) + 1
             graph_insert_node(db, path_raw, path_raw, "import", file_path, line, "", false)
+            continue
+        }
+        if name_node, has_const := m.captures["const_name"]; has_const {
+            name := naming_extract_text(name_node, lines)
+            if name == "" { continue }
+            pt   := ts_node_start_point(name_node)
+            end  := ts_node_end_point(name_node)
+            // Skip identifiers on the value side of :: (they're not the const name)
+            if int(pt.row) < len(lines) {
+                src_line := lines[pt.row]
+                dc := strings.index(src_line, "::")
+                if dc < 0 || int(end.column) > dc { continue }
+            }
+            line        := int(pt.row) + 1
+            qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
+            is_exported := !decl_node_is_private(name_node, lines)
+            graph_insert_node(db, name, qualified, "constant", file_path, line, "", is_exported)
+            continue
+        }
+        if name_node, has_var := m.captures["var_name"]; has_var {
+            name := naming_extract_text(name_node, lines)
+            if name == "" { continue }
+            pt   := ts_node_start_point(name_node)
+            end  := ts_node_end_point(name_node)
+            // Skip identifiers on the type/value side of : (they're not the var name)
+            if int(pt.row) < len(lines) {
+                src_line := lines[pt.row]
+                colon := strings.index(src_line, ":")
+                if colon < 0 || int(end.column) > colon { continue }
+            }
+            line        := int(pt.row) + 1
+            qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
+            is_exported := !decl_node_is_private(name_node, lines)
+            graph_insert_node(db, name, qualified, "variable", file_path, line, "", is_exported)
+            continue
+        }
+        if name_node, has_pkg_var := m.captures["pkg_var"]; has_pkg_var {
+            // variable_declaration is only at package scope (:= at top level)
+            name := naming_extract_text(name_node, lines)
+            if name == "" { continue }
+            pt   := ts_node_start_point(name_node)
+            end  := ts_node_end_point(name_node)
+            // Skip identifiers on the RHS of :=
+            if int(pt.row) < len(lines) {
+                src_line := lines[pt.row]
+                dc := strings.index(src_line, ":=")
+                if dc < 0 || int(end.column) > dc { continue }
+            }
+            line        := int(pt.row) + 1
+            qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
+            is_exported := !decl_node_is_private(name_node, lines)
+            graph_insert_node(db, name, qualified, "variable", file_path, line, "", is_exported)
             continue
         }
     }
