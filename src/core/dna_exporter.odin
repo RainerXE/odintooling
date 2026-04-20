@@ -338,7 +338,7 @@ _pass4_attach_violations :: proc(
                     }
                 }
                 if q_c003_ok {
-                    for d in dedupDiagnostics(naming_scm_run(file_path, root, lines, &q_c003)) {
+                    for d in dedupDiagnostics(naming_scm_run(file_path, root, lines, &q_c003, NAMING_ALL_ENABLED)) {
                         append(&collector, d)
                     }
                 }

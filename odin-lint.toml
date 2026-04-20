@@ -2,6 +2,15 @@
 # Clippy-inspired configuration with enhanced flexibility
 # This file controls which rules run on which paths
 
+# Scope-aware naming rules (C016-C018)
+# C016 is on by default (standard Odin style).
+# C017 and C018 are opt-in — enable them for projects that use these conventions.
+# NOTE: if you enable C018, also disable C003 to avoid conflicting diagnostics.
+[naming]
+c016 = true   # local variables must be snake_case
+c017 = false  # package-level variables must be camelCase (opt-in)
+c018 = false  # @(private) procs snake_case / public procs PascalCase (opt-in)
+
 [rules]
 # Global rule configuration with categories (Clippy-inspired)
 C001 = { level = "error", category = "correctness" }
