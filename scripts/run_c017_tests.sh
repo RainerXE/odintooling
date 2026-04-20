@@ -22,7 +22,7 @@ for test_file in "${test_files[@]}"; do
     ./artifacts/odin-lint "$test_file" > "$output_file" 2>&1
 
     if [[ "$test_file" == *"pass"* ]]; then
-        if ! grep -q "C017" "$output_file"; then
+        if ! grep -q "C017 \[style\]" "$output_file"; then
             echo "  PASS: No C017 violations (as expected)"
             ((passed_tests++))
         else
@@ -31,8 +31,8 @@ for test_file in "${test_files[@]}"; do
             ((failed_tests++))
         fi
     elif [[ "$test_file" == *"fail"* ]]; then
-        if grep -q "C017" "$output_file"; then
-            count=$(grep -c "C017" "$output_file")
+        if grep -q "C017 \[style\]" "$output_file"; then
+            count=$(grep -c "C017 \[style\]" "$output_file")
             echo "  PASS: $count C017 violation(s) detected (as expected)"
             ((passed_tests++))
         else
