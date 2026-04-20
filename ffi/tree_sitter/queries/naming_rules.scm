@@ -25,3 +25,8 @@
 ; C007 — enum type declarations
 (enum_declaration
   (identifier) @enum_name)
+
+; C016 — local variable declarations inside proc bodies (:= assignments)
+; Note: assignment_statement covers both := and = — Odin code filters to := only
+(assignment_statement
+  (identifier) @local_var)

@@ -103,6 +103,11 @@ naming_scm_run :: proc(
                 })
             }
         }
+
+        // C016: local variable names must be snake_case
+        if d, ok := c016_scm_run(file_path, result.captures, file_lines); ok {
+            append(&diagnostics, d)
+        }
     }
 
     return diagnostics[:]
