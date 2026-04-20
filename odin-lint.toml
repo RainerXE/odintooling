@@ -6,6 +6,12 @@
 # C016 is on by default (standard Odin style).
 # C017 and C018 are opt-in — enable them for projects that use these conventions.
 # NOTE: if you enable C018, also disable C003 to avoid conflicting diagnostics.
+[domains]
+ffi             = true    # enable C011 FFI safety rules
+odin_2026       = true    # enable C009, C010 migration rules
+semantic_naming = false   # enable C012 semantic ownership hints (opt-in)
+dead_code       = false   # enable C014, C015 dead code detection (opt-in, project-wide)
+
 [naming]
 c016 = true   # local variables must be snake_case
 c017 = false  # package-level variables must be camelCase (opt-in)

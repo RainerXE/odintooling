@@ -327,13 +327,16 @@ _main :: proc() -> int {
         defer deinitTreeSitterParser(ts_parser)
 
         db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
-        r := export_symbols(opts.targets[:], &ts_parser, db_path)
+        r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config)
         if !r.ok {
             fmt.eprintln("error: export-symbols failed")
             return 2
         }
         fmt.printfln("export-symbols: %d files, %d nodes, %d edges, %d unresolved",
             r.files_indexed, r.nodes_written, r.edges_written, r.unresolved)
+        if r.dead_code_count > 0 {
+            fmt.printfln("  dead code:    %d C014 violation(s)", r.dead_code_count)
+        }
         fmt.printfln("  graph db:    %s", r.db_path)
         fmt.printfln("  symbols.json: %s", r.symbols_path)
         return 0
