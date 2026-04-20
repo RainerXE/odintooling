@@ -28,6 +28,7 @@ OdinLintConfig :: struct {
     ffi_domain:             bool, // C011 FFI safety rules
     odin_2026_domain:       bool, // C009, C010 migration rules
     semantic_naming_domain: bool, // C012 semantic ownership hints
+    dead_code_domain:       bool, // C014, C015 dead code (opt-in, project-wide)
 
     // Per-rule flags for scope-aware naming rules (C016–C018).
     naming_c016: bool, // C016 local snake_case  (default: true)
@@ -47,6 +48,7 @@ default_config :: proc() -> OdinLintConfig {
         ffi_domain             = true,
         odin_2026_domain       = true,
         semantic_naming_domain = false,
+        dead_code_domain       = false,  // opt-in: project-wide dead code (C014, C015)
         naming_c016            = true,   // standard rule — on by default
         naming_c017            = false,  // opt-in: camelCase globals
         naming_c018            = false,  // opt-in: visibility-based proc naming
@@ -163,6 +165,7 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             case "ffi":             cfg.ffi_domain             = val == "true"
             case "odin_2026":       cfg.odin_2026_domain       = val == "true"
             case "semantic_naming": cfg.semantic_naming_domain = val == "true"
+            case "dead_code":       cfg.dead_code_domain       = val == "true"
             }
         case "naming":
             switch key {
@@ -197,6 +200,8 @@ config_domain_enabled :: proc(rule_id: string, cfg: OdinLintConfig) -> bool {
         return effective.ffi_domain
     case "C012":
         return effective.semantic_naming_domain
+    case "C014", "C015":
+        return effective.dead_code_domain
     case "C016":
         return effective.naming_c016
     case "C017":
@@ -225,8 +230,8 @@ filepath_dir :: proc(path: string) -> string {
 print_config_summary :: proc(cfg: OdinLintConfig) {
     if !cfg.loaded { return }
     fmt.eprintfln("config: odin-lint.toml loaded")
-    fmt.eprintfln("  domains: ffi=%v odin_2026=%v semantic_naming=%v",
-        cfg.ffi_domain, cfg.odin_2026_domain, cfg.semantic_naming_domain)
+    fmt.eprintfln("  domains: ffi=%v odin_2026=%v semantic_naming=%v dead_code=%v",
+        cfg.ffi_domain, cfg.odin_2026_domain, cfg.semantic_naming_domain, cfg.dead_code_domain)
     fmt.eprintfln("  naming:  c016=%v c017=%v c018=%v",
         cfg.naming_c016, cfg.naming_c017, cfg.naming_c018)
     if cfg.odin_version != "" {
