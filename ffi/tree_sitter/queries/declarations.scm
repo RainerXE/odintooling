@@ -25,3 +25,20 @@
 ; Import declarations — path only (alias captured separately if present)
 (import_declaration
   (string (string_content) @import_path)) @import_decl
+
+; Package-level constant declarations (NAME :: value)
+; NOTE: (identifier) also matches identifiers in the value — Pass 1 filters to
+; the name side by checking column < position of '::' in the source line.
+(const_declaration
+  (identifier) @const_name) @const_decl
+
+; Package-level inferred variable declarations (name := value)
+; variable_declaration is ONLY produced at package scope; inside procs the
+; same syntax becomes assignment_statement.
+(variable_declaration
+  (identifier) @pkg_var) @pkg_var_decl
+
+; Package-level explicit-type variable declarations (name: Type = value)
+; NOTE: same dedup concern — Pass 1 checks column < position of ':'.
+(var_declaration
+  (identifier) @var_name) @var_decl
