@@ -164,8 +164,8 @@ analyze_file :: proc(
         }
     }
 
-    // C003 + C007: Naming rules (shared SCM pass)
-    if rule_enabled("C003", "style", opts) || rule_enabled("C007", "style", opts) {
+    // C003 + C007 + C016: Naming rules (shared SCM pass)
+    if rule_enabled("C003", "style", opts) || rule_enabled("C007", "style", opts) || rule_enabled("C016", "style", opts) {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
         if err == nil {
             defer delete(content)
