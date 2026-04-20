@@ -62,7 +62,7 @@ analyze_content :: proc(
 		}
 	}
 
-	// C003 + C007 + C016: Naming conventions (shared SCM pass)
+	// C003 + C007 + C016 + C017: Naming conventions (shared SCM pass)
 	{
 		q, q_ok := load_query_src(ts.adapter.language, NAMING_RULES_SCM, "naming_rules.scm")
 		if q_ok {
