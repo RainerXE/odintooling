@@ -649,6 +649,7 @@ M5   OLS Plugin Integration              ✅ COMPLETE (April 18 2026)
 M5.5 MCP Gateway                         ✅ COMPLETE (April 18 2026)
 M5.6 DNA Impact Analysis + Code Graph    ✅ COMPLETE (April 19 2026)
 M6   Extended Rules + Refactoring        ⬜ PLANNED (C016-C018 naming, C013-C015 dead code, C012-T, C019 type markers, rename, LSP call hierarchy)
+M6.5 Structural Rules (B-category)      ⬜ PLANNED (B001 unmatched brace / unclosed block)
 ```
 
 ---
@@ -1625,6 +1626,83 @@ cases against the enum's member list.
 
 ---
 
+### ⬜ Milestone 6.5 — Structural Rules (B-category)
+
+**New rule category.** "B" rules operate on the raw token stream, not the AST.
+They fire when the file is too broken for the AST to be trusted.
+
+---
+
+#### B001: Unmatched Brace / Unclosed Block
+
+**Category:** Structural  
+**Severity:** Error  
+**Opt-in:** No — B001 runs by default on every file
+
+##### What it detects
+
+A `{` that is opened inside a procedure, struct, enum, union, or control-flow
+block but never closed before the end of the file, or a `}` encountered when no
+matching `{` is on the stack (surplus brace). The canonical symptom is that the
+Odin compiler reports "undeclared name" errors in _other files_ or at _distant_
+locations with no indication of where the structural imbalance actually is — the
+compiler desyncs silently on brace imbalance.
+
+##### Why this matters
+
+The Odin compiler does not pinpoint the mismatched brace. It reports downstream
+consequences instead — type errors, undeclared identifiers, sometimes in entirely
+unrelated files. B001 surfaces the actual fault location immediately, saving
+potentially hours of debugging.
+
+##### Diagnostic messages
+
+```
+B001 [structural]: unclosed block opened at line N, col M — expected matching '}'
+B001 [structural]: unexpected '}' at line N, col M — no matching opening '{'
+```
+
+##### Implementation
+
+**Token-level scan, not AST.** When a file has an unmatched brace tree-sitter
+produces error nodes and the AST shape is unreliable. Do not trust `ts_node_is_error`
+alone — the AST may be partially constructed with wrong structure. Prefer a
+linear scan of the raw file bytes:
+
+1. Read the file as bytes (already available from `analyze_content`).
+2. Walk byte-by-byte, tracking:
+   - Inside a single-line comment (`//` until `\n`) — skip `{` / `}`.
+   - Inside a block comment (`/*` until `*/`, nestable in Odin) — skip `{` / `}`.
+   - Inside a string literal (`"..."` — `\"` escapes, no raw strings in Odin) — skip.
+   - Inside a rune literal (`'...'`) — skip.
+3. On every `{`: push `(line, col)` onto a stack.
+4. On every `}`: if stack is non-empty, pop; else emit surplus-brace diagnostic.
+5. At end of file: any remaining stack entries are unclosed-block diagnostics.
+
+**Odin-specific note:** Odin allows nested block comments (`/* /* */ */`). Track
+comment nesting depth with a counter, not a boolean flag.
+
+**Integration:** Run B001 first, before tree-sitter parsing. If B001 fires, skip
+all other rules for that file (the AST is untrustworthy). Emit a note alongside
+each B001 violation: `"other diagnostics suppressed for this file"`.
+
+**File:** `src/core/b001-STR-BraceBalance.odin`  
+**SCM query:** None — pure byte scan.
+
+##### Gate 6.5
+
+- [ ] B001 fires on unclosed `{` at correct line and column
+- [ ] B001 fires on surplus `}` at correct line and column
+- [ ] B001 silent on perfectly balanced files
+- [ ] String literals, rune literals, and comments correctly excluded
+- [ ] Nested block comments (`/* /* */ */`) handled correctly
+- [ ] When B001 fires, remaining rules are suppressed for that file with note
+- [ ] 3 pass + 3 fail fixtures (unclosed, surplus, mixed)
+- [ ] Own codebase: 0 B001 violations
+- [ ] RuiShin corpus: 0 B001 violations (all files well-formed)
+
+---
+
 ## 12. Lessons Learned
 
 *V6 lessons preserved. Extended with query-architecture lessons.*
@@ -1800,6 +1878,7 @@ cases against the enum's member list.
 | 5.5 | MCP gateway | Agent-driven semantic editing + symbol export | ✅ |
 | 5.6 | DNA Impact Analysis + Code Graph | SQLite graph, MCP tools, memory roles, find_all_references | 🔧 |
 | 6 | Extended rules + Refactoring | C013-C015 dead code, C101/C201/C202, rename, LSP call hierarchy | ⬜ |
+| 6.5 | Structural rules (B-category) | B001 unmatched brace — token scan, error tier | ⬜ |
 
 ---
 
