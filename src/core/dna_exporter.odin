@@ -12,22 +12,25 @@ SYMBOLS_JSON_PATH :: ".codegraph/symbols.json"
 
 // ExportResult summarises what the exporter produced.
 ExportResult :: struct {
-    files_indexed: int,
-    nodes_written: int,
-    edges_written: int,
-    unresolved:    int,
-    db_path:       string,
-    symbols_path:  string,
-    ok:            bool,
+    files_indexed:    int,
+    nodes_written:    int,
+    edges_written:    int,
+    unresolved:       int,
+    dead_code_count:  int,
+    db_path:          string,
+    symbols_path:     string,
+    ok:               bool,
 }
 
 // export_symbols runs the full 5-pass DNA export pipeline.
 // paths: the same target list accepted by the CLI (files or directories).
 // db_path: where to write the SQLite graph (defaults to GRAPH_DB_PATH).
+// cfg: project config — used to gate optional dead-code rules (C014/C015).
 export_symbols :: proc(
     paths:     []string,
     ts_parser: ^TreeSitterASTParser,
     db_path:   string = GRAPH_DB_PATH,
+    cfg:       OdinLintConfig = {},
 ) -> ExportResult {
     result := ExportResult{db_path = db_path, symbols_path = SYMBOLS_JSON_PATH}
 
@@ -124,7 +127,21 @@ export_symbols :: proc(
     _pass4_attach_violations(db, files[:], ts_parser, dummy_opts)
 
     // -----------------------------------------------------------------------
-    // Pass 5 — Write symbols.json.
+    // Pass 5 — Dead code detection (C014: private procs with zero callers).
+    // Only runs when dead_code domain is enabled in config.
+    // -----------------------------------------------------------------------
+    if config_domain_enabled("C014", cfg) {
+        dead_diags := c014_query_dead_procs(db)
+        defer delete(dead_diags)
+        for d in dead_diags {
+            fmt.printfln("%s:%d:%d: %s [%s] %s",
+                d.file, d.line, d.column, d.rule_id, d.tier, d.message)
+        }
+        result.dead_code_count = len(dead_diags)
+    }
+
+    // -----------------------------------------------------------------------
+    // Pass 6 — Write symbols.json.
     // -----------------------------------------------------------------------
     _pass5_write_symbols_json(db, SYMBOLS_JSON_PATH)
     result.nodes_written = _count_table(db, "nodes")
@@ -153,10 +170,11 @@ _pass1_index_declarations :: proc(
         if name_node, has_proc := m.captures["proc_name"]; has_proc {
             name := naming_extract_text(name_node, lines)
             if name == "" { continue }
-            pt        := ts_node_start_point(name_node)
-            line      := int(pt.row) + 1
-            qualified := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
-            graph_insert_node(db, name, qualified, "proc", file_path, line, "", true)
+            pt          := ts_node_start_point(name_node)
+            line        := int(pt.row) + 1
+            qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
+            is_exported := !proc_node_is_private(name_node, lines)
+            graph_insert_node(db, name, qualified, "proc", file_path, line, "", is_exported)
             continue
         }
         if name_node, has_struct := m.captures["struct_name"]; has_struct {

@@ -26,10 +26,10 @@ import "core:strings"
 // Category: STYLE (opt-in, warn tier)
 // =============================================================================
 
-// _proc_has_private_attr returns true if the procedure_declaration node that
+// proc_node_is_private returns true if the procedure_declaration node that
 // owns proc_name_node has an @(private) or @(private="file") attribute.
-@(private="file")
-_proc_has_private_attr :: proc(proc_name_node: TSNode, file_lines: []string) -> bool {
+// Package-level so dna_exporter and other rules can reuse this check.
+proc_node_is_private :: proc(proc_name_node: TSNode, file_lines: []string) -> bool {
     decl := ts_node_parent(proc_name_node)
     if ts_node_is_null(decl) { return false }
     if string(ts_node_type(decl)) != "procedure_declaration" { return false }
@@ -69,7 +69,7 @@ c018_scm_run :: proc(
     name := naming_extract_text(proc_node, file_lines)
     if len(name) == 0 { return {}, false }
 
-    is_private := _proc_has_private_attr(proc_node, file_lines)
+    is_private := proc_node_is_private(proc_node, file_lines)
     pt := ts_node_start_point(proc_node)
 
     if is_private {
