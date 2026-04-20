@@ -108,6 +108,11 @@ naming_scm_run :: proc(
         if d, ok := c016_scm_run(file_path, result.captures, file_lines); ok {
             append(&diagnostics, d)
         }
+
+        // C017: package-level variable names must be camelCase (opt-in)
+        if d, ok := c017_scm_run(file_path, result.captures, file_lines); ok {
+            append(&diagnostics, d)
+        }
     }
 
     return diagnostics[:]

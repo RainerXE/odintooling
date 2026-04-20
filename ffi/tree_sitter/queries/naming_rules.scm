@@ -30,3 +30,9 @@
 ; Note: assignment_statement covers both := and = — Odin code filters to := only
 (assignment_statement
   (identifier) @local_var)
+
+; C017 — package-level mutable variable (:= at package scope)
+; variable_declaration is ONLY emitted at package scope (inside proc bodies
+; use assignment_statement instead) — no scope filtering needed in Odin code.
+(variable_declaration
+  (identifier) @pkg_var)
