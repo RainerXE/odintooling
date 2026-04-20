@@ -19,7 +19,8 @@ for test_file in "${test_files[@]}"; do
     echo "Testing: $(basename $test_file)"
     test_name=$(basename "$test_file" .odin)
     output_file="test_results/c017_results/${test_name}_results.txt"
-    ./artifacts/odin-lint "$test_file" > "$output_file" 2>&1
+    # C017 is opt-in; use --rule=C017 to force-enable it for testing
+    ./artifacts/odin-lint --rule=C017 "$test_file" > "$output_file" 2>&1
 
     if [[ "$test_file" == *"pass"* ]]; then
         if ! grep -q "C017 \[style\]" "$output_file"; then

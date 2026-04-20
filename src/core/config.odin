@@ -29,6 +29,11 @@ OdinLintConfig :: struct {
     odin_2026_domain:       bool, // C009, C010 migration rules
     semantic_naming_domain: bool, // C012 semantic ownership hints
 
+    // Per-rule flags for scope-aware naming rules (C016–C018).
+    naming_c016: bool, // C016 local snake_case  (default: true)
+    naming_c017: bool, // C017 global camelCase  (default: false — opt-in)
+    naming_c018: bool, // C018 proc visibility   (default: false — opt-in, conflicts with C003)
+
     // Target settings.
     odin_version: string, // e.g. "dev-2026-04"
 
@@ -42,6 +47,9 @@ default_config :: proc() -> OdinLintConfig {
         ffi_domain             = true,
         odin_2026_domain       = true,
         semantic_naming_domain = false,
+        naming_c016            = true,   // standard rule — on by default
+        naming_c017            = false,  // opt-in: camelCase globals
+        naming_c018            = false,  // opt-in: visibility-based proc naming
         odin_version           = "",
         loaded                 = false,
     }
@@ -156,6 +164,12 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             case "odin_2026":       cfg.odin_2026_domain       = val == "true"
             case "semantic_naming": cfg.semantic_naming_domain = val == "true"
             }
+        case "naming":
+            switch key {
+            case "c016": cfg.naming_c016 = val == "true"
+            case "c017": cfg.naming_c017 = val == "true"
+            case "c018": cfg.naming_c018 = val == "true"
+            }
         case "target":
             if key == "odin_version" {
                 // Strip surrounding quotes if present.
@@ -170,14 +184,25 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
 
 // config_domain_enabled returns whether a rule should be active according to
 // the project config. Called alongside rule_enabled for domain-gated rules.
+// When no config was loaded (zero-value OdinLintConfig), defaults from
+// default_config() are used so callers that pass {} still get correct behaviour.
 config_domain_enabled :: proc(rule_id: string, cfg: OdinLintConfig) -> bool {
+    effective := cfg
+    if !cfg.loaded { effective = default_config() }
+
     switch rule_id {
     case "C009", "C010":
-        return cfg.odin_2026_domain
+        return effective.odin_2026_domain
     case "C011":
-        return cfg.ffi_domain
+        return effective.ffi_domain
     case "C012":
-        return cfg.semantic_naming_domain
+        return effective.semantic_naming_domain
+    case "C016":
+        return effective.naming_c016
+    case "C017":
+        return effective.naming_c017
+    case "C018":
+        return effective.naming_c018
     }
     return true // all other rules: not domain-gated
 }
@@ -202,6 +227,8 @@ print_config_summary :: proc(cfg: OdinLintConfig) {
     fmt.eprintfln("config: odin-lint.toml loaded")
     fmt.eprintfln("  domains: ffi=%v odin_2026=%v semantic_naming=%v",
         cfg.ffi_domain, cfg.odin_2026_domain, cfg.semantic_naming_domain)
+    fmt.eprintfln("  naming:  c016=%v c017=%v c018=%v",
+        cfg.naming_c016, cfg.naming_c017, cfg.naming_c018)
     if cfg.odin_version != "" {
         fmt.eprintfln("  target odin_version: %s", cfg.odin_version)
     }
