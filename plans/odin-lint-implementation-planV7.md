@@ -1417,8 +1417,7 @@ Extends C003/C007 with scope and visibility awareness. All optional, configurabl
 via `odin-lint.toml`. All fire `warn` tier.
 
 **M6 implementation order:**
-1. Explore Odin tree-sitter grammar — confirm node types for variable declarations
-   and `@(private)` attributes
+1. ✅ Grammar exploration complete (April 20 2026) — see findings below
 2. C016 — local variable naming
 3. C017 — package-level variable naming
 4. C018 — proc visibility naming split
@@ -1439,8 +1438,32 @@ via `odin-lint.toml`. All fire `warn` tier.
 - `allowed_acronyms` list in toml (e.g. `["HTTP","URL","JSON"]`) exempts names
   that are all-uppercase acronyms from the PascalCase check.
 
+##### Grammar Exploration Findings (April 20 2026)
+
+**C016 — Local variable node types**
+- Package-level `:=` → `variable_declaration` (different node — no cross-contamination)
+- Inside-proc `:=` AND `=` reassignment → both `assignment_statement`
+- `assignment_statement` children: `attributes`, `expression` (LHS name), anonymous operator token, `expression`/`procedure` (RHS)
+- SCM pattern: `(assignment_statement (identifier) @local_var)`
+- **Odin filter required**: check source line text for `:=` after identifier end to skip `=` reassignments (no predicate support in our query engine)
+
+**C017 — Package-level variable node types**
+- `var x: Type = value` → `var_declaration` (children: `attributes`, `expression`, `type`)
+- `x := value` at package level → `variable_declaration` (children: `attributes`, `expression`, `procedure`)
+- Both live under `source_file > declaration` — naturally scoped, no proc-body contamination
+- SCM: two patterns needed, one for each form
+
+**C018 — `@(private)` attribute structure**
+- `@(private)` → `procedure_declaration > attributes > attribute > identifier("private")`
+- `@(private="file")` → same path, attribute also has a `string` child
+- SCM: `(procedure_declaration (identifier) @proc_name)` captures all procs (with or without attributes)
+- **Odin logic**: walk `ts_node_parent` of `proc_name` → scan children for `attributes` node → scan its children for `attribute` → check if any `identifier` child text == `"private"` using `ts_node_child_count` + `ts_node_child` + `ts_node_type` (all bindings confirmed present)
+- No SCM predicates needed — all attribute checking done in Odin
+
+**Shared helper to write**: `_is_declaration(node TSNode, line string) -> bool` — checks if `:=` follows the identifier in the source line (distinguishes new declarations from reassignments in `assignment_statement`).
+
 **Gate C016–C018:**
-- [ ] Grammar exploration complete — node types documented
+- [x] Grammar exploration complete — node types documented
 - [ ] C016 fires on uppercase local variable, silent on snake_case
 - [ ] C017 fires on snake_case package-level variable, silent on camelCase
 - [ ] C018 fires on `@(private)` proc with PascalCase name
