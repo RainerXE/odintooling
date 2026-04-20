@@ -22,7 +22,8 @@ for test_file in "${test_files[@]}"; do
     echo "Testing: $(basename $test_file)"
     test_name=$(basename "$test_file" .odin)
     output_file="test_results/c018_results/${test_name}_results.txt"
-    ./artifacts/odin-lint "$test_file" > "$output_file" 2>&1
+    # C018 is opt-in; use --rule=C018 to force-enable it for testing
+    ./artifacts/odin-lint --rule=C018 "$test_file" > "$output_file" 2>&1
 
     if [[ "$test_file" == *"pass"* ]]; then
         # Pass fixture: must produce zero C018 violations (C003 may still fire)

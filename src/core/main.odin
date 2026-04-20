@@ -165,7 +165,14 @@ analyze_file :: proc(
     }
 
     // C003 + C007 + C016 + C017 + C018: Naming rules (shared SCM pass)
-    if rule_enabled("C003", "style", opts) || rule_enabled("C007", "style", opts) || rule_enabled("C016", "style", opts) || rule_enabled("C017", "style", opts) || rule_enabled("C018", "style", opts) {
+    naming_flags := NamingRuleFlags{
+        c003 = rule_enabled("C003", "style", opts),
+        c007 = rule_enabled("C007", "style", opts),
+        c016 = rule_enabled("C016", "style", opts),
+        c017 = rule_enabled("C017", "style", opts),
+        c018 = rule_enabled("C018", "style", opts),
+    }
+    if naming_flags.c003 || naming_flags.c007 || naming_flags.c016 || naming_flags.c017 || naming_flags.c018 {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
         if err == nil {
             defer delete(content)
@@ -177,7 +184,7 @@ analyze_file :: proc(
                 if !ts_node_is_null(root) {
                     q, q_ok := load_query_src(ts_parser.adapter.language, NAMING_RULES_SCM, "naming_rules.scm")
                     if q_ok {
-                        diags := naming_scm_run(file_path, root, lines, &q)
+                        diags := naming_scm_run(file_path, root, lines, &q, naming_flags)
                         unload_query(&q)
                         for d in dedupDiagnostics(diags) {
                             violations += emit_or_collect(d, collector)

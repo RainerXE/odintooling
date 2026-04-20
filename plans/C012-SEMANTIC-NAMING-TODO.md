@@ -1,7 +1,7 @@
 # C012: Semantic Ownership Naming — Implementation TODO
 *Rule tier: INFO / CONTEXTUAL (opt-in, never VIOLATION)*
-*Milestone: M3.3 (syntactic checks) + M6 (type-gated checks)*
-*Config: disabled by default — enabled via odin-lint.toml*
+*Milestone: M3.3 (syntactic checks) ✅ COMPLETE · M6 (type-gated checks) ⬜ PLANNED*
+*Config: disabled by default — enabled via `--enable-c012` flag (M3.3) or `odin-lint.toml` (M4+)*
 
 ---
 
@@ -212,25 +212,30 @@ check the variable name.
 
 ## Implementation Phases
 
-### Phase 1 — M3.3: Syntactic Rules (no type info needed)
+### Phase 1 — M3.3: Syntactic Rules ✅ COMPLETE
 
-These fire based on AST patterns alone and are safe to implement with
-the SCM query engine:
+These fire based on AST patterns alone using the SCM query engine.
+Implementation lives in `src/core/c012_rules.scm` + `c012_scm_run`.
 
-| Sub-rule | Convention | SCM file | Status |
-|----------|-----------|----------|--------|
-| C012-S1 | `_owned` on make/new assignments | `naming_rules.scm` | ⬜ |
-| C012-S2 | `_view`/`_borrowed` on slice expressions | `naming_rules.scm` | ⬜ |
-| C012-S3 | `alloc` heuristic on known allocator calls | `naming_rules.scm` | ⬜ |
-| C012-S4 | `_arena` heuristic on Arena type declarations | `naming_rules.scm` | ⬜ |
+| Sub-rule | Convention | SCM file | Status | Notes |
+|----------|-----------|----------|--------|-------|
+| C012-S1 | `_owned` on make/new assignments | `c012_rules.scm` | ✅ | INFO tier |
+| C012-S2 | `_view`/`_borrowed` on slice expressions | `c012_rules.scm` | ✅ | INFO tier |
+| C012-S3 | `alloc` heuristic on known allocator calls | `c012_rules.scm` | ✅ | INFO tier |
+| C012-S4 | `_arena` on Arena type declarations | `c012_rules.scm` | ⬜ | Deferred to M6: type annotation matching needed |
+
+Key finding during M3.3: `:=` inside procedure bodies is `assignment_statement`
+in the Odin tree-sitter grammar, NOT `variable_declaration` (which is package scope
+only). All S-rules updated accordingly.
 
 ### Phase 2 — M6: Type-Gated Rules (OLS type info required)
 
 | Sub-rule | Convention | Requires | Status |
 |----------|-----------|----------|--------|
-| C012-T1 | `alloc` in name for `mem.Allocator` type | OLS type resolution | ⬜ |
-| C012-T2 | `_arena` in name for `mem.Arena` type | OLS type resolution | ⬜ |
-| C012-T3 | `_owned` on procedure return type inference | OLS + C001 results | ⬜ |
+| C012-S4 | `_arena` on `mem.Arena`/`virtual.Arena` declarations | OLS type OR type-name heuristic | ⬜ |
+| C012-T1 | `alloc` in name for any `mem.Allocator`-typed variable | OLS type resolution | ⬜ |
+| C012-T2 | `_arena` in name for any `mem.Arena`-typed variable | OLS type resolution | ⬜ |
+| C012-T3 | `_owned` on return values from allocator-role procedures | OLS + DNA export | ⬜ |
 
 ---
 
@@ -254,22 +259,40 @@ severity = "info"   # or "contextual"
 
 ---
 
-## Gate Criteria (M3.3)
+## Gate Criteria
 
-- [ ] C012-S1 fires on `buf := make([]u8, n)` when C012 enabled
-- [ ] C012-S1 is silent on `buf_owned := make([]u8, n)`
-- [ ] C012-S1 is silent when make result is immediately returned
-- [ ] C012-S2 fires on `header := buf[0:4]` when C012 enabled
-- [ ] C012-S2 is silent on `header_view := buf[0:4]`
-- [ ] C012-S3 fires on `x := mem.tracking_allocator(&t)` when C012 enabled
-- [ ] C012-S3 is silent on `my_alloc := mem.tracking_allocator(&t)`
-- [ ] C012-S4 fires on `scratch: mem.Arena` when C012 enabled
-- [ ] C012-S4 is silent on `scratch_arena: mem.Arena`
-- [ ] **All C012 rules are completely silent when disabled (default)**
-- [ ] C012 diagnostics all use DiagnosticType.INFO — never VIOLATION
-- [ ] 3 pass + 3 fail fixtures for each sub-rule
-- [ ] `--list-rules` output marks C012 as "(opt-in)"
-- [ ] `--explain` output for C012 includes the LLM reasoning benefit
+### M3.3 Gate ✅ PASSED
+
+- [x] C012-S1 fires on `buf := make([]u8, n)` when C012 enabled
+- [x] C012-S1 is silent on `buf_owned := make([]u8, n)`
+- [x] C012-S1 is silent when make result is immediately returned
+- [x] C012-S2 fires on `header := buf[0:4]` when C012 enabled
+- [x] C012-S2 is silent on `header_view := buf[0:4]`
+- [x] C012-S3 fires on `x := mem.tracking_allocator(&t)` when C012 enabled
+- [x] C012-S3 is silent on `my_alloc := mem.tracking_allocator(&t)`
+- [x] All C012 rules completely silent when disabled (default)
+- [x] C012 diagnostics use DiagnosticType.INFO — never VIOLATION
+- [x] 3 pass + 3 fail fixtures for S1, S2, S3
+- [x] `--list-rules` marks C012 as "(opt-in)"
+- [ ] C012-S4 (arena type declarations) — deferred to M6
+- [ ] `odin-lint.toml` per-sub-rule config — deferred to M4 (config loading)
+- [ ] `--explain C012` output — deferred to M4.1
+
+### M6 Gate (C012 Type-Gated Phase)
+
+*Prerequisite: Gate 5 (OLS plugin + type resolution working)*
+
+- [ ] C012-T1 fires on `mem.Allocator`-typed variable with no `alloc`/`allocator` in name
+- [ ] C012-T1 is silent on variables already named `*_allocator`, `*_alloc`, etc.
+- [ ] C012-T2 fires on `mem.Arena` or `virtual.Arena`-typed variable without `arena` in name
+- [ ] C012-T2 is silent on `scratch_arena`, `temp_arena`, `block_arena`
+- [ ] C012-T3 fires when callee's DNA `memory_role == "allocator"` and LHS has no `_owned`
+- [ ] C012-T3 requires `--enable-c012` and is silent otherwise (default off)
+- [ ] C012-S4 (arena declarations) promoted from heuristic to type-exact
+- [ ] `dna_exporter.odin` `infer_memory_role_from_name` uses all suffix/name signals
+- [ ] `symbols.json` `memory_role` field populated for 100% of procedures
+- [ ] 3 pass + 3 fail fixtures for each T sub-rule
+- [ ] False positive rate on RuiShin < 5% for all T sub-rules
 
 ---
 
@@ -360,7 +383,186 @@ ffi/tree_sitter/queries/naming_rules.scm  # add C012 patterns here
 
 ---
 
-*Created: April 2026*
-*Milestone: M3.3 (syntactic) + M6 (type-gated)*
-*Rule tier: INFO — opt-in via odin-lint.toml*
-*Previous discussion: plans/odin-lint-implementation-planV7.md Section 1 (What Was Rejected from Addon Proposals — for why p_/pa_ prefixes were not adopted)*
+## M6 Implementation Detail
+
+*This section is the agent prompt / task spec for implementing C012 Phase 2.*
+*Prerequisite: M5 complete (OLS plugin returning type information).*
+
+### What OLS provides that M3.3 could not use
+
+OLS resolves every identifier to its declared type. After M5, the odin-lint
+OLS plugin path (`src/rules/correctness/`) receives `^ast.File` with full
+type information. The C012 M6 rules live on this OLS path — they do NOT use
+tree-sitter SCM queries, because the SCM path has no type info.
+
+```
+C012 Phase 2 implementation path:
+  src/rules/correctness/c012-OLS-Naming.odin   ← NEW file for M6
+  Uses: ^ast.File, ast.Visitor, type_checker results
+  NOT: tree-sitter, SCM queries
+```
+
+### C012-T1: `mem.Allocator` typed variables
+
+**Detection logic:**
+1. Walk all `var_decl` and `short_var_decl` nodes via `ast.Visitor`
+2. For each, ask OLS type checker: is the resolved type `mem.Allocator`
+   or `mem.Allocator_Proc`?
+3. If yes and variable name does not contain `alloc` or `allocator` → INFO
+
+**Implementation sketch:**
+```odin
+c012_t1_check :: proc(
+    node:      ^ast.Expr,
+    type_info: ^types.Type,
+    var_name:  string,
+    file_path: string,
+) -> Maybe(Diagnostic) {
+    // Only fire if type is mem.Allocator
+    if !type_is_allocator(type_info) do return nil
+
+    // Name already signals allocator — silent
+    if strings.contains(var_name, "alloc") do return nil
+    if strings.contains(var_name, "allocator") do return nil
+
+    return Diagnostic{
+        file      = file_path,
+        line      = node.pos.line,
+        rule_id   = "C012",
+        tier      = "style",
+        message   = "Variable holds a mem.Allocator but name gives no signal. Consider including 'alloc' or 'allocator'.",
+        fix       = fmt.aprintf("Rename to '%v_allocator' or '%v_alloc'", var_name, var_name),
+        diag_type = .INFO,
+    }
+}
+```
+
+**`type_is_allocator` helper:**
+```odin
+type_is_allocator :: proc(t: ^types.Type) -> bool {
+    // Check for mem.Allocator (named type)
+    if named, ok := t.(^types.Named); ok {
+        return named.obj.pkg.path == "core:mem" &&
+               (named.obj.name == "Allocator" || named.obj.name == "Allocator_Proc")
+    }
+    return false
+}
+```
+
+---
+
+### C012-T2: `mem.Arena` / `virtual.Arena` typed variables
+
+Same pattern as T1, checking for arena types:
+
+```odin
+type_is_arena :: proc(t: ^types.Type) -> bool {
+    if named, ok := t.(^types.Named); ok {
+        arena_pkgs := []string{"core:mem", "core:mem/virtual"}
+        for pkg in arena_pkgs {
+            if named.obj.pkg.path == pkg && named.obj.name == "Arena" {
+                return true
+            }
+        }
+    }
+    return false
+}
+```
+
+Name check: variable must contain `arena`. `scratch`, `block`, `temp` alone
+are not sufficient — they must be `scratch_arena`, `block_arena`, `temp_arena`.
+
+---
+
+### C012-T3: `_owned` on allocator-procedure return values
+
+This is the most complex sub-rule. It fires when:
+1. A procedure call's return value is assigned without `_owned` suffix, AND
+2. The callee is known to be an "allocator" — meaning it returns heap-allocated
+   memory that the caller must free
+
+**How "allocator callee" is determined (two sources, in priority order):**
+
+Source A — DNA export (M5.6): if `symbols.json` / SQLite has the callee's
+`memory_role == "allocator"`, that is authoritative.
+
+Source B — C012 naming convention in the callee's own body: if the callee
+procedure has a `_owned` suffix on its return variable, it signals ownership
+transfer. This is detectable without the DNA export.
+
+```odin
+// Callee has _owned return — C012-T3 can infer this proc is an allocator
+load_config :: proc() -> Config {
+    cfg_owned := Config{ ... }   // _owned signals: caller takes ownership
+    return cfg_owned
+}
+
+// Caller should name the result _owned
+cfg := load_config()        // C012-T3 INFO
+cfg_owned := load_config()  // silent
+```
+
+**Implementation note:** T3 requires a two-pass approach or pre-built callee
+index. Build the index during the OLS plugin's document-open phase:
+scan all proc declarations in the workspace for `_owned` return variables;
+store in a `map[string]bool` (proc name → is_allocator). Then T3 check is
+a map lookup per call site.
+
+**Escape hatches for T3:**
+- Callee is in `core/`, `vendor/` — skip (different conventions)
+- Return value is immediately passed to another call (no local name) — skip
+- C012 is disabled — skip
+- `// odin-lint:ignore C012` present — skip
+
+---
+
+### DNA Exporter Integration (M5.6 dependency)
+
+The `infer_memory_role_from_name` function in `dna_exporter.odin` must be
+updated to use all C012 signals:
+
+```odin
+infer_memory_role_from_name :: proc(
+    proc_name:    string,
+    return_names: []string,   // names of return variables
+    param_names:  []string,   // names of parameters
+) -> string {
+    // Check return variables for _owned suffix
+    for name in return_names {
+        if strings.has_suffix(name, "_owned") do return "allocator"
+    }
+    // Check if any parameter is an allocator
+    for name in param_names {
+        if strings.contains(name, "alloc") || strings.contains(name, "allocator") {
+            return "borrower"  // takes allocator = borrows memory management
+        }
+    }
+    return "neutral"
+}
+```
+
+This ensures `symbols.json` `memory_role` is populated for every procedure
+as soon as C012 conventions are adopted — feeding C012-T3 and the AI pipeline
+simultaneously.
+
+---
+
+### Files to Create for M6
+
+```
+src/rules/correctness/c012-OLS-Naming.odin   # T1, T2, T3 implementation
+tests/C012_SEM_NAMING/
+    c012_t1_fixture_pass.odin    # mem.Allocator var with 'alloc' in name
+    c012_t1_fixture_fail.odin    # mem.Allocator var with opaque name
+    c012_t2_fixture_pass.odin    # mem.Arena var with 'arena' in name
+    c012_t2_fixture_fail.odin    # mem.Arena var without 'arena'
+    c012_t3_fixture_pass.odin    # _owned on allocator proc return
+    c012_t3_fixture_fail.odin    # no _owned on allocator proc return
+    M6_TEST_SUMMARY.md
+```
+
+---
+
+*Updated: April 2026 — M3.3 complete, M6 specification added*
+*Milestone: M3.3 ✅ COMPLETE · M6 ⬜ PLANNED (after Gate 5)*
+*Rule tier: INFO — opt-in via `--enable-c012` or `odin-lint.toml`*

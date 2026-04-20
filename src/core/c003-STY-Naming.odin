@@ -17,6 +17,20 @@ import "core:strings"
 // Category: STYLE
 // =============================================================================
 
+// NamingRuleFlags controls which naming rules fire in naming_scm_run.
+// Build from rule_enabled() calls in main.odin, or use the constants below.
+NamingRuleFlags :: struct {
+    c003, c007, c016, c017, c018: bool,
+}
+
+// NAMING_ALL_ENABLED enables every naming rule — used by analyze_content,
+// OLS plugin, and MCP tools which don't have per-rule config filtering.
+NAMING_ALL_ENABLED :: NamingRuleFlags{c003=true, c007=true, c016=true, c017=true, c018=true}
+
+// NAMING_DEFAULTS enables only the rules that are on by default (C016 is on,
+// C017/C018 are opt-in). Used when opts are unavailable.
+NAMING_DEFAULTS :: NamingRuleFlags{c003=true, c007=true, c016=true, c017=false, c018=false}
+
 C003Rule :: proc() -> Rule {
     return Rule{
         id       = "C003",
@@ -47,6 +61,7 @@ naming_scm_run :: proc(
     root_node:  TSNode,
     file_lines: []string,
     q:          ^CompiledQuery,
+    flags:      NamingRuleFlags = NAMING_ALL_ENABLED,
 ) -> []Diagnostic {
     results := run_query(q, root_node, file_lines)
     defer free_query_results(results)
@@ -55,7 +70,7 @@ naming_scm_run :: proc(
 
     for result in results {
         // C003: proc names must start lowercase
-        if proc_node, ok := result.captures["proc_name"]; ok {
+        if proc_node, ok := result.captures["proc_name"]; ok && flags.c003 {
             name := naming_extract_text(proc_node, file_lines)
             if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
                 pt := ts_node_start_point(proc_node)
@@ -78,6 +93,7 @@ naming_scm_run :: proc(
         }
 
         // C007: struct/enum type names must start uppercase
+        if flags.c007 {
         struct_node, has_struct := result.captures["struct_name"]
         enum_node,   has_enum   := result.captures["enum_name"]
 
@@ -104,19 +120,27 @@ naming_scm_run :: proc(
             }
         }
 
+        } // end flags.c007
+
         // C016: local variable names must be snake_case
-        if d, ok := c016_scm_run(file_path, result.captures, file_lines); ok {
-            append(&diagnostics, d)
+        if flags.c016 {
+            if d, ok := c016_scm_run(file_path, result.captures, file_lines); ok {
+                append(&diagnostics, d)
+            }
         }
 
         // C017: package-level variable names must be camelCase (opt-in)
-        if d, ok := c017_scm_run(file_path, result.captures, file_lines); ok {
-            append(&diagnostics, d)
+        if flags.c017 {
+            if d, ok := c017_scm_run(file_path, result.captures, file_lines); ok {
+                append(&diagnostics, d)
+            }
         }
 
         // C018: proc naming must reflect @(private) visibility (opt-in)
-        if d, ok := c018_scm_run(file_path, result.captures, file_lines); ok {
-            append(&diagnostics, d)
+        if flags.c018 {
+            if d, ok := c018_scm_run(file_path, result.captures, file_lines); ok {
+                append(&diagnostics, d)
+            }
         }
     }
 
