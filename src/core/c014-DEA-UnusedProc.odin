@@ -1,6 +1,7 @@
 package core
 
 import "core:fmt"
+import "core:strings"
 import sq "../../vendor/odin-sqlite3"
 
 // =============================================================================
@@ -36,8 +37,8 @@ c014_query_dead_procs :: proc(db: ^GraphDB) -> []Diagnostic {
     defer sq.stmt_finalize(&s)
 
     for sq.stmt_step(&s) {
-        name := sq.stmt_col_text(&s, 0)
-        file := sq.stmt_col_text(&s, 1)
+        name := strings.clone(sq.stmt_col_text(&s, 0))
+        file := strings.clone(sq.stmt_col_text(&s, 1))
         line := sq.stmt_col_int(&s, 2)
 
         append(&diags, Diagnostic{

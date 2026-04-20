@@ -335,7 +335,7 @@ _main :: proc() -> int {
         fmt.printfln("export-symbols: %d files, %d nodes, %d edges, %d unresolved",
             r.files_indexed, r.nodes_written, r.edges_written, r.unresolved)
         if r.dead_code_count > 0 {
-            fmt.printfln("  dead code:    %d C014 violation(s)", r.dead_code_count)
+            fmt.printfln("  dead code:    %d violation(s)", r.dead_code_count)
         }
         fmt.printfln("  graph db:    %s", r.db_path)
         fmt.printfln("  symbols.json: %s", r.symbols_path)
