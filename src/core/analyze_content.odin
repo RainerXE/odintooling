@@ -26,6 +26,24 @@ analyze_content :: proc(
 	ts:        ^TreeSitterASTParser,
 	diags:     ^[dynamic]Diagnostic,
 ) {
+	// ── B001: Brace balance — runs before tree-sitter, suppresses other rules ─
+	b001_diags := b001_check(file_path, content)
+	defer delete(b001_diags)
+	if len(b001_diags) > 0 {
+		for d in b001_diags { append(diags, d) }
+		append(diags, Diagnostic{
+			file      = file_path,
+			line      = 0,
+			column    = 0,
+			rule_id   = "B001",
+			tier      = "structural",
+			message   = "other diagnostics suppressed — fix brace imbalance first",
+			has_fix   = false,
+			diag_type = .INFO,
+		})
+		return
+	}
+
 	lines := strings.split(content, "\n")
 	defer delete(lines)
 
