@@ -467,15 +467,22 @@ is_free_call :: proc(node: ^ASTNode, var_name: string) -> bool {
     if node.node_type != "call_expression" do return false
     found_callee := false
     for &child in node.children {
-        if child.node_type == "identifier" &&
-           (child.text == "free" || child.text == "delete") {
-            found_callee = true
-        }
+        // argument_list wrapper (unused in current Odin grammar, kept for safety).
         if child.node_type == "argument_list" && found_callee {
             for &arg in child.children {
                 if arg.node_type == "identifier" && arg.text == var_name {
                     return true
                 }
+            }
+        }
+        if child.node_type == "identifier" {
+            if !found_callee {
+                if child.text == "free" || child.text == "delete" {
+                    found_callee = true
+                }
+            } else {
+                // First identifier after the callee is the first argument.
+                if child.text == var_name do return true
             }
         }
     }
@@ -487,13 +494,17 @@ is_free_call :: proc(node: ^ASTNode, var_name: string) -> bool {
 has_manual_cleanup :: proc(var_name: string, block: ^ASTNode) -> bool {
     if var_name == "" || var_name == "_" do return false
     for &child in block.children {
-        if child.node_type == "expression_statement" {
-            if is_free_call(&child, var_name) do return true
-        }
+        // In the Odin tree-sitter grammar, call_expression is a direct child
+        // of block — there is no expression_statement wrapper.
+        if is_free_call(&child, var_name) do return true
         if child.node_type == "if_statement" &&
            contains_identifier(&child, var_name) {
             for &gc in child.children {
-                if is_free_call(&gc, var_name) do return true
+                if gc.node_type == "block" {
+                    for &ggc in gc.children {
+                        if is_free_call(&ggc, var_name) do return true
+                    }
+                }
             }
         }
     }
