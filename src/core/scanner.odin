@@ -2,6 +2,7 @@ package core
 
 import "core:fmt"
 import "core:os"
+import "core:path/filepath"
 import "core:strings"
 
 // =============================================================================
@@ -33,6 +34,32 @@ collect_odin_files :: proc(
         }
     }
     return files
+}
+
+// group_files_by_dir groups a flat file list by parent directory.
+// Keys are cloned directory paths (owned by the map).
+// Values are dynamic slices of file path strings (not cloned — owned by caller).
+// Call free_dir_groups to release.
+group_files_by_dir :: proc(files: []string) -> map[string][dynamic]string {
+    groups := make(map[string][dynamic]string)
+    for file in files {
+        dir := filepath.dir(file)
+        if dir not_in groups {
+            groups[strings.clone(dir)] = make([dynamic]string)
+        }
+        append(&groups[dir], file)
+    }
+    return groups
+}
+
+// free_dir_groups releases memory allocated by group_files_by_dir.
+// Does NOT free the file path strings (those are owned by the caller's file list).
+free_dir_groups :: proc(groups: ^map[string][dynamic]string) {
+    for k, v in groups {
+        delete(k)
+        delete(v)
+    }
+    delete(groups^)
 }
 
 // walk_dir appends .odin files found in dir_path to files.
