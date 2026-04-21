@@ -70,6 +70,7 @@ main :: proc() {
     mcp.server_register_tool(&s, make_get_impact_radius_tool())
     mcp.server_register_tool(&s, make_find_allocators_tool())
     mcp.server_register_tool(&s, make_find_all_references_tool())
+    mcp.server_register_tool(&s, make_rename_symbol_tool())
 
     mcp.server_run(&s) // blocks until stdin EOF
 }

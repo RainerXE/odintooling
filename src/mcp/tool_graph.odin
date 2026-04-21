@@ -2,6 +2,7 @@ package mcp_server
 
 import "core:encoding/json"
 import "core:fmt"
+import "core:os"
 import "core:strings"
 import "base:runtime"
 
@@ -224,6 +225,109 @@ _find_all_references_handler :: proc(params: json.Value, allocator: runtime.Allo
     }
     strings.write_string(&sb, `]}`)
     return fmt.aprintf("%s", strings.to_string(sb)), false
+}
+
+// =============================================================================
+// rename_symbol
+// =============================================================================
+
+make_rename_symbol_tool :: proc() -> mcp.RegisteredTool {
+    return mcp.RegisteredTool{
+        defn = mcp.ToolDefinition{
+            name        = "rename_symbol",
+            description = "Generate text-edit patches to rename a symbol everywhere in the project. Returns one edit per call site + declaration. Safe rename: does not touch string literals or comments.",
+            input_schema = `{
+                "type": "object",
+                "properties": {
+                    "old_name": {"type": "string", "description": "Current symbol name"},
+                    "new_name": {"type": "string", "description": "New symbol name"},
+                    "db_path":  {"type": "string", "description": "Path to graph db (default: .codegraph/odin_lint_graph.db)"}
+                },
+                "required": ["old_name", "new_name"]
+            }`,
+        },
+        handler = _rename_symbol_handler,
+    }
+}
+
+@(private="file")
+_rename_symbol_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+    old_name, err1 := _extract_string_param(params, "old_name")
+    if err1 != "" { return err1, true }
+    new_name, err2 := _extract_string_param(params, "new_name")
+    if err2 != "" { return err2, true }
+    db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
+
+    if old_name == new_name { return `{"edits":[],"edit_count":0,"note":"old and new names are identical"}`, false }
+
+    db, ok := core.graph_open(db_path)
+    if !ok { return fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path), true }
+    defer core.graph_close(db)
+
+    locs := core.graph_rename_locations(db, old_name)
+    defer core.graph_free_rename_locations(&locs)
+
+    if len(locs) == 0 {
+        return fmt.aprintf(`{"edits":[],"edit_count":0,"note":"symbol '%s' not found in graph"}`, old_name), false
+    }
+
+    sb := strings.builder_make()
+    defer strings.builder_destroy(&sb)
+
+    strings.write_string(&sb, `{"old_name":`)
+    strings.write_string(&sb, _gj(old_name))
+    strings.write_string(&sb, `,"new_name":`)
+    strings.write_string(&sb, _gj(new_name))
+    fmt.sbprintf(&sb, `,"edit_count":%d,"edits":[`, len(locs))
+
+    for loc, idx in locs {
+        col := _find_col_in_file(loc.file, loc.line, old_name)
+        if idx > 0 { strings.write_string(&sb, ",") }
+        strings.write_string(&sb, `{"file":`)
+        strings.write_string(&sb, _gj(loc.file))
+        fmt.sbprintf(&sb, `,"line":%d,"column":%d,`, loc.line, col)
+        strings.write_string(&sb, `"kind":`)
+        strings.write_string(&sb, _gj(loc.kind))
+        strings.write_string(&sb, `,"old_text":`)
+        strings.write_string(&sb, _gj(old_name))
+        strings.write_string(&sb, `,"new_text":`)
+        strings.write_string(&sb, _gj(new_name))
+        strings.write_string(&sb, "}")
+    }
+    strings.write_string(&sb, `]}`)
+    return fmt.aprintf("%s", strings.to_string(sb)), false
+}
+
+// _find_col_in_file reads line `line_num` of a file and returns the 1-based column
+// of the first occurrence of `token` as a whole word, or 0 if not found / unreadable.
+@(private="file")
+_find_col_in_file :: proc(file_path: string, line_num: int, token: string) -> int {
+    content, err := os.read_entire_file_from_path(file_path, context.temp_allocator)
+    if err != nil { return 0 }
+
+    lines := strings.split(string(content), "\n", context.temp_allocator)
+    idx   := line_num - 1
+    if idx < 0 || idx >= len(lines) { return 0 }
+
+    line := lines[idx]
+    pos  := 0
+    for pos < len(line) {
+        col := strings.index(line[pos:], token)
+        if col < 0 { return 0 }
+        abs := pos + col
+        // Word-boundary check: char before and after must not be identifier chars.
+        before_ok := abs == 0 || !_is_ident_char(line[abs-1])
+        after_end := abs + len(token)
+        after_ok  := after_end >= len(line) || !_is_ident_char(line[after_end])
+        if before_ok && after_ok { return abs + 1 }
+        pos = abs + 1
+    }
+    return 0
+}
+
+@(private="file")
+_is_ident_char :: proc(c: byte) -> bool {
+    return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
 // =============================================================================
