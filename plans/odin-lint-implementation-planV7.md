@@ -661,7 +661,25 @@ M6   Extended Rules + Refactoring        🔧 IN PROGRESS
   C019 type marker suffixes                       ⬜ BLOCKED (conventions need discussion)
   rename_symbol MCP tool                          ⬜ PLANNED
   LSP Call Hierarchy                              ⬜ PLANNED
-M6.5 Structural Rules (B-category)      ⬜ PLANNED (B001 unmatched brace / unclosed block)
+M6.5 Structural Rules (B-category)      ✅ COMPLETE (April 21 2026)
+  B001 Unmatched Brace / Unclosed Block            ✅ COMPLETE (April 21 2026)
+M6.6 C001 False Positive Reduction (AST layer)   ⬜ NEXT
+  Tier 1: fix has_allocator_arg, context.allocator detection, multi-line make
+  Tier 2: _init proc name heuristic
+  ↳ Prerequisite for M7 (graph layer builds on same escape-hatch framework)
+M6.7 C019 STY-TypeMarker (type suffix conventions) ⬜ PLANNED (conventions to agree first)
+M7   Rule Quality + Graph-Semantic Layer          ⬜ PLANNED
+  Tier 3: graph-based LHS scope check (package-level var → skip C001)
+  Tier 4: memory_role propagation for allocator-type variables
+  ↳ Requires M6.6 escape-hatch framework + M5.6 graph DB
+  ↳ Unlocks C012-T type-gated rules (same memory_role infrastructure)
+M7.1 OLS Refactoring + Advanced Rules             ⬜ PLANNED
+  rename_symbol MCP tool (find_all_references → FixEdit set)
+  LSP Call Hierarchy (VS Code "Show Call Hierarchy" on Odin procs)
+  C101 Context Integrity (control-flow, context.allocator restore check)
+  C201 Unchecked Result Guard (ignored error returns)
+  C202 Switch Exhaustiveness (incomplete enum switches)
+  C012-T Type-Gated Ownership Naming              ⬜ BLOCKED until M7 (needs memory_role)
 ```
 
 ---
@@ -1625,20 +1643,20 @@ cases against the enum's member list.
 - [x] C014 fires on non-exported proc with zero callers
 - [x] C015 fires on non-exported constant/variable with zero references
 - [x] `dead_code` domain in `odin-lint.toml` enables/suppresses C014–C015
-- [ ] C012-T1, T2, T3 implemented and tested (see C012-T gate above)
-- [ ] `dna_exporter.odin` populates `memory_role` for all procedures (improves on M5.6 heuristics via OLS types)
-- [ ] C101 false positive rate < 5% on RuiShin
-- [ ] C201 fires on unchecked error returns, silent on intentional ignores
-- [ ] C202 fires on incomplete enum switches
-- [ ] `rename_symbol` MCP tool generates correct FixEdit set for a proc rename
-- [ ] Rename does not touch string literals (safe mode)
-- [ ] C019 conventions agreed with user — implementation deferred until then
-- [ ] LSP Call Hierarchy: VS Code "Show Call Hierarchy" works on an Odin proc
+- [ ] C012-T1, T2, T3 implemented and tested → moved to M7.1 (BLOCKED until M7 memory_role)
+- [ ] `dna_exporter.odin` populates `memory_role` for all procedures → moved to M7 Tier 4
+- [ ] C101 false positive rate < 5% on RuiShin → moved to M7.1
+- [ ] C201 fires on unchecked error returns, silent on intentional ignores → moved to M7.1
+- [ ] C202 fires on incomplete enum switches → moved to M7.1
+- [ ] `rename_symbol` MCP tool generates correct FixEdit set for a proc rename → moved to M7.1
+- [ ] Rename does not touch string literals (safe mode) → moved to M7.1
+- [ ] C019 conventions agreed with user — moved to M6.7
+- [ ] LSP Call Hierarchy: VS Code "Show Call Hierarchy" works on an Odin proc → moved to M7.1
 - [ ] All new rules: 3 pass + 3 fail fixtures
 
 ---
 
-### ⬜ Milestone 6.5 — Structural Rules (B-category)
+### ✅ Milestone 6.5 — Structural Rules (B-category) — COMPLETE (April 21 2026)
 
 **New rule category.** "B" rules operate on the raw token stream, not the AST.
 They fire when the file is too broken for the AST to be trusted.
@@ -1703,15 +1721,270 @@ each B001 violation: `"other diagnostics suppressed for this file"`.
 
 ##### Gate 6.5
 
-- [ ] B001 fires on unclosed `{` at correct line and column
-- [ ] B001 fires on surplus `}` at correct line and column
-- [ ] B001 silent on perfectly balanced files
-- [ ] String literals, rune literals, and comments correctly excluded
-- [ ] Nested block comments (`/* /* */ */`) handled correctly
-- [ ] When B001 fires, remaining rules are suppressed for that file with note
-- [ ] 3 pass + 3 fail fixtures (unclosed, surplus, mixed)
-- [ ] Own codebase: 0 B001 violations
-- [ ] RuiShin corpus: 0 B001 violations (all files well-formed)
+- [x] B001 fires on unclosed `{` at correct line and column
+- [x] B001 fires on surplus `}` at correct line and column
+- [x] B001 silent on perfectly balanced files
+- [x] String literals, rune literals, and comments correctly excluded
+- [x] Nested block comments (`/* /* */ */`) handled correctly
+- [x] When B001 fires, remaining rules are suppressed for that file with note
+- [x] 3 pass + 3 fail fixtures (unclosed, surplus, balanced)
+- [x] Own codebase: 0 B001 violations
+- [x] RuiShin corpus: 1 file with real brace imbalance detected (`tools/odin/final_debug.odin`), src/ clean
+
+---
+
+### ⬜ Milestone 6.6 — C001 False Positive Reduction (AST Layer)
+
+*Prerequisite: Gate 6.5 (B001 complete) — PASSED*  
+*Unlocks: M7 Graph-Semantic Layer (same escape-hatch framework extended)*
+
+**Context.** RuiShin `src/` scan (109 files, April 2026) produced 72 C001 hits.
+Manual review classified 62 as false positives in three patterns and identified
+3 confirmed bugs in the existing escape-hatch logic. This milestone fixes those
+bugs and adds a new heuristic escape hatch, targeting ≤ 10 false positives on
+the same corpus.
+
+The improvements are purely within `src/core/c001-COR-Memory.odin` — no schema
+changes, no graph queries. M7 (graph layer) extends the same escape-hatch
+framework with richer signal once the AST layer is clean.
+
+---
+
+#### Bug 1 — `has_allocator_arg` patterns are too narrow
+
+**Root cause.** The function tests three narrow text patterns against the make()
+line. `runtime.default_allocator()` fails all three:
+
+| Pattern | Why it misses `default_allocator()` |
+|---------|-------------------------------------|
+| `"temp_allocator"` | literal substring match, not present |
+| `".allocator"` | `.` separates the package, not a field — `runtime.default_allocator` contains no `.allocator` substring |
+| `"allocator)"` | the `)` closes `default_allocator()`'s own argument list; `allocator)` is never contiguous |
+
+Same failure for `mem.arena_allocator(&x)` and any named allocator variable
+like `path_scratch` or `frame_scratch`.
+
+**Fix.** Replace the three-pattern check with a single broad match:
+
+```odin
+return strings.contains(args, "allocator")
+```
+
+If the word `allocator` appears anywhere in the argument list, the call is using
+a custom or explicit allocator. This catches `runtime.default_allocator()`,
+`mem.arena_allocator(...)`, `context.temp_allocator`, `context.allocator`, and
+any proc that ends in `_allocator`. It still misses opaque variables like
+`path_scratch` — those are handled in M7 (Tier 4 `memory_role` propagation).
+
+**Impact.** Eliminates roughly 30 of the 62 false positives (Category A: explicit
+arena/scratch allocators).
+
+---
+
+#### Bug 2 — `changes_context_allocator` block walk mismatch
+
+**Root cause.** Confirmed via live test: a proc that starts with
+`context.allocator = context.temp_allocator` still triggers C001 on subsequent
+`make()` calls. The `has_arena` flag is set but the assignment's AST node
+structure does not match what `changes_context_allocator` expects. Likely the
+`assignment_statement` is wrapped in an extra expression node in the actual
+tree-sitter Odin grammar.
+
+**Fix.** Debug by printing the node type path for a known failing case. Adjust
+`changes_context_allocator` to match the actual tree structure. Add a targeted
+test fixture:
+
+```odin
+// c001_fixture_temp_alloc.odin — must produce 0 C001 violations
+test_temp :: proc() {
+    context.allocator = context.temp_allocator
+    buf := make([dynamic]u8, 0, 128)
+    _ = buf
+}
+```
+
+**Impact.** Eliminates roughly 8 false positives (Category C: temp-allocator
+procs in `bidi.odin`, `text/layout.odin`, `text/shaper.odin`).
+
+---
+
+#### Bug 3 — Multi-line `make()` allocator argument not scanned
+
+**Root cause.** `uses_non_default_allocator` reads only `file_lines[call_node.start_line - 1]`.
+Multi-line calls with the allocator argument on a continuation line are invisible:
+
+```odin
+buf := make(          // start_line → only this line is read
+    [dynamic]u8,
+    0, 128,
+    runtime.default_allocator(),  // never seen
+)
+```
+
+**Fix.** Scan from `call_node.start_line` to `call_node.end_line`, joining the
+lines before searching for the `"allocator"` substring. Guard against very long
+ranges (cap at 20 lines to avoid pathological cases).
+
+**Impact.** Eliminates roughly 4 false positives (multi-line init patterns).
+
+---
+
+#### Tier 2 — `_init` proc name heuristic
+
+**Pattern.** Procs named `*_init`, `init_*`, or exactly `init` are by
+convention lifetime-scoped initializers. Their allocations live for the program
+or subsystem lifetime and are intentionally never `defer`-freed individually.
+This is idiomatic Odin (and C, and Go): an `init` proc sets up module state
+once; a matching `destroy` or `shutdown` proc tears it down.
+
+**Fix.** In `analyze_block`, detect the enclosing proc name (already available
+from the AST walk context). If the proc name matches `*_init`, `init_*`, or
+`init`, set `ctx.has_arena = true` to suppress C001 for the entire block.
+
+```odin
+// In the block analysis loop setup:
+if strings.has_suffix(proc_name, "_init") ||
+   strings.has_prefix(proc_name, "init_") ||
+   proc_name == "init" {
+    ctx.has_arena = true
+}
+```
+
+This is a heuristic, not a guarantee. A genuine leak inside an `_init` proc
+(e.g. a loop body that allocates per-iteration) would be suppressed. Accept
+this trade-off: the naming convention is strong enough that false negatives in
+`_init` procs are rare and the user can add a suppression comment for the
+exceptional case.
+
+**Impact.** Eliminates roughly 16 false positives (Category B: init-and-hold).
+
+---
+
+#### Gate 6.6
+
+- [ ] `has_allocator_arg` matches `runtime.default_allocator()` — add to existing fixture
+- [ ] `has_allocator_arg` matches `mem.arena_allocator(&x)` — add to existing fixture
+- [ ] `context.allocator = context.temp_allocator` at proc top suppresses all C001 in that proc
+- [ ] Multi-line `make()` with allocator on continuation line: no C001 violation
+- [ ] `_init` / `init_*` proc heuristic suppresses all C001 in initializer procs
+- [ ] 5 new pass fixtures (one per fixed case)
+- [ ] Existing 3 fail fixtures still fire
+- [ ] RuiShin `src/` false positive count: ≤ 10 (down from 62)
+- [ ] Own codebase: 0 regressions
+- [ ] Remaining ~10 FPs documented in `plans/ruishin_check_c001.md` as known architectural gap → deferred to M7
+
+---
+
+### ⬜ Milestone 7 — Rule Quality: Graph-Semantic Layer
+
+*Prerequisite: Gate 6.6 (AST escape hatches clean) + Gate 5.6 (graph DB)*  
+*Builds on: M5.6 `nodes`/`edges` schema — no schema changes needed*  
+*Unlocks: C012-T type-gated semantic naming (shares `memory_role` infrastructure)*
+
+**Context.** After M6.6 the remaining C001 false positives all share one root
+cause: C001 cannot determine whether the allocation target is a local variable or
+a package-scoped symbol, and cannot determine whether a custom variable (like
+`path_scratch`) is an allocator type. Both facts exist in the graph — the first
+is derivable from the `nodes` table today; the second requires a new graph pass
+to populate `memory_role` for variables.
+
+M7 makes C001 graph-aware. The same infrastructure (scope query, memory_role
+annotation) also unblocks the remaining C012-T type-gated naming rules.
+
+---
+
+#### Tier 3 — Graph-based LHS scope check
+
+**Pattern.** When C001 sees `foo = make(...)` (assignment, not `:=`), it cannot
+tell from the AST alone whether `foo` is local or package-scoped. Package-scoped
+assignments inside `_init` procs are already caught by M6.6's heuristic, but
+assignments outside named init procs slip through.
+
+**Fix.** Before flagging `foo = make(...)` as a C001 violation, query the graph:
+
+```sql
+SELECT 1 FROM nodes
+WHERE name = ?       -- LHS identifier
+  AND file = ?       -- current file
+  AND kind = 'variable'
+LIMIT 1;
+```
+
+If a matching `nodes` row exists, `foo` is a package-level symbol. Skip C001.
+The graph query only runs when C001 would otherwise fire — zero cost for the
+common case.
+
+**Dependency.** Requires the DNA exporter (`dna_exporter.odin`) to index
+package-level variable declarations into `nodes` with `kind='variable'`. The
+exporter already indexes constants and variables in some passes; verify coverage
+and fill any gaps.
+
+**Impact.** Eliminates the remaining ~8 init-and-hold false positives not caught
+by the `_init` heuristic (e.g. `image_path_cache = make(...)` outside an
+explicitly named init proc).
+
+---
+
+#### Tier 4 — `memory_role` propagation for allocator-type variables
+
+**Pattern.** Custom allocator variables like `path_scratch`, `frame_scratch`,
+`arena_alloc` are of type `mem.Allocator` or `runtime.Allocator`. When one of
+these is passed as the last argument to `make()`, no `defer delete` is needed —
+the arena owns the allocation. C001 currently cannot detect this because the
+variable name contains no `allocator` substring.
+
+**Fix (two parts):**
+
+1. **Graph pass.** Extend the DNA exporter to detect declarations of type
+   `mem.Allocator` or `runtime.Allocator` and set `memory_role = 'allocator'`
+   in their `nodes` row. This is a tree-sitter SCM pattern:
+   ```scheme
+   (short_var_decl
+     (identifier) @var_name
+     (call_expression
+       function: (identifier) @fn (#match? @fn "_allocator")))
+   ```
+
+2. **C001 query.** When a `make()` argument does not match the `"allocator"`
+   text pattern (Bug 1 fix), fall back to a graph query: does any argument
+   identifier have `memory_role = 'allocator'` in the `nodes` table? If yes,
+   suppress C001.
+
+**Dependency.** Requires M6.6 Bug 1 fix (to avoid re-checking already-caught
+cases) and the `memory_role` exporter pass above.
+
+**Impact.** Eliminates the last ~8 false positives from custom allocator
+variables (`path_scratch`, `frame_scratch`, `arena_alloc`, etc.). Combined with
+M6.6, target is **≤ 2 false positives** on the RuiShin `src/` corpus — only
+genuine ambiguous patterns where the linter truly cannot determine intent without
+type resolution.
+
+---
+
+#### C012-T unlock
+
+The `memory_role = 'allocator'` pass required for Tier 4 is the same
+infrastructure C012-T needs to detect `mem.Allocator`-typed variables with
+opaque names. Once Tier 4 is done, the C012-T gate criteria become achievable:
+
+> *C012-T1: fires on `mem.Allocator`-typed variable with opaque name*  
+> *C012-T3: fires when callee has `memory_role == "allocator"` and LHS has no `_owned`*
+
+Both check `memory_role` in the graph — the same column populated by Tier 4.
+
+---
+
+#### Gate 7
+
+- [ ] DNA exporter indexes package-level variable declarations (`kind='variable'`)
+- [ ] Graph query in C001 skips flagging package-level LHS variables
+- [ ] DNA exporter populates `memory_role='allocator'` for `mem.Allocator`-typed var decls
+- [ ] Graph query in C001 suppresses make() calls that pass a `memory_role='allocator'` variable
+- [ ] RuiShin `src/` C001 false positive count: ≤ 2 (down from ≤ 10 after M6.6)
+- [ ] `plans/ruishin_check_c001.md` updated — remaining entries are confirmed genuine candidates only
+- [ ] C012-T gate criteria re-evaluated — T1 and T3 now achievable
+- [ ] Own codebase: 0 regressions
+- [ ] Graph DB backward-compatible: no schema changes required
 
 ---
 
@@ -1889,8 +2162,12 @@ each B001 violation: `"other diagnostics suppressed for this file"`.
 | 5 | OLS plugin | Editor diagnostics + code actions | ✅ |
 | 5.5 | MCP gateway | Agent-driven semantic editing + symbol export | ✅ |
 | 5.6 | DNA Impact Analysis + Code Graph | SQLite graph, MCP tools, memory roles, find_all_references | 🔧 |
-| 6 | Extended rules + Refactoring | C013-C015 dead code, C101/C201/C202, rename, LSP call hierarchy | ⬜ |
-| 6.5 | Structural rules (B-category) | B001 unmatched brace — token scan, error tier | ⬜ |
+| 6 | Extended rules + Refactoring | C013-C015 dead code, C101/C201/C202, rename, LSP call hierarchy | 🔧 |
+| 6.5 | Structural rules (B-category) | B001 unmatched brace — token scan, error tier | ✅ |
+| 6.6 | C001 FP reduction (AST layer) | Fix 3 escape-hatch bugs + `_init` heuristic; RuiShin FP ≤ 10 | ⬜ |
+| 6.7 | C019 type marker suffixes | Agree conventions, implement suffix rule | ⬜ |
+| 7 | Rule quality: graph-semantic layer | Package-level scope check + memory_role propagation; FP ≤ 2 | ⬜ |
+| 7.1 | OLS refactoring + advanced rules | rename_symbol, LSP call hierarchy, C101/C201/C202; C012-T after M7 | ⬜ |
 
 ---
 
@@ -2117,6 +2394,6 @@ codebase structurally, execute lint analysis, and apply verified fixes.
 
 ---
 
-*Version: 7.2*
-*Last status review: April 18 2026*
+*Version: 7.3*
+*Last status review: April 21 2026*
 *Previous version: odin-lint-implementation-planV6.md (V7.0 was the internal draft)*
