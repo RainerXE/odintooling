@@ -16,6 +16,9 @@ dead_code       = false   # enable C014, C015 dead code detection (opt-in, proje
 c016 = true   # local variables must be snake_case
 c017 = false  # package-level variables must be camelCase (opt-in)
 c018 = false  # @(private) procs snake_case / public procs PascalCase (opt-in)
+c020 = false  # short variable/parameter names flagged (opt-in)
+c020_min_length = 3          # flag names shorter than this (1-2 char by default)
+c020_allowed = "i,j,k,x,y,z,n,ok,err,db,id"  # always-OK short names
 
 [rules]
 # Global rule configuration with categories (Clippy-inspired)

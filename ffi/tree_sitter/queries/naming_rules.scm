@@ -36,3 +36,9 @@
 ; use assignment_statement instead) — no scope filtering needed in Odin code.
 (variable_declaration
   (identifier) @pkg_var)
+
+; C020 — procedure parameter names (short name check)
+; _param_header is an inline rule so its identifier children appear directly
+; under parameter in the AST.
+(parameter
+  (identifier) @param_name)
