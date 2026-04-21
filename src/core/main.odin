@@ -125,6 +125,31 @@ analyze_file :: proc(
 ) -> (int, bool) {
     violations := 0
 
+    // B001: Brace balance — runs before everything else.
+    // If braces are unbalanced the AST is unreliable; suppress all other rules.
+    {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            b001_diags := b001_check(file_path, string(content))
+            defer delete(b001_diags)
+            if len(b001_diags) > 0 {
+                for d in b001_diags { violations += emit_or_collect(d, collector) }
+                violations += emit_or_collect(Diagnostic{
+                    file      = file_path,
+                    line      = 0,
+                    column    = 0,
+                    rule_id   = "B001",
+                    tier      = "structural",
+                    message   = "other diagnostics suppressed — fix brace imbalance first",
+                    has_fix   = false,
+                    diag_type = .INFO,
+                }, collector)
+                return violations, false
+            }
+        }
+    }
+
     // C001: Memory allocation without defer free (OdinLint AST walker)
     if rule_enabled("C001", "correctness", opts) {
         ast_root, parse_ok := parseFile(ts_parser^, file_path)
