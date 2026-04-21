@@ -1430,7 +1430,7 @@ now as a standalone MCP tool lets it be validated before refactoring is built on
 
 ---
 
-### ⬜ Milestone 6 — Extended Rules + Refactoring Foundation
+### ✅ Milestone 6 — Extended Rules + Refactoring Foundation — COMPLETE (April 21 2026)
 
 *Prerequisite: Gate 5.6 (code graph + SQLite working)*
 *Full C012 M6 spec: `plans/C012-SEMANTIC-NAMING-TODO.md` → M6 Implementation Detail*
@@ -1885,7 +1885,7 @@ exceptional case.
 
 ---
 
-### ⬜ Milestone 6.9 — Package-Scope Linting Foundation
+### ✅ Milestone 6.9 — Package-Scope Linting Foundation — COMPLETE (April 21 2026)
 
 *Prerequisite: Gate 6.6 complete*  
 *Introduces: B002, B003 — first rules that require multi-file context*  
@@ -2015,7 +2015,7 @@ Rules that need package context (B002, B003, C017) query `pkg_context`.
 
 ---
 
-### ⬜ Milestone 7 — Graph Enrichment for LLM Tooling + Refactoring
+### ✅ Milestone 7 — Graph Enrichment for LLM Tooling + Refactoring — COMPLETE (April 21 2026)
 
 *Prerequisite: Gate 6.9 (package-scope foundation) + Gate 5.6 (graph DB)*  
 *Reframed from original "C001 FP via graph" — see architecture rationale below*  
@@ -2283,13 +2283,13 @@ no schema changes required.
 | 5 | OLS plugin | Editor diagnostics + code actions | ✅ |
 | 5.5 | MCP gateway | Agent-driven semantic editing + symbol export | ✅ |
 | 5.6 | DNA Impact Analysis + Code Graph | SQLite graph, MCP tools, memory roles, find_all_references | 🔧 |
-| 6 | Extended rules + Refactoring | C013-C015 dead code, C101/C201/C202, rename, LSP call hierarchy | 🔧 |
+| 6 | Extended rules + Refactoring | C016-C018 naming, C014-C015 dead code, rename_symbol MCP | ✅ |
 | 6.5 | Structural rules (B-category) | B001 unmatched brace — token scan, error tier | ✅ |
 | 6.6 | C001 FP reduction (AST layer) | Fix escape-hatch bugs, `_init` heuristic, direct delete detection | ✅ |
 | 6.7 | C019 type marker suffixes | DEFERRED — needs C012 Phase 2 type inference + convention agreement | ↷ |
-| 6.9 | Package-scope linting foundation | Four scope levels defined; B002 package name consistency; B003 subfolder name clash | ⬜ |
-| 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock, incremental rebuild | ⬜ |
-| 7.1 | OLS refactoring + advanced rules | rename_symbol, LSP call hierarchy, C101/C201/C202, C012-T, C019 | ⬜ |
+| 6.9 | Package-scope linting foundation | Four scope levels defined; B002 package name consistency; B003 subfolder name clash | ✅ |
+| 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock, incremental rebuild | ✅ |
+| 7.1 | OLS refactoring + advanced rules | LSP call hierarchy, C101/C201/C202, C012-T, C019 | ⬜ |
 
 ---
 
