@@ -21,11 +21,18 @@ import "core:strings"
 // ESCAPE HATCHES — the rule is silent when:
 //   1. The variable is returned from the proc (ownership transferred to caller)
 //   2. A matching defer free() / defer delete() exists in the same block
-//   3. A non-default allocator is passed as an argument (arena, temp, custom)
-//   4. context.allocator is reassigned in the same block (arena pattern)
+//   3. Any argument to make/new contains the word "allocator" — covers
+//      runtime.default_allocator(), mem.arena_allocator(&x),
+//      context.temp_allocator, context.allocator, and custom allocator vars.
+//      Multi-line calls are scanned across all lines of the call expression.
+//   4. context.allocator is assigned anywhere in the block (arena pattern).
+//      Detected via both AST walk and source-line text scan.
 //   5. context := context appears in the block (context-shadow arena pattern)
 //   6. A manual free/delete call for the variable exists in the block
-//   7. An inline suppression comment is present (see below)
+//   7. The enclosing proc is an initializer: name ends in _init, starts with
+//      init_, or is exactly "init" — these procs allocate module-lifetime
+//      state that is torn down at subsystem shutdown, not per-call.
+//   8. An inline suppression comment is present (see below)
 //
 // SUPPRESSION — add to the allocation line or the line before:
 //   buf := make([]u8, n)  // odin-lint:ignore C001 caller owns this
@@ -149,6 +156,17 @@ check_block :: proc(
     file_path:  string,
     file_lines: []string,
 ) -> []Diagnostic {
+    // Tier 2: init-and-hold heuristic.
+    // Procs named *_init, init_*, or init allocate module-lifetime state.
+    // No individual defer free is expected — the whole subsystem is torn down
+    // together.  Suppress C001 for the entire block.
+    proc_name := get_enclosing_proc_name(block, file_lines)
+    if strings.has_suffix(proc_name, "_init") ||
+       strings.has_prefix(proc_name, "init_") ||
+       proc_name == "init" {
+        return {}
+    }
+
     ctx := C001ScopeContext{
         returns_var  = make(map[string]bool),
         allocations  = make([dynamic]AllocationInfo, 0, 8),
@@ -182,7 +200,7 @@ check_block :: proc(
             }
         }
 
-        if changes_context_allocator(&child) do ctx.has_arena = true
+        if changes_context_allocator(&child, file_lines) do ctx.has_arena = true
 
         if is_return_statement(&child) {
             extract_returned_vars(&child, &ctx.returns_var)
@@ -280,29 +298,51 @@ find_direct_call_expression :: proc(node: ^ASTNode) -> ^ASTNode {
     return nil
 }
 
-// uses_non_default_allocator returns true when the make/new call on this line
-// passes an explicit allocator argument.
+// uses_non_default_allocator returns true when the make/new call passes an
+// explicit allocator argument.  Scans all source lines of the call expression
+// (start_line..end_line) so multi-line make() calls are handled correctly.
+//
+// The first line is checked with has_allocator_arg (anchored to the make/new
+// position).  Continuation lines have no make( prefix, so they are checked
+// for the bare word "allocator" in the non-comment portion of the line.
 uses_non_default_allocator :: proc(call_node: ^ASTNode, file_lines: []string) -> bool {
-    idx := call_node.start_line - 1
-    if idx < 0 || idx >= len(file_lines) do return false
-    return has_allocator_arg(file_lines[idx])
+    start := call_node.start_line - 1
+    end   := call_node.end_line   - 1
+    if start < 0 || start >= len(file_lines) do return false
+    if end < start { end = start }
+    end = min(end, start + 20)          // cap: avoid pathological ranges
+    end = min(end, len(file_lines) - 1)
+
+    // First line: use full has_allocator_arg (anchored to make/new position).
+    if has_allocator_arg(file_lines[start]) do return true
+
+    // Continuation lines: check for "allocator" in non-comment code.
+    for i in start + 1 ..= end {
+        line := file_lines[i]
+        code := line
+        if comment := strings.index(line, "//"); comment >= 0 {
+            code = line[:comment]
+        }
+        if strings.contains(code, "allocator") do return true
+    }
+    return false
 }
 
 // has_allocator_arg checks whether the argument list of make/new on this
 // source line contains an allocator expression.  Only looks inside the
 // parentheses, not at the rest of the line, to avoid false matches in
 // comments or variable names.
+//
+// Matches any argument that contains the word "allocator" — this covers:
+//   runtime.default_allocator(), mem.arena_allocator(&x),
+//   context.temp_allocator, context.allocator, my_arena_alloc, etc.
 has_allocator_arg :: proc(line: string) -> bool {
     make_pos := strings.index(line, "make(")
     new_pos  := strings.index(line, "new(")
 
     call_start := -1
     if make_pos >= 0 && new_pos >= 0 {
-        if make_pos < new_pos {
-            call_start = make_pos + 4
-        } else {
-            call_start = new_pos + 3
-        }
+        call_start = make_pos + 4 if make_pos < new_pos else new_pos + 3
     } else if make_pos >= 0 {
         call_start = make_pos + 4
     } else if new_pos >= 0 {
@@ -311,15 +351,18 @@ has_allocator_arg :: proc(line: string) -> bool {
     if call_start < 0 do return false
 
     args := line[call_start:]
-    return strings.contains(args, "temp_allocator") ||
-           strings.contains(args, ".allocator")     ||  // context.allocator, arena.allocator
-           strings.contains(args, "allocator)")         // named param at end
+    return strings.contains(args, "allocator")
 }
 
 // changes_context_allocator returns true when the node either:
 //   - reassigns context.allocator  (assignment_statement)
 //   - shadows context via context := context  (short_var_decl)
-changes_context_allocator :: proc(node: ^ASTNode) -> bool {
+//
+// Uses both AST inspection and a text-based fallback because the Odin
+// tree-sitter grammar uses selector_expression (not field_expression) for
+// context.allocator on the LHS, and the node type varies across grammar
+// versions.
+changes_context_allocator :: proc(node: ^ASTNode, file_lines: []string) -> bool {
     if node.node_type != "assignment_statement" &&
        node.node_type != "short_var_decl" {
         return false
@@ -337,20 +380,36 @@ changes_context_allocator :: proc(node: ^ASTNode) -> bool {
         return false
     }
 
-    // Detect context.allocator = ... on the LHS.
+    // AST check: context.allocator = ... on the LHS.
+    // Handles both field_expression and selector_expression grammar variants.
     for &child in node.children {
-        if child.node_type != "field_expression" do continue
+        is_field_node := child.node_type == "field_expression" ||
+                         child.node_type == "selector_expression"
+        if !is_field_node { continue }
         found_context := false
         for &gc in child.children {
             if gc.node_type == "identifier" && gc.text == "context" {
                 found_context = true
             }
             if found_context &&
-               gc.node_type == "field_identifier" &&
+               (gc.node_type == "field_identifier" || gc.node_type == "identifier") &&
                gc.text == "allocator" {
                 return true
             }
         }
+    }
+
+    // Text-based fallback: scan the source line for context.allocator assignment.
+    // Catches cases where the AST node type doesn't match expectations.
+    if node.start_line >= 1 && node.start_line <= len(file_lines) {
+        line := file_lines[node.start_line - 1]
+        // Strip trailing comment before checking, to avoid matching
+        // commented-out code: "// context.allocator = ..."
+        code := line
+        if comment := strings.index(line, "//"); comment >= 0 {
+            code = line[:comment]
+        }
+        if strings.contains(code, "context.allocator") do return true
     }
     return false
 }
@@ -503,6 +562,36 @@ is_perf_critical_block :: proc(block: ^ASTNode, file_lines: []string) -> bool {
 extract_lhs_name :: proc(node: ^ASTNode) -> string {
     for &child in node.children {
         if child.node_type == "identifier" do return child.text
+    }
+    return ""
+}
+
+// get_enclosing_proc_name scans backwards from the block's opening line to
+// find the nearest "name :: proc" declaration and returns the proc name.
+// Returns "" if no declaration is found within 5 lines.
+get_enclosing_proc_name :: proc(block: ^ASTNode, file_lines: []string) -> string {
+    // block.start_line is 1-based; convert to 0-indexed.
+    // The opening brace is typically on the SAME line as "name :: proc() {",
+    // so start the scan at the brace line itself (start_line - 1, 0-indexed).
+    start := block.start_line - 1
+    for i := start; i >= max(0, start - 5); i -= 1 {
+        if i >= len(file_lines) do continue
+        line := file_lines[i]
+        decl_pos := strings.index(line, ":: proc")
+        if decl_pos < 0 do continue
+        // Extract the identifier to the left of "::"
+        lhs := strings.trim_space(line[:decl_pos])
+        // The name is the last whitespace-separated token on the lhs
+        // (handles indented methods or table entries).
+        last_space := strings.last_index(lhs, " ")
+        if last_space >= 0 {
+            lhs = lhs[last_space + 1:]
+        }
+        last_tab := strings.last_index(lhs, "\t")
+        if last_tab >= 0 {
+            lhs = lhs[last_tab + 1:]
+        }
+        return lhs
     }
     return ""
 }
