@@ -1,6 +1,7 @@
 package core
 
 import "core:fmt"
+import sq "../../vendor/odin-sqlite3"
 import "core:strings"
 
 // =============================================================================
@@ -104,6 +105,38 @@ c012_scm_run :: proc(
             }
         }
 
+        // C012-T1: explicitly typed mem.Allocator / runtime.Allocator variable
+        if t1_node, ok := result.captures["c012_t1_var"]; ok {
+            var_name := naming_extract_text(t1_node, file_lines)
+            if len(var_name) > 0 {
+                pt  := ts_node_start_point(t1_node)
+                row := int(pt.row)
+                if row < len(file_lines) {
+                    src := file_lines[row]
+                    is_alloc_type := strings.contains(src, "mem.Allocator") ||
+                                     strings.contains(src, "runtime.Allocator")
+                    has_hint := strings.contains(var_name, "alloc") ||
+                                strings.contains(var_name, "allocator")
+                    if is_alloc_type && !has_hint {
+                        append(&diagnostics, Diagnostic{
+                            file      = file_path,
+                            line      = row + 1,
+                            column    = int(pt.column) + 1,
+                            rule_id   = "C012",
+                            tier      = "style",
+                            message   = fmt.aprintf(
+                                "Variable '%s' is typed mem.Allocator — include 'alloc' or 'allocator' in the name to signal its role",
+                                var_name,
+                            ),
+                            has_fix   = true,
+                            fix       = fmt.aprintf("Rename '%s' to '%s_alloc'", var_name, var_name),
+                            diag_type = .INFO,
+                        })
+                    }
+                }
+            }
+        }
+
         // C012-S3: package-qualified allocator call without alloc/allocator in name
         if qalloc_var_node, ok1 := result.captures["c012_qalloc_var"]; ok1 {
             if qalloc_fn_node, ok2 := result.captures["c012_qalloc_fn"]; ok2 {
@@ -136,4 +169,104 @@ c012_scm_run :: proc(
     }
 
     return diagnostics[:]
+}
+
+// =============================================================================
+// C012-T3: callee is graph-known allocator-role proc, LHS lacks _owned
+// =============================================================================
+//
+// Fires when:
+//   result := allocator_factory_proc()
+// where `allocator_factory_proc` has memory_role='allocator' in the code graph
+// and `result` does not contain '_owned'.
+//
+// Requires the code graph to have been built (--export-symbols).
+// Called from main.odin only when --enable-c012 and graph DB is present.
+//
+// db_path: path to the graph SQLite DB (GRAPH_DB_PATH by default).
+// =============================================================================
+c012_t3_run :: proc(
+    file_path:  string,
+    root_node:  TSNode,
+    file_lines: []string,
+    q:          ^CompiledQuery,
+    db_path:    string,
+) -> []Diagnostic {
+    db, db_ok := graph_open(db_path)
+    if !db_ok { return nil }
+    defer graph_close(db)
+
+    results := run_query(q, root_node, file_lines)
+    defer free_query_results(results)
+
+    diagnostics := make([dynamic]Diagnostic)
+
+    for result in results {
+        // Check both direct calls (@c012_alloc_fn) and qualified calls (@c012_qalloc_fn).
+        callee_name := ""
+        var_node:    TSNode
+        var_ok := false
+
+        if fn_node, ok1 := result.captures["c012_alloc_fn"]; ok1 {
+            if v, ok2 := result.captures["c012_alloc_var"]; ok2 {
+                callee_name = naming_extract_text(fn_node, file_lines)
+                var_node    = v
+                var_ok      = true
+            }
+        } else if fn_node, ok1 := result.captures["c012_qalloc_fn"]; ok1 {
+            if v, ok2 := result.captures["c012_qalloc_var"]; ok2 {
+                callee_name = naming_extract_text(fn_node, file_lines)
+                var_node    = v
+                var_ok      = true
+            }
+        }
+
+        if !var_ok || callee_name == "" { continue }
+
+        // Skip builtins — they're handled by S1 already.
+        if callee_name == "make" || callee_name == "new" { continue }
+
+        // Look up the callee in the graph.
+        role := _c012_t3_get_role(db, callee_name)
+        if role != "allocator" { continue }
+
+        var_name := naming_extract_text(var_node, file_lines)
+        if len(var_name) == 0 { continue }
+
+        // Fire if LHS doesn't signal ownership.
+        if strings.contains(var_name, "_owned") { continue }
+
+        pt := ts_node_start_point(var_node)
+        append(&diagnostics, Diagnostic{
+            file      = file_path,
+            line      = int(pt.row) + 1,
+            column    = int(pt.column) + 1,
+            rule_id   = "C012",
+            tier      = "style",
+            message   = fmt.aprintf(
+                "'%s' receives ownership from allocator-role proc '%s' — consider suffix '_owned' to signal caller must free",
+                var_name, callee_name,
+            ),
+            has_fix   = true,
+            fix       = fmt.aprintf("Rename '%s' to '%s_owned'", var_name, var_name),
+            diag_type = .INFO,
+        })
+    }
+
+    return diagnostics[:]
+}
+
+@(private)
+_c012_t3_get_role :: proc(db: ^GraphDB, name: string) -> string {
+    s, ok := sq.db_prepare(db.conn,
+        "SELECT memory_role FROM nodes WHERE name=? AND kind='proc' LIMIT 1;")
+    if !ok { return "" }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, name)
+    if sq.stmt_step(&s) {
+        role := sq.stmt_col_text(&s, 0)
+        defer delete(role)
+        return strings.clone(role)
+    }
+    return ""
 }

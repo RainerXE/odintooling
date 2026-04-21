@@ -32,3 +32,14 @@
   (member_expression
     (call_expression
       function: (identifier) @c012_qalloc_fn)))
+
+; C012-T1: explicitly typed mem.Allocator / runtime.Allocator variable (M7.1)
+; var_declaration is the "name: Type = value" or "name: Type" form (any scope).
+; Odin code checks: source line contains "Allocator", var name lacks "alloc"/"allocator".
+(var_declaration
+  (identifier) @c012_t1_var)
+
+; C012-T3 reuses @c012_alloc_fn/@c012_alloc_var (S1) and
+; @c012_qalloc_fn/@c012_qalloc_var (S3) — no new SCM patterns needed.
+; Odin code looks up the callee in the graph DB and fires when
+; memory_role='allocator' and the LHS name lacks '_owned'.

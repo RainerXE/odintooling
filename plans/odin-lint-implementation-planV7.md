@@ -682,14 +682,15 @@ M7   Graph Enrichment for LLM Tooling + Refactoring  ⬜ PLANNED
   C012-T unlock (shares memory_role infrastructure)
   Incremental graph rebuild: file-hash cache + eviction (--export-symbols fast path)
   ↳ Requires M6.9 package-scope foundation + M5.6 graph DB
-M7.1 OLS Refactoring + Advanced Rules             ⬜ PLANNED
-  rename_symbol MCP tool (find_all_references → FixEdit set)
-  LSP Call Hierarchy (VS Code "Show Call Hierarchy" on Odin procs)
-  C101 Context Integrity (control-flow, context.allocator restore check)
-  C201 Unchecked Result Guard (ignored error returns)
-  C202 Switch Exhaustiveness (incomplete enum switches)
-  C012-T Type-Gated Ownership Naming              ⬜ BLOCKED until M7 (needs memory_role)
-  C019 STY-TypeMarker                             ⬜ BLOCKED until C012 Phase 2 + convention agreement
+M7.1 OLS Refactoring + Advanced Rules             🔄 IN PROGRESS (April 21 2026)
+  ✅ C012-T1: explicit mem.Allocator var naming (fired when name lacks alloc/allocator)
+  ✅ C012-T3: allocator-return without _owned (graph-enriched, needs memory_role DB)
+  ✅ rename_symbol MCP tool (find_all_references → FixEdit set) — COMPLETE in M6
+  ⬜ LSP Call Hierarchy (VS Code "Show Call Hierarchy" on Odin procs)
+  ⬜ C101 Context Integrity (control-flow, context.allocator restore check)
+  ⬜ C201 Unchecked Result Guard (ignored error returns)
+  ⬜ C202 Switch Exhaustiveness (incomplete enum switches)
+  ⬜ C019 STY-TypeMarker (BLOCKED until C012 Phase 2 + convention agreement)
 ```
 
 ---
@@ -2289,7 +2290,7 @@ no schema changes required.
 | 6.7 | C019 type marker suffixes | DEFERRED — needs C012 Phase 2 type inference + convention agreement | ↷ |
 | 6.9 | Package-scope linting foundation | Four scope levels defined; B002 package name consistency; B003 subfolder name clash | ✅ |
 | 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock, incremental rebuild | ✅ |
-| 7.1 | OLS refactoring + advanced rules | LSP call hierarchy, C101/C201/C202, C012-T, C019 | ⬜ |
+| 7.1 | OLS refactoring + advanced rules | LSP call hierarchy, C101/C201/C202, C012-T, C019 | 🔄 C012-T1+T3 done |
 
 ---
 
