@@ -648,7 +648,19 @@ M4.5 Autofix Layer                       ✅ COMPLETE (April 13 2026)
 M5   OLS Plugin Integration              ✅ COMPLETE (April 18 2026)
 M5.5 MCP Gateway                         ✅ COMPLETE (April 18 2026)
 M5.6 DNA Impact Analysis + Code Graph    ✅ COMPLETE (April 19 2026)
-M6   Extended Rules + Refactoring        ⬜ PLANNED (C016-C018 naming, C013-C015 dead code, C012-T, C019 type markers, rename, LSP call hierarchy)
+M6   Extended Rules + Refactoring        🔧 IN PROGRESS
+  C016 STY-LocalNaming (snake_case locals)        ✅ COMPLETE (April 20 2026)
+  C017 STY-GlobalNaming (camelCase globals)       ✅ COMPLETE (April 20 2026)
+  C018 STY-ProcVisibility (visibility naming)     ✅ COMPLETE (April 20 2026)
+  C016–C018 per-rule toml opt-in/opt-out          ✅ COMPLETE (April 20 2026)
+  C014 DEA-UnusedProc (dead private procs)        ✅ COMPLETE (April 20 2026)
+  C015 DEA-UnusedConst (dead private consts/vars) ✅ COMPLETE (April 21 2026)
+  C020 STY-ShortName (short var/param names)      ✅ COMPLETE (April 21 2026)
+  C013 DEA-UnusedImport                           ⬜ SKIPPED (Odin compiler catches this)
+  C012-T type-gated semantic naming               ⬜ PLANNED
+  C019 type marker suffixes                       ⬜ BLOCKED (conventions need discussion)
+  rename_symbol MCP tool                          ⬜ PLANNED
+  LSP Call Hierarchy                              ⬜ PLANNED
 M6.5 Structural Rules (B-category)      ⬜ PLANNED (B001 unmatched brace / unclosed block)
 ```
 
@@ -1604,15 +1616,15 @@ Analytic step: OLS resolves the switched type to an enum, compares covered
 cases against the enum's member list.
 
 **Gate 6:**
-- [ ] C016–C018 grammar exploration complete
-- [ ] C016 fires on uppercase local variable name
-- [ ] C017 fires on snake_case package-level variable name
-- [ ] C018 fires on visibility/naming mismatch (opt-in)
-- [ ] C016–C018 patterns configurable via `odin-lint.toml`
-- [ ] C013 fires on unused imports, silent when import is used
-- [ ] C014 fires on non-exported proc with zero callers
-- [ ] C015 fires on non-exported constant/variable with zero references
-- [ ] `dead_code` domain in `odin-lint.toml` enables/suppresses C013–C015
+- [x] C016–C018 grammar exploration complete
+- [x] C016 fires on uppercase local variable name
+- [x] C017 fires on snake_case package-level variable name
+- [x] C018 fires on visibility/naming mismatch (opt-in)
+- [x] C016–C018 patterns configurable via `odin-lint.toml`
+- [ ] C013 fires on unused imports — SKIPPED (Odin compiler catches this; no value added)
+- [x] C014 fires on non-exported proc with zero callers
+- [x] C015 fires on non-exported constant/variable with zero references
+- [x] `dead_code` domain in `odin-lint.toml` enables/suppresses C014–C015
 - [ ] C012-T1, T2, T3 implemented and tested (see C012-T gate above)
 - [ ] `dna_exporter.odin` populates `memory_role` for all procedures (improves on M5.6 heuristics via OLS types)
 - [ ] C101 false positive rate < 5% on RuiShin
