@@ -378,6 +378,57 @@ graph_find_all_references :: proc(db: ^GraphDB, name: string) -> [dynamic]GraphE
     return result
 }
 
+// RenameLocation is a single site where a symbol name must be changed.
+RenameLocation :: struct {
+    file:   string,
+    line:   int,
+    kind:   string,  // "declaration" | "call_site"
+}
+
+// graph_rename_locations returns all locations (declaration + call sites) for old_name.
+graph_rename_locations :: proc(db: ^GraphDB, old_name: string) -> [dynamic]RenameLocation {
+    result := make([dynamic]RenameLocation)
+
+    // Declaration site.
+    s1, ok1 := sq.db_prepare(db.conn, "SELECT file, line FROM nodes WHERE name=? LIMIT 1;")
+    if ok1 {
+        sq.stmt_bind_text(&s1, 1, old_name)
+        if sq.stmt_step(&s1) {
+            append(&result, RenameLocation{
+                file = sq.stmt_col_text(&s1, 0),
+                line = sq.stmt_col_int(&s1, 1),
+                kind = "declaration",
+            })
+        }
+        sq.stmt_finalize(&s1)
+    }
+
+    // Call / reference sites.
+    s2, ok2 := sq.db_prepare(db.conn,
+        `SELECT src.file, e.line FROM edges e
+         JOIN nodes src ON e.source_id=src.id
+         JOIN nodes tgt ON e.target_id=tgt.id
+         WHERE tgt.name=?;`)
+    if ok2 {
+        sq.stmt_bind_text(&s2, 1, old_name)
+        for sq.stmt_step(&s2) {
+            append(&result, RenameLocation{
+                file = sq.stmt_col_text(&s2, 0),
+                line = sq.stmt_col_int(&s2, 1),
+                kind = "call_site",
+            })
+        }
+        sq.stmt_finalize(&s2)
+    }
+
+    return result
+}
+
+graph_free_rename_locations :: proc(locs: ^[dynamic]RenameLocation) {
+    for l in locs^ { delete(l.file) }
+    delete(locs^)
+}
+
 // graph_search_nodes does a prefix-match search on node names.
 // FTS5 full-text search is planned for a later milestone; this uses LIKE for now.
 graph_search_nodes :: proc(db: ^GraphDB, query: string, limit: int) -> [dynamic]GraphNodeInfo {
