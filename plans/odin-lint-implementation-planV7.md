@@ -680,6 +680,7 @@ M7   Graph Enrichment for LLM Tooling + Refactoring  ⬜ PLANNED
   Proc return-type tracking in graph (enables allocator-return detection)
   Enrich get_dna_context MCP tool with variable roles
   C012-T unlock (shares memory_role infrastructure)
+  Incremental graph rebuild: file-hash cache + eviction (--export-symbols fast path)
   ↳ Requires M6.9 package-scope foundation + M5.6 graph DB
 M7.1 OLS Refactoring + Advanced Rules             ⬜ PLANNED
   rename_symbol MCP tool (find_all_references → FixEdit set)
@@ -2066,6 +2067,27 @@ refactoring. These are separate concerns and must remain separate.
   - C012-T1: `mem.Allocator`-typed variable with opaque name → suggest `_alloc` suffix
   - C012-T3: callee has `memory_role='allocator'` and LHS has no `_owned`
 
+**5. Incremental graph rebuild (file-hash cache)**
+
+The current `--export-symbols` wipes and rebuilds the entire graph on every
+run. For large projects this is slow. M7 makes it incremental:
+
+1. **Eviction** — at export start, delete `nodes`/`edges`/`files` rows for
+   paths that no longer exist on disk. Prevents stale entries from deleted files.
+2. **Skip unchanged files** — for each file, compare its current content hash
+   against the stored hash in the `files` table. If identical, skip re-parsing
+   and re-indexing entirely (existing nodes/edges are still valid).
+3. **Re-index changed files** — if the hash differs, delete all nodes and edges
+   whose `file` column matches, then run Pass 1–4 for that file only.
+
+This makes repeated `--export-symbols` runs (CI, watch mode, post-save hooks)
+fast regardless of project size. The lint pass itself stays cache-free — file
+I/O and tree-sitter parsing per file is fast enough that caching adds more
+complexity than it saves.
+
+The `files` table already has `hash TEXT` and `indexed_at INTEGER` columns —
+no schema changes required.
+
 ---
 
 #### Gate 7
@@ -2078,6 +2100,10 @@ refactoring. These are separate concerns and must remain separate.
 - [ ] `get_dna_context` MCP response includes variable roles and proc return types
 - [ ] `find_allocators()` returns allocator-role procs AND allocator-typed variables
 - [ ] C012-T gate criteria re-evaluated — T1 and T3 now achievable
+- [ ] Incremental export: evict nodes/edges for deleted files on each export run
+- [ ] Incremental export: unchanged files (same hash) are skipped — nodes/edges reused
+- [ ] Incremental export: changed files are re-indexed (old nodes/edges deleted first)
+- [ ] Verified: full rebuild and incremental rebuild produce identical graph content
 - [ ] Own codebase: 0 regressions after graph rebuild
 - [ ] RuiShin: `find_allocators()` correctly identifies `g2d_get_path_scratch`, `g2d_get_frame_scratch`
 
@@ -2262,7 +2288,7 @@ refactoring. These are separate concerns and must remain separate.
 | 6.6 | C001 FP reduction (AST layer) | Fix escape-hatch bugs, `_init` heuristic, direct delete detection | ✅ |
 | 6.7 | C019 type marker suffixes | DEFERRED — needs C012 Phase 2 type inference + convention agreement | ↷ |
 | 6.9 | Package-scope linting foundation | Four scope levels defined; B002 package name consistency; B003 subfolder name clash | ⬜ |
-| 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock | ⬜ |
+| 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock, incremental rebuild | ⬜ |
 | 7.1 | OLS refactoring + advanced rules | rename_symbol, LSP call hierarchy, C101/C201/C202, C012-T, C019 | ⬜ |
 
 ---
@@ -2647,6 +2673,6 @@ handled by suppression comments, not by extending file-scope C001 analysis.
 
 ---
 
-*Version: 7.5*
+*Version: 7.6*
 *Last status review: April 21 2026*
 *Previous version: odin-lint-implementation-planV6.md (V7.0 was the internal draft)*
