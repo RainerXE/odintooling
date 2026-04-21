@@ -401,6 +401,56 @@ _main :: proc() -> int {
     files_with_violations := 0
     had_error             := false
 
+    // -----------------------------------------------------------------------
+    // Package-scope phase (B002, B003) — runs before per-file analysis.
+    // Groups files by directory, checks package name consistency.
+    // -----------------------------------------------------------------------
+    dir_groups := group_files_by_dir(files[:])
+    defer free_dir_groups(&dir_groups)
+
+    // Build dir → majority package name map for B003 subfolder check.
+    dir_pkg_names := make(map[string]string)
+    defer {
+        for k, v in dir_pkg_names { delete(k); delete(v) }
+        delete(dir_pkg_names)
+    }
+    for dir, dir_files in dir_groups {
+        maj := b002_majority_name(dir_files[:])
+        dir_pkg_names[strings.clone(dir)] = maj
+    }
+
+    // B002: package name consistency within each directory.
+    for dir, dir_files in dir_groups {
+        maj, _ := dir_pkg_names[dir]
+        pkg_diags := b002_check_directory(dir_files[:], maj)
+        defer delete(pkg_diags)
+        for d in pkg_diags {
+            total_violations += 1
+            if use_collector {
+                append(&collector, d)
+            } else {
+                emitDiagnostic(d)
+            }
+        }
+    }
+
+    // B003: subfolder shares parent package name.
+    {
+        b3_diags := b003_check_subdirs(dir_pkg_names, dir_groups)
+        defer delete(b3_diags)
+        for d in b3_diags {
+            total_violations += 1
+            if use_collector {
+                append(&collector, d)
+            } else {
+                emitDiagnostic(d)
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // File-scope phase — per-file analysis (all other rules).
+    // -----------------------------------------------------------------------
     for file_path in files {
         coll := &collector if use_collector else nil
         v, err := analyze_file(file_path, &ts_parser, opts, coll)
