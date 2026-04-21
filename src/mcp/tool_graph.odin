@@ -16,7 +16,7 @@ make_get_dna_context_tool :: proc() -> mcp.RegisteredTool {
     return mcp.RegisteredTool{
         defn = mcp.ToolDefinition{
             name        = "get_dna_context",
-            description = "Return callers, callees, memory role, and lint violations for a named Odin procedure.",
+            description = "Return callers, callees, memory role, return type, lint violations, and allocator-typed variables for a named Odin procedure.",
             input_schema = `{
                 "type": "object",
                 "properties": {
@@ -51,10 +51,12 @@ _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocato
     sb := strings.builder_make()
     defer strings.builder_destroy(&sb)
 
-    role := node.memory_role if node.memory_role != "" else "neutral"
+    role       := node.memory_role if node.memory_role != "" else "neutral"
     violations := node.lint_violations if node.lint_violations != "" else "[]"
-    fmt.sbprintf(&sb, `{"proc":{"name":%s,"file":%s,"line":%d,"memory_role":%s,"signature":%s,"lint_violations":%s}`,
-        _gj(node.name), _gj(node.file), node.line, _gj(role), _gj(node.signature), violations)
+    fmt.sbprintf(&sb,
+        `{"proc":{"name":%s,"file":%s,"line":%d,"memory_role":%s,"return_type":%s,"signature":%s,"lint_violations":%s}`,
+        _gj(node.name), _gj(node.file), node.line, _gj(role),
+        _gj(node.return_type), _gj(node.signature), violations)
 
     strings.write_string(&sb, `,"callers":[`)
     for n, idx in callers {
@@ -65,6 +67,15 @@ _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocato
     for n, idx in callees {
         if idx > 0 { strings.write_string(&sb, ",") }
         fmt.sbprintf(&sb, "%s", _gj(n.name))
+    }
+
+    // Include allocator-typed package variables from the same file for context.
+    allocator_vars := core.graph_find_file_allocator_vars(db, node.file)
+    defer { _free_nodes(allocator_vars[:]); delete(allocator_vars) }
+    strings.write_string(&sb, `],"allocator_vars":[`)
+    for n, idx in allocator_vars {
+        if idx > 0 { strings.write_string(&sb, ",") }
+        fmt.sbprintf(&sb, `{"name":%s,"line":%d}`, _gj(n.name), n.line)
     }
     strings.write_string(&sb, `]}`)
     return fmt.aprintf("%s", strings.to_string(sb)), false
@@ -379,7 +390,7 @@ _graph_opt_int :: proc(params: json.Value, key: string, default_val: int) -> int
 @(private="file")
 _free_node :: proc(n: ^core.GraphNodeInfo) {
     delete(n.name); delete(n.kind); delete(n.file)
-    delete(n.memory_role); delete(n.lint_violations); delete(n.signature)
+    delete(n.memory_role); delete(n.lint_violations); delete(n.signature); delete(n.return_type)
 }
 
 @(private="file")
