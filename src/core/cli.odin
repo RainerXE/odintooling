@@ -144,13 +144,14 @@ rule_enabled :: proc(rule_id: string, tier: string, opts: LintOptions) -> bool {
     explicitly_requested := false
     for r in opts.rule_filter { if r == rule_id { explicitly_requested = true; break } }
 
-    if !explicitly_requested && !config_domain_enabled(rule_id, opts.config) {
+    // C012 can be enabled by --enable-c012 flag OR via semantic_naming domain.
+    // Check the flag first so it can bypass the domain gate.
+    if rule_id == "C012" {
+        if !explicitly_requested && !opts.c012_enabled && !config_domain_enabled(rule_id, opts.config) {
+            return false
+        }
+    } else if !explicitly_requested && !config_domain_enabled(rule_id, opts.config) {
         return false
-    }
-
-    // C012 is also opt-in via --enable-c012 (in addition to semantic_naming domain).
-    if rule_id == "C012" && !opts.c012_enabled && !opts.config.semantic_naming_domain {
-        if !explicitly_requested { return false }
     }
 
     if opts.tier_filter != "" && tier != opts.tier_filter { return false }
