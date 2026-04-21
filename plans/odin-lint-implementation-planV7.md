@@ -1,6 +1,6 @@
 # odin-lint — Implementation Plan (v7)
 *A Super Linter & Semantic Engine for the Odin Programming Language*
-*Version 7.2 · April 2026 — SCM Query Architecture, AI Integration Layer, Semantic-Graph Agent Strategy & FFI Safety Rules*
+*Version 7.5 · April 2026 — SCM Query Architecture, AI Integration Layer, Semantic-Graph Agent Strategy & FFI Safety Rules*
 
 ---
 
@@ -19,6 +19,7 @@
 11. [Milestones & Status](#11-milestones--status)
 12. [Lessons Learned](#12-lessons-learned)
 13. [Semantic-Graph Agent Strategy (V7.1)](#13-semantic-graph-agent-strategy-v71)
+14. [Analysis Scope Model](#14-analysis-scope-model)
 
 ---
 
@@ -663,16 +664,23 @@ M6   Extended Rules + Refactoring        🔧 IN PROGRESS
   LSP Call Hierarchy                              ⬜ PLANNED
 M6.5 Structural Rules (B-category)      ✅ COMPLETE (April 21 2026)
   B001 Unmatched Brace / Unclosed Block            ✅ COMPLETE (April 21 2026)
-M6.6 C001 False Positive Reduction (AST layer)   ⬜ NEXT
-  Tier 1: fix has_allocator_arg, context.allocator detection, multi-line make
-  Tier 2: _init proc name heuristic
-  ↳ Prerequisite for M7 (graph layer builds on same escape-hatch framework)
-M6.7 C019 STY-TypeMarker (type suffix conventions) ⬜ PLANNED (conventions to agree first)
-M7   Rule Quality + Graph-Semantic Layer          ⬜ PLANNED
-  Tier 3: graph-based LHS scope check (package-level var → skip C001)
-  Tier 4: memory_role propagation for allocator-type variables
-  ↳ Requires M6.6 escape-hatch framework + M5.6 graph DB
-  ↳ Unlocks C012-T type-gated rules (same memory_role infrastructure)
+M6.6 C001 False Positive Reduction (AST layer)   ✅ COMPLETE (April 21 2026)
+  Tier 1: fix has_allocator_arg, context.allocator detection, multi-line make ✅
+  Tier 2: _init proc name heuristic                                            ✅
+  Tier 2b: fix is_free_call / has_manual_cleanup (direct delete detection)     ✅
+  Remaining C001 FPs deferred — require package-scope or return-type info (M6.9/M7)
+M6.7 C019 STY-TypeMarker                           ⬜ DEFERRED → post-C012 Phase 2 (M7.1+)
+M6.9 Package-Scope Linting Foundation             ⬜ NEXT
+  Define four analysis scopes (see Section 14)
+  Group files by package (directory + matching package declaration)
+  B002 STR-PackageName: file has wrong package declaration (majority wins)
+  B003 STR-SubfolderPackage: subfolder shares package name with parent
+M7   Graph Enrichment for LLM Tooling + Refactoring  ⬜ PLANNED
+  Proper variable indexing (top-level only, memory_role for Allocator-typed)
+  Proc return-type tracking in graph (enables allocator-return detection)
+  Enrich get_dna_context MCP tool with variable roles
+  C012-T unlock (shares memory_role infrastructure)
+  ↳ Requires M6.9 package-scope foundation + M5.6 graph DB
 M7.1 OLS Refactoring + Advanced Rules             ⬜ PLANNED
   rename_symbol MCP tool (find_all_references → FixEdit set)
   LSP Call Hierarchy (VS Code "Show Call Hierarchy" on Odin procs)
@@ -680,6 +688,7 @@ M7.1 OLS Refactoring + Advanced Rules             ⬜ PLANNED
   C201 Unchecked Result Guard (ignored error returns)
   C202 Switch Exhaustiveness (incomplete enum switches)
   C012-T Type-Gated Ownership Naming              ⬜ BLOCKED until M7 (needs memory_role)
+  C019 STY-TypeMarker                             ⬜ BLOCKED until C012 Phase 2 + convention agreement
 ```
 
 ---
@@ -1650,7 +1659,7 @@ cases against the enum's member list.
 - [ ] C202 fires on incomplete enum switches → moved to M7.1
 - [ ] `rename_symbol` MCP tool generates correct FixEdit set for a proc rename → moved to M7.1
 - [ ] Rename does not touch string literals (safe mode) → moved to M7.1
-- [ ] C019 conventions agreed with user — moved to M6.7
+- [ ] C019 conventions agreed with user — deferred to post-C012 Phase 2 (M7.1+); requires type inference for := vars
 - [ ] LSP Call Hierarchy: VS Code "Show Call Hierarchy" works on an Odin proc → moved to M7.1
 - [ ] All new rules: 3 pass + 3 fail fixtures
 
@@ -1875,116 +1884,202 @@ exceptional case.
 
 ---
 
-### ⬜ Milestone 7 — Rule Quality: Graph-Semantic Layer
+### ⬜ Milestone 6.9 — Package-Scope Linting Foundation
 
-*Prerequisite: Gate 6.6 (AST escape hatches clean) + Gate 5.6 (graph DB)*  
-*Builds on: M5.6 `nodes`/`edges` schema — no schema changes needed*  
-*Unlocks: C012-T type-gated semantic naming (shares `memory_role` infrastructure)*
+*Prerequisite: Gate 6.6 complete*  
+*Introduces: B002, B003 — first rules that require multi-file context*  
+*Establishes: canonical four-scope model (see Section 14)*
 
-**Context.** After M6.6 the remaining C001 false positives all share one root
-cause: C001 cannot determine whether the allocation target is a local variable or
-a package-scoped symbol, and cannot determine whether a custom variable (like
-`path_scratch`) is an allocator type. Both facts exist in the graph — the first
-is derivable from the `nodes` table today; the second requires a new graph pass
-to populate `memory_role` for variables.
+**Context.** odin-lint has always operated file-by-file, but Odin's compilation
+model is package-based: every `.odin` file in a directory that shares the same
+`package foo` declaration belongs to the same namespace. File boundaries are
+purely organisational. A variable declared in `graphics_a.odin` is visible in
+`graphics_b.odin` without any import — they are the same package.
 
-M7 makes C001 graph-aware. The same infrastructure (scope query, memory_role
-annotation) also unblocks the remaining C012-T type-gated naming rules.
+This means several existing rules produce false positives (C001, C014/C015) or
+incomplete results (C017) because they cannot see across file boundaries within
+a package. M6.9 establishes the architecture that fixes this, and delivers two
+immediately useful structural rules as its first payoff.
+
+Odin's package model (confirmed):
+- All `.odin` files in a directory sharing the same `package` declaration form one package.
+- Subfolders are always separate packages — Odin does not recurse.
+- Having two different package names in the same directory (excluding `_test`
+  variants) is a **compiler error** that odin-lint can catch before the build.
 
 ---
 
-#### Tier 3 — Graph-based LHS scope check
+#### The Four Analysis Scopes (see Section 14 for full definition)
 
-**Pattern.** When C001 sees `foo = make(...)` (assignment, not `:=`), it cannot
-tell from the AST alone whether `foo` is local or package-scoped. Package-scoped
-assignments inside `_init` procs are already caught by M6.6's heuristic, but
-assignments outside named init procs slip through.
+| Scope | Unit | Examples |
+|-------|------|---------|
+| **File** | Single `.odin` file | C001, C002, B001 |
+| **Package** | All files in a dir with matching `package` decl | B002, B003, C017 |
+| **Project** | All packages in the project | DNA graph, C014/C015, rename |
+| **External/FFI** | Vendor + C libraries | C011, excluded from most rules |
 
-**Fix.** Before flagging `foo = make(...)` as a C001 violation, query the graph:
+Rules must be clearly tagged with their required scope. A file-scope rule that
+accidentally depends on cross-file information is architecturally wrong — the
+fix is either to move it to package scope or accept it as a known limitation.
 
-```sql
-SELECT 1 FROM nodes
-WHERE name = ?       -- LHS identifier
-  AND file = ?       -- current file
-  AND kind = 'variable'
-LIMIT 1;
+---
+
+#### B002 — Package Name Consistency
+
+**Pattern.** A file in a directory declares a `package` name that differs from
+the majority of other files in the same directory.
+
+**Why it matters.** Odin refuses to compile a package where files disagree on
+the package name. This is a build error that manifests confusingly. Catching it
+at lint time gives a clear, actionable message.
+
+**Algorithm:**
+1. Collect `package <name>` declarations from all `.odin` files in the directory.
+2. Exclude `_test` variant: `package foo_test` is always valid alongside `package foo`.
+3. Determine majority name (most common, or first if tied).
+4. Flag every file whose declaration differs from the majority.
+
+**Severity:** ERROR (will fail the build).
+
+**Example:**
+```
+src/graphics/shader.odin:1: B002 [structural] package "shader" — expected "graphics" (11/12 files)
 ```
 
-If a matching `nodes` row exists, `foo` is a package-level symbol. Skip C001.
-The graph query only runs when C001 would otherwise fire — zero cost for the
-common case.
+---
 
-**Dependency.** Requires the DNA exporter (`dna_exporter.odin`) to index
-package-level variable declarations into `nodes` with `kind='variable'`. The
-exporter already indexes constants and variables in some passes; verify coverage
-and fill any gaps.
+#### B003 — Subfolder Shares Parent Package Name
 
-**Impact.** Eliminates the remaining ~8 init-and-hold false positives not caught
-by the `_init` heuristic (e.g. `image_path_cache = make(...)` outside an
-explicitly named init proc).
+**Pattern.** A subfolder contains `.odin` files with the same `package` name as
+its parent directory.
+
+**Why it matters.** In Odin subfolders are always separate packages. If
+`src/graphics/` uses `package graphics` and `src/graphics/utils/` also uses
+`package graphics`, the two are NOT the same package — the compiler treats them
+as separate and the utils package must be explicitly imported. This is almost
+always an organisational mistake (the developer expected the files to be part of
+the same package without realising subfolders are separate).
+
+**Algorithm:**
+1. For each directory being linted, record its package name.
+2. For each subdirectory, record its package name.
+3. If a subdirectory's package name matches the parent's package name → warn.
+
+**Severity:** WARNING (compiles, but almost certainly wrong intent).
+
+**Example:**
+```
+src/graphics/utils/math_helpers.odin:1: B003 [structural] package "graphics" — subfolder
+  is a separate package from parent src/graphics/; did you mean package "graphics_utils"?
+```
 
 ---
 
-#### Tier 4 — `memory_role` propagation for allocator-type variables
+#### Architecture change: package-grouped scanning
 
-**Pattern.** Custom allocator variables like `path_scratch`, `frame_scratch`,
-`arena_alloc` are of type `mem.Allocator` or `runtime.Allocator`. When one of
-these is passed as the last argument to `make()`, no `defer delete` is needed —
-the arena owns the allocation. C001 currently cannot detect this because the
-variable name contains no `allocator` substring.
+The CLI scan loop changes from:
 
-**Fix (two parts):**
+```
+for each file → analyze_file(file)
+```
 
-1. **Graph pass.** Extend the DNA exporter to detect declarations of type
-   `mem.Allocator` or `runtime.Allocator` and set `memory_role = 'allocator'`
-   in their `nodes` row. This is a tree-sitter SCM pattern:
-   ```scheme
-   (short_var_decl
-     (identifier) @var_name
-     (call_expression
-       function: (identifier) @fn (#match? @fn "_allocator")))
-   ```
+to:
 
-2. **C001 query.** When a `make()` argument does not match the `"allocator"`
-   text pattern (Bug 1 fix), fall back to a graph query: does any argument
-   identifier have `memory_role = 'allocator'` in the `nodes` table? If yes,
-   suppress C001.
+```
+for each directory → collect files → group by package_name → analyze_package(pkg)
+  for each file in pkg → analyze_file(file, pkg_context)
+```
 
-**Dependency.** Requires M6.6 Bug 1 fix (to avoid re-checking already-caught
-cases) and the `memory_role` exporter pass above.
+`PackageContext` carries:
+- `name: string` — the agreed package name
+- `files: []string` — all files in the package
+- `top_level_symbols: map[string]SymbolKind` — populated lazily on first use
 
-**Impact.** Eliminates the last ~8 false positives from custom allocator
-variables (`path_scratch`, `frame_scratch`, `arena_alloc`, etc.). Combined with
-M6.6, target is **≤ 2 false positives** on the RuiShin `src/` corpus — only
-genuine ambiguous patterns where the linter truly cannot determine intent without
-type resolution.
+Rules that need only file context receive `pkg_context = nil` (unchanged path).
+Rules that need package context (B002, B003, C017) query `pkg_context`.
 
 ---
 
-#### C012-T unlock
+#### Gate 6.9
 
-The `memory_role = 'allocator'` pass required for Tier 4 is the same
-infrastructure C012-T needs to detect `mem.Allocator`-typed variables with
-opaque names. Once Tier 4 is done, the C012-T gate criteria become achievable:
+- [ ] CLI scan groups files by directory + matching package declaration
+- [ ] `PackageContext` struct defined and populated before per-file analysis
+- [ ] B002 fires on file with wrong package declaration; silent on correct files
+- [ ] B002 silent on `_test` package variants
+- [ ] B003 fires when subfolder shares parent package name
+- [ ] B003 silent when subfolder has distinct package name
+- [ ] 3 pass + 3 fail fixtures for B002; 2 pass + 2 fail for B003
+- [ ] Own codebase: 0 regressions
+- [ ] RuiShin src/: B002 and B003 report zero (codebase is clean)
 
-> *C012-T1: fires on `mem.Allocator`-typed variable with opaque name*  
-> *C012-T3: fires when callee has `memory_role == "allocator"` and LHS has no `_owned`*
+---
 
-Both check `memory_role` in the graph — the same column populated by Tier 4.
+### ⬜ Milestone 7 — Graph Enrichment for LLM Tooling + Refactoring
+
+*Prerequisite: Gate 6.9 (package-scope foundation) + Gate 5.6 (graph DB)*  
+*Reframed from original "C001 FP via graph" — see architecture rationale below*  
+*Unlocks: richer MCP context, C012-T, rename_symbol foundation*
+
+**Architecture rationale (April 2026).** Investigation into the remaining C001
+false positives in RuiShin revealed a deeper truth: the root causes (`path_scratch
+:= g2d_get_path_scratch()` returning `mem.Allocator`) require **return-type
+tracking** — knowing what a proc returns, not just what it calls. This is firmly
+LSP-layer territory, not file-scope linting.
+
+The correct architecture:
+
+| Layer | Scope | Owns |
+|-------|-------|------|
+| **odin-lint** | File / Package | Syntactic + local semantic rules (C001–C020, B001–B003) |
+| **DNA graph** | Project | Cross-package call graph, memory roles, symbol index |
+| **OLS / LSP** | Project + types | Full type resolution, hover, go-to-def |
+
+C001 FPs that require cross-file or return-type information are **accepted as
+known limitations of file-scope analysis**. The graph layer is not a workaround
+for linter limitations — it is a first-class service for LLM tooling and
+refactoring. These are separate concerns and must remain separate.
+
+---
+
+#### M7 Goals
+
+**1. Proper variable indexing**
+- Restrict `var_declaration` capture in `declarations.scm` to top-level only
+  (anchor to `source_file`), eliminating local variables from the `nodes` table.
+- When inserting variable nodes, detect `: mem.Allocator` / `: runtime.Allocator`
+  type annotations and set `memory_role='allocator'` immediately in Pass 1.
+
+**2. Proc return-type tracking**
+- Extend `nodes` schema with `return_type TEXT` column.
+- Pass 1 extracts the return type string from proc signatures.
+- Pass 3 uses `return_type` to tag procs that return `mem.Allocator` as
+  `memory_role='allocator'` (e.g. `g2d_get_path_scratch`).
+- This makes allocator-returning factory procs visible to MCP queries.
+
+**3. Richer `get_dna_context` MCP output**
+- Include variable nodes with `memory_role` in context responses.
+- Include return type in proc node output.
+- `find_allocators()` now returns both allocator-role procs AND allocator-typed variables.
+
+**4. C012-T unlock**
+- `memory_role='allocator'` on variables is the prerequisite for:
+  - C012-T1: `mem.Allocator`-typed variable with opaque name → suggest `_alloc` suffix
+  - C012-T3: callee has `memory_role='allocator'` and LHS has no `_owned`
 
 ---
 
 #### Gate 7
 
-- [ ] DNA exporter indexes package-level variable declarations (`kind='variable'`)
-- [ ] Graph query in C001 skips flagging package-level LHS variables
-- [ ] DNA exporter populates `memory_role='allocator'` for `mem.Allocator`-typed var decls
-- [ ] Graph query in C001 suppresses make() calls that pass a `memory_role='allocator'` variable
-- [ ] RuiShin `src/` C001 false positive count: ≤ 2 (down from ≤ 10 after M6.6)
-- [ ] `plans/ruishin_check_c001.md` updated — remaining entries are confirmed genuine candidates only
+- [ ] `declarations.scm` `var_declaration` capture anchored to `source_file` (no local vars)
+- [ ] Pass 1 tags `: mem.Allocator` / `: runtime.Allocator` variables with `memory_role='allocator'`
+- [ ] `nodes` schema extended with `return_type TEXT`
+- [ ] Pass 1 extracts return type from proc signature strings
+- [ ] Pass 3 tags procs returning `mem.Allocator` / `runtime.Allocator` as `memory_role='allocator'`
+- [ ] `get_dna_context` MCP response includes variable roles and proc return types
+- [ ] `find_allocators()` returns allocator-role procs AND allocator-typed variables
 - [ ] C012-T gate criteria re-evaluated — T1 and T3 now achievable
-- [ ] Own codebase: 0 regressions
-- [ ] Graph DB backward-compatible: no schema changes required
+- [ ] Own codebase: 0 regressions after graph rebuild
+- [ ] RuiShin: `find_allocators()` correctly identifies `g2d_get_path_scratch`, `g2d_get_frame_scratch`
 
 ---
 
@@ -2164,10 +2259,11 @@ Both check `memory_role` in the graph — the same column populated by Tier 4.
 | 5.6 | DNA Impact Analysis + Code Graph | SQLite graph, MCP tools, memory roles, find_all_references | 🔧 |
 | 6 | Extended rules + Refactoring | C013-C015 dead code, C101/C201/C202, rename, LSP call hierarchy | 🔧 |
 | 6.5 | Structural rules (B-category) | B001 unmatched brace — token scan, error tier | ✅ |
-| 6.6 | C001 FP reduction (AST layer) | Fix 3 escape-hatch bugs + `_init` heuristic; RuiShin FP ≤ 10 | ⬜ |
-| 6.7 | C019 type marker suffixes | Agree conventions, implement suffix rule | ⬜ |
-| 7 | Rule quality: graph-semantic layer | Package-level scope check + memory_role propagation; FP ≤ 2 | ⬜ |
-| 7.1 | OLS refactoring + advanced rules | rename_symbol, LSP call hierarchy, C101/C201/C202; C012-T after M7 | ⬜ |
+| 6.6 | C001 FP reduction (AST layer) | Fix escape-hatch bugs, `_init` heuristic, direct delete detection | ✅ |
+| 6.7 | C019 type marker suffixes | DEFERRED — needs C012 Phase 2 type inference + convention agreement | ↷ |
+| 6.9 | Package-scope linting foundation | Four scope levels defined; B002 package name consistency; B003 subfolder name clash | ⬜ |
+| 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock | ⬜ |
+| 7.1 | OLS refactoring + advanced rules | rename_symbol, LSP call hierarchy, C101/C201/C202, C012-T, C019 | ⬜ |
 
 ---
 
@@ -2394,6 +2490,163 @@ codebase structurally, execute lint analysis, and apply verified fixes.
 
 ---
 
-*Version: 7.3*
+---
+
+## 14. Analysis Scope Model
+
+*Added April 2026. This section is the canonical reference for which layer owns
+which analysis. Every rule and service must be tagged with its scope. A rule
+that accidentally depends on information from a higher scope is either wrong or
+must be explicitly promoted.*
+
+---
+
+### The Four Scopes
+
+#### Scope 1 — File
+
+**Unit:** A single `.odin` source file.  
+**Available information:** The file's own AST, its token stream, its line text.  
+**Not available:** Other files in the package, imported symbols, type resolution.
+
+This is the scope of traditional linting. It is fast, parallelisable, and
+requires no coordination between files. Rules at this scope can run on a single
+file passed to the CLI (`odin-lint file.odin`) with full correctness.
+
+**Rules at file scope:** C001, C002, C003, C007, C009, C010, C011, C016, C018,
+C020, B001.
+
+**Known limitation:** File-scope rules cannot distinguish package-level variables
+from local variables when they appear in the same syntactic position. Remaining
+C001 false positives from init-and-hold patterns (`foo = make(...)` where `foo`
+is package-level) are accepted as a file-scope limitation. Use
+`// odin-lint:ignore C001` for intentional package-level allocations in
+non-`_init` procs.
+
+---
+
+#### Scope 2 — Package
+
+**Unit:** All `.odin` files in one directory that share the same `package`
+declaration.  
+**Available information:** Everything in Scope 1, plus: the full symbol namespace
+of the package (all top-level declarations across all files), cross-file
+`package`-name consistency.  
+**Not available:** Symbols from other packages (require explicit import).
+
+In Odin, the package is the fundamental compilation unit. A variable declared in
+`graphics_a.odin` is visible in `graphics_b.odin` without import — they share
+one namespace. Subfolders are always separate packages regardless of name.
+
+Rules at this scope require the CLI to group files by directory before analysis.
+The `PackageContext` struct carries the shared namespace and is passed to rules
+that need it.
+
+**Rules at package scope:** B002 (package name consistency), B003 (subfolder
+name clash), C017 (package-level naming — needs to see all package-level vars).
+
+**Odin-specific package rules:**
+- All files in a directory MUST share the same `package` name — different names
+  are a compiler error (→ B002 ERROR).
+- `package foo_test` is a valid sibling of `package foo` for test files.
+- Subfolders are separate packages; sharing a parent's package name is almost
+  always a mistake (→ B003 WARNING).
+
+---
+
+#### Scope 3 — Project
+
+**Unit:** All packages in the project, including cross-package call graph and
+symbol index.  
+**Available information:** Full symbol graph (nodes + edges), memory roles,
+call hierarchy, all references.  
+**Not available:** External library internals; runtime type resolution.
+
+This is the scope of the DNA graph (`dna_exporter.odin` + SQLite DB). It answers
+questions that no individual file or package can answer alone: "what calls this
+proc?", "what is the memory role of this symbol across the whole project?",
+"what is the impact radius of renaming this function?".
+
+Project-scope analysis requires `--export-symbols` to have been run first. It is
+not fast enough for file-by-file linting and is explicitly NOT wired into the
+per-file lint path. It is a **separate service** consumed by:
+- MCP tools (`get_dna_context`, `find_allocators`, `get_impact_radius`)
+- Refactoring tools (`rename_symbol`, LSP call hierarchy)
+- C012-T rules (which require `memory_role` across the project)
+
+**Services at project scope:** DNA graph, all MCP graph tools, C014/C015 (dead
+code — require seeing all callers), C012-T.
+
+**Critical distinction:** Linting rules that require project-scope information
+are **not linting rules** — they are semantic analysis services. They live in
+the MCP/OLS layer, not in the file-by-file lint pipeline.
+
+---
+
+#### Scope 4 — External / FFI
+
+**Unit:** Vendored dependencies, C static libraries, tree-sitter grammars, OLS
+fork.  
+**Available information:** Public API surface only (header files, exported
+symbols).  
+**Analysis policy:** External code is excluded from all linting rules by default.
+The `--include-vendor` flag overrides this for vendored Odin code only.
+
+**Rules that operate at the FFI boundary:** C011 (FFI resource safety — checks
+*our* code's use of C resources, not the C library itself). The rule fires when
+our code acquires a C resource (`ts_parser_new()`, etc.) without a matching
+`defer ts_parser_delete()`. The C library's internals are opaque.
+
+---
+
+### Scope Assignment Reference
+
+| Rule | Scope | Rationale |
+|------|-------|-----------|
+| C001 | File | AST walk within one file; cross-file limitation accepted |
+| C002 | File | Double-free detection within one file |
+| C003/C007 | File | Name conventions visible from declaration alone |
+| C009/C010 | File | Import and API deprecation, per-file |
+| C011 | File (FFI boundary) | Our code's use of C resources |
+| C014/C015 | Project | Dead code requires seeing all callers across all packages |
+| C016 | File | Local variable naming |
+| C017 | Package | Package-level variable naming (needs all files in package) |
+| C018 | File | Proc visibility naming, visible from declaration |
+| C019 | Package + types | Type-suffix conventions; requires type inference (deferred) |
+| C020 | File | Short variable name warning |
+| B001 | File | Token-level brace balance |
+| B002 | Package | Package name consistency across files in directory |
+| B003 | Package | Subfolder package name clash with parent |
+| C012-T | Project | Type-gated ownership naming; requires `memory_role` graph |
+| DNA graph | Project | Full symbol index, memory roles, call graph |
+| MCP tools | Project | Query layer over DNA graph |
+| rename_symbol | Project | Cross-file FixEdit generation |
+| LSP call hierarchy | Project | OLS-mediated cross-package navigation |
+
+---
+
+### Why These Scopes Matter
+
+**For rule authors:** Before implementing a rule, identify its scope. A file-scope
+rule that reads from the DNA graph is architecturally wrong — it creates a hidden
+dependency on a separately-built artefact and breaks `odin-lint single_file.odin`.
+
+**For performance:** File-scope rules run in parallel, one goroutine per file.
+Package-scope rules run after grouping but before the file passes. Project-scope
+services run separately, on demand, not during the lint pass.
+
+**For OLS plugin:** The plugin runs file-scope rules only (no graph DB access on
+every keystroke). Package-scope rules run when the user saves and OLS decides to
+re-analyse the package. Project-scope tools are available via MCP, not via the
+diagnostic stream.
+
+**For C001 false positives:** The remaining FPs after M6.6 (custom allocator
+variables like `path_scratch := g2d_get_path_scratch()`) require **return-type
+tracking** — a project-scope / type-resolution capability. They are correctly
+handled by suppression comments, not by extending file-scope C001 analysis.
+
+---
+
+*Version: 7.5*
 *Last status review: April 21 2026*
 *Previous version: odin-lint-implementation-planV6.md (V7.0 was the internal draft)*
