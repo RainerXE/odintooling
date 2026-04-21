@@ -72,7 +72,7 @@ emitDiagnostic :: proc(diag: Diagnostic) {
     case .CONTEXTUAL:
         fmt.printf("🟡 %s:%d:%d: %s [%s] %s", diag.file, diag.line, diag.column, diag.rule_id, diag.tier, diag.message)
     case .INFO:
-        fmt.printf("🔵 %s:%d:%d: INFO - %s", diag.file, diag.line, diag.column, diag.message)
+        fmt.printf("🔵 %s:%d:%d: %s [%s] INFO: %s", diag.file, diag.line, diag.column, diag.rule_id, diag.tier, diag.message)
     case .VIOLATION, .NONE:
         fmt.printf("🔴 %s:%d:%d: %s [%s] %s", diag.file, diag.line, diag.column, diag.rule_id, diag.tier, diag.message)
     }
@@ -291,11 +291,20 @@ analyze_file :: proc(
                 if !ts_node_is_null(root) {
                     q, q_ok := load_query_src(ts_parser.adapter.language, C012_RULES_SCM, "c012_rules.scm")
                     if q_ok {
+                        // S1-S3 + T1: pure tree-sitter checks
                         diags := c012_scm_run(file_path, root, lines, &q)
-                        unload_query(&q)
                         for d in dedupDiagnostics(diags) {
                             violations += emit_or_collect(d, collector)
                         }
+                        // T3: graph-enriched allocator-return ownership check
+                        db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
+                        if os.is_file(db_path) {
+                            t3_diags := c012_t3_run(file_path, root, lines, &q, db_path)
+                            for d in dedupDiagnostics(t3_diags) {
+                                violations += emit_or_collect(d, collector)
+                            }
+                        }
+                        unload_query(&q)
                     }
                 }
             }
