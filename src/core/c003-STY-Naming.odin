@@ -20,16 +20,16 @@ import "core:strings"
 // NamingRuleFlags controls which naming rules fire in naming_scm_run.
 // Build from rule_enabled() calls in main.odin, or use the constants below.
 NamingRuleFlags :: struct {
-    c003, c007, c016, c017, c018: bool,
+    c003, c007, c016, c017, c018, c020: bool,
+    c020_cfg: C020Config, // populated when c020=true
 }
 
 // NAMING_ALL_ENABLED enables every naming rule — used by analyze_content,
 // OLS plugin, and MCP tools which don't have per-rule config filtering.
-NAMING_ALL_ENABLED :: NamingRuleFlags{c003=true, c007=true, c016=true, c017=true, c018=true}
+NAMING_ALL_ENABLED :: NamingRuleFlags{c003=true, c007=true, c016=true, c017=true, c018=true, c020=false}
 
-// NAMING_DEFAULTS enables only the rules that are on by default (C016 is on,
-// C017/C018 are opt-in). Used when opts are unavailable.
-NAMING_DEFAULTS :: NamingRuleFlags{c003=true, c007=true, c016=true, c017=false, c018=false}
+// NAMING_DEFAULTS enables only the rules that are on by default.
+NAMING_DEFAULTS :: NamingRuleFlags{c003=true, c007=true, c016=true, c017=false, c018=false, c020=false}
 
 C003Rule :: proc() -> Rule {
     return Rule{
@@ -139,6 +139,13 @@ naming_scm_run :: proc(
         // C018: proc naming must reflect @(private) visibility (opt-in)
         if flags.c018 {
             if d, ok := c018_scm_run(file_path, result.captures, file_lines); ok {
+                append(&diagnostics, d)
+            }
+        }
+
+        // C020: short variable/parameter names (opt-in)
+        if flags.c020 {
+            if d, ok := c020_scm_run(file_path, result.captures, file_lines, flags.c020_cfg); ok {
                 append(&diagnostics, d)
             }
         }

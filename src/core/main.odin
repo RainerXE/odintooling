@@ -164,15 +164,19 @@ analyze_file :: proc(
         }
     }
 
-    // C003 + C007 + C016 + C017 + C018: Naming rules (shared SCM pass)
+    // C003 + C007 + C016–C018 + C020: Naming rules (shared SCM pass)
+    c020_enabled := rule_enabled("C020", "style", opts)
     naming_flags := NamingRuleFlags{
-        c003 = rule_enabled("C003", "style", opts),
-        c007 = rule_enabled("C007", "style", opts),
-        c016 = rule_enabled("C016", "style", opts),
-        c017 = rule_enabled("C017", "style", opts),
-        c018 = rule_enabled("C018", "style", opts),
+        c003     = rule_enabled("C003", "style", opts),
+        c007     = rule_enabled("C007", "style", opts),
+        c016     = rule_enabled("C016", "style", opts),
+        c017     = rule_enabled("C017", "style", opts),
+        c018     = rule_enabled("C018", "style", opts),
+        c020     = c020_enabled,
+        c020_cfg = c020_build_config(opts.config) if c020_enabled else C020Config{},
     }
-    if naming_flags.c003 || naming_flags.c007 || naming_flags.c016 || naming_flags.c017 || naming_flags.c018 {
+    defer if c020_enabled { c020_free_config(&naming_flags.c020_cfg) }
+    if naming_flags.c003 || naming_flags.c007 || naming_flags.c016 || naming_flags.c017 || naming_flags.c018 || naming_flags.c020 {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
         if err == nil {
             defer delete(content)
