@@ -1,6 +1,7 @@
 package core
 
 import "core:fmt"
+import "core:hash"
 import "core:os"
 import "core:strings"
 import "core:time"
@@ -20,6 +21,7 @@ ExportResult :: struct {
     db_path:          string,
     symbols_path:     string,
     ok:               bool,
+    cached:           bool,  // true when all files were unchanged and no rebuild was needed
 }
 
 // export_symbols runs the full 5-pass DNA export pipeline.
@@ -46,12 +48,60 @@ export_symbols :: proc(
     }
     defer graph_close(db)
 
-    graph_clear(db)
-
     files := collect_odin_files(paths, true, false)
     defer {
         for f in files { delete(f) }
         delete(files)
+    }
+
+    // -----------------------------------------------------------------------
+    // Incremental rebuild — compute content hashes, skip unchanged files,
+    // evict deleted files.
+    // -----------------------------------------------------------------------
+    known_hashes := graph_known_file_hashes(db)
+    defer graph_free_file_hashes(&known_hashes)
+
+    // Build set of current file paths for eviction detection.
+    current_set := make(map[string]bool, context.temp_allocator)
+    for f in files { current_set[f] = true }
+
+    // Evict files that no longer exist.
+    for known_path in known_hashes {
+        if known_path not_in current_set {
+            graph_evict_file(db, known_path)
+        }
+    }
+
+    // Compute per-file hashes; build list of files that need re-indexing.
+    now_ts := i64(time.now()._nsec / 1_000_000_000)
+    changed_files := make([dynamic]string, context.temp_allocator)
+    file_hashes   := make(map[string]string, context.temp_allocator)
+
+    for file_path in files {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err != nil { continue }
+        h := hash.fnv64a(content)
+        hash_str := fmt.tprintf("%x", h)
+        delete(content)
+
+        file_hashes[file_path] = hash_str
+        known_h, is_known := known_hashes[file_path]
+        if is_known && known_h == hash_str {
+            continue  // unchanged — skip
+        }
+        // Changed or new — evict old data then re-index.
+        if is_known { graph_evict_file(db, file_path) }
+        append(&changed_files, file_path)
+    }
+
+    if len(changed_files) == 0 {
+        // Nothing changed — return cached result.
+        result.nodes_written = _count_table(db, "nodes")
+        result.edges_written = _count_table(db, "edges")
+        result.unresolved    = _count_table(db, "unresolved_refs")
+        result.ok     = true
+        result.cached = true
+        return result
     }
 
     // -----------------------------------------------------------------------
@@ -64,12 +114,13 @@ export_symbols :: proc(
     }
     defer unload_query(&decl_q)
 
-    for file_path in files {
+    for file_path in changed_files {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
         if err != nil { continue }
 
-        now_ts := i64(time.now()._nsec / 1_000_000_000)
-        graph_insert_file(db, file_path, fmt.tprintf("%d", len(content)), now_ts)
+        if h, ok2 := file_hashes[file_path]; ok2 {
+            graph_insert_file(db, file_path, h, now_ts)
+        }
 
         lines := strings.split(string(content), "\n")
 
@@ -184,7 +235,12 @@ _pass1_index_declarations :: proc(
             line        := int(pt.row) + 1
             qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
             is_exported := !proc_node_is_private(name_node, lines)
-            graph_insert_node(db, name, qualified, "proc", file_path, line, "", is_exported)
+            sig         := _extract_proc_signature(name_node, lines)
+            rt          := _extract_return_type(sig)
+            node_id     := graph_insert_node(db, name, qualified, "proc", file_path, line, sig, is_exported)
+            if node_id >= 0 && rt != "" {
+                graph_update_return_type(db, node_id, rt)
+            }
             continue
         }
         if name_node, has_struct := m.captures["struct_name"]; has_struct {
@@ -244,7 +300,15 @@ _pass1_index_declarations :: proc(
             line        := int(pt.row) + 1
             qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
             is_exported := !decl_node_is_private(name_node, lines)
-            graph_insert_node(db, name, qualified, "variable", file_path, line, "", is_exported)
+            node_id     := graph_insert_node(db, name, qualified, "variable", file_path, line, "", is_exported)
+            // Tag explicit allocator-typed package variables (e.g. "scratch: mem.Allocator")
+            if node_id >= 0 && int(pt.row) < len(lines) {
+                src_line := lines[pt.row]
+                if strings.contains(src_line, "mem.Allocator") ||
+                   strings.contains(src_line, "runtime.Allocator") {
+                    graph_update_memory_role(db, node_id, "allocator")
+                }
+            }
             continue
         }
         if name_node, has_pkg_var := m.captures["pkg_var"]; has_pkg_var {
@@ -324,17 +388,27 @@ _find_enclosing_proc :: proc(db: ^GraphDB, file: string, line: int) -> i64 {
 
 @(private)
 _pass3_tag_memory_roles :: proc(db: ^GraphDB) {
-    s, ok := sq.db_prepare(db.conn, `SELECT id FROM nodes WHERE kind='proc';`)
+    s, ok := sq.db_prepare(db.conn, `SELECT id, return_type FROM nodes WHERE kind='proc';`)
     if !ok { return }
     defer sq.stmt_finalize(&s)
 
-    ids := make([dynamic]i64)
-    defer delete(ids)
-    for sq.stmt_step(&s) { append(&ids, sq.stmt_col_i64(&s, 0)) }
+    ids          := make([dynamic]i64)
+    return_types := make([dynamic]string)
+    defer { delete(ids); for rt in return_types { delete(rt) }; delete(return_types) }
 
-    for id in ids {
-        role := _infer_role(db, id)
-        graph_update_memory_role(db, id, role)
+    for sq.stmt_step(&s) {
+        append(&ids,          sq.stmt_col_i64(&s, 0))
+        append(&return_types, sq.stmt_col_text(&s, 1))
+    }
+
+    for i in 0..<len(ids) {
+        // Procs that return an allocator type are themselves allocator factories.
+        if strings.contains(return_types[i], "Allocator") {
+            graph_update_memory_role(db, ids[i], "allocator")
+            continue
+        }
+        role := _infer_role(db, ids[i])
+        graph_update_memory_role(db, ids[i], role)
     }
 }
 
@@ -480,7 +554,7 @@ _pass5_write_symbols_json :: proc(db: ^GraphDB, out_path: string) {
     strings.write_string(&sb, `{"schema":"odin-lint-symbols/1.0","procedures":[`)
 
     s, ok := sq.db_prepare(db.conn,
-        `SELECT id,name,file,line,memory_role,lint_violations,signature FROM nodes WHERE kind='proc';`)
+        `SELECT id,name,file,line,memory_role,lint_violations,signature,return_type FROM nodes WHERE kind='proc';`)
     if !ok { return }
     defer sq.stmt_finalize(&s)
 
@@ -493,7 +567,8 @@ _pass5_write_symbols_json :: proc(db: ^GraphDB, out_path: string) {
         line := sq.stmt_col_int(&s, 3)
         role_raw := sq.stmt_col_text(&s, 4)
         violations_raw := sq.stmt_col_text(&s, 5)
-        sig  := sq.stmt_col_text(&s, 6)
+        sig     := sq.stmt_col_text(&s, 6)
+        ret_raw := sq.stmt_col_text(&s, 7)
 
         // Use display values (may be literals); always delete the owned raw copies.
         role_str       := role_raw       if role_raw       != "" else "neutral"
@@ -513,6 +588,8 @@ _pass5_write_symbols_json :: proc(db: ^GraphDB, out_path: string) {
         strings.write_string(&sb, _json_str(role_str))
         strings.write_string(&sb, `,"signature":`)
         strings.write_string(&sb, _json_str(sig))
+        strings.write_string(&sb, `,"return_type":`)
+        strings.write_string(&sb, _json_str(ret_raw))
         strings.write_string(&sb, `,"lint_violations":`)
         strings.write_string(&sb, violations_str)
 
@@ -528,9 +605,9 @@ _pass5_write_symbols_json :: proc(db: ^GraphDB, out_path: string) {
         }
         strings.write_string(&sb, `]}`)
 
-        for n in callers { delete(n.name); delete(n.kind); delete(n.file); delete(n.memory_role); delete(n.lint_violations); delete(n.signature) }
+        for n in callers { delete(n.name); delete(n.kind); delete(n.file); delete(n.memory_role); delete(n.lint_violations); delete(n.signature); delete(n.return_type) }
         delete(callers)
-        for n in callees { delete(n.name); delete(n.kind); delete(n.file); delete(n.memory_role); delete(n.lint_violations); delete(n.signature) }
+        for n in callees { delete(n.name); delete(n.kind); delete(n.file); delete(n.memory_role); delete(n.lint_violations); delete(n.signature); delete(n.return_type) }
         delete(callees)
 
         delete(name)
@@ -538,6 +615,7 @@ _pass5_write_symbols_json :: proc(db: ^GraphDB, out_path: string) {
         delete(role_raw)
         delete(violations_raw)
         delete(sig)
+        delete(ret_raw)
     }
 
     strings.write_string(&sb, `]}`)
@@ -599,6 +677,37 @@ _json_str :: proc(s: string) -> string {
     e1, _ := strings.replace_all(s,  `\`, `\\`)
     e2, _ := strings.replace_all(e1, `"`, `\"`)
     return fmt.tprintf(`"%s"`, e2)
+}
+
+// _extract_proc_signature returns the text from the proc_name position up to (but
+// not including) the opening '{' of the proc body, collapsed to a single line.
+// Scans at most 10 lines to handle multi-line parameter lists.
+@(private)
+_extract_proc_signature :: proc(name_node: TSNode, lines: []string) -> string {
+    pt         := ts_node_start_point(name_node)
+    start_line := int(pt.row)
+
+    sb := strings.builder_make(context.temp_allocator)
+    for i := start_line; i < len(lines) && i < start_line+10; i += 1 {
+        line := lines[i]
+        brace := strings.index(line, "{")
+        if brace >= 0 {
+            strings.write_string(&sb, line[:brace])
+            break
+        }
+        if i > start_line { strings.write_byte(&sb, ' ') }
+        strings.write_string(&sb, line)
+    }
+    return strings.trim_space(strings.to_string(sb))
+}
+
+// _extract_return_type parses the `->` portion of a proc signature string.
+// Returns the trimmed return type, or "" if no `->` is present.
+@(private)
+_extract_return_type :: proc(sig: string) -> string {
+    arrow := strings.last_index(sig, "->")
+    if arrow < 0 { return "" }
+    return strings.trim_space(sig[arrow+2:])
 }
 
 @(private)
