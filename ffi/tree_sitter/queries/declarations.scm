@@ -39,6 +39,8 @@
   (identifier) @pkg_var) @pkg_var_decl
 
 ; Package-level explicit-type variable declarations (name: Type = value)
+; Anchored to source_file to exclude locals inside proc bodies.
 ; NOTE: same dedup concern — Pass 1 checks column < position of ':'.
-(var_declaration
-  (identifier) @var_name) @var_decl
+(source_file
+  (var_declaration
+    (identifier) @var_name) @var_decl)

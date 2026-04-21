@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS nodes (
     signature      TEXT,
     is_exported    INTEGER NOT NULL DEFAULT 1,
     memory_role    TEXT,              -- "allocator"|"deallocator"|"borrower"|"neutral"
-    lint_violations TEXT              -- JSON array of rule IDs, e.g. '["C001"]'
+    lint_violations TEXT,             -- JSON array of rule IDs, e.g. '["C001"]'
+    return_type    TEXT               -- extracted return type string, e.g. "mem.Allocator"
 );
 
 CREATE TABLE IF NOT EXISTS edges (
@@ -65,14 +66,15 @@ GraphDB :: struct {
 }
 
 GraphNodeInfo :: struct {
-    id:           i64,
-    name:         string,
-    kind:         string,
-    file:         string,
-    line:         int,
-    memory_role:  string,
+    id:             i64,
+    name:           string,
+    kind:           string,
+    file:           string,
+    line:           int,
+    memory_role:    string,
     lint_violations: string,
-    signature:    string,
+    signature:      string,
+    return_type:    string,
 }
 
 GraphEdgeInfo :: struct {
@@ -95,6 +97,8 @@ graph_open :: proc(path: string) -> (db: ^GraphDB, ok: bool) {
         free(db)
         return nil, false
     }
+    // Additive migration: add return_type if this db predates M7.
+    sq.db_exec(db.conn, "ALTER TABLE nodes ADD COLUMN return_type TEXT;")
     return db, true
 }
 
@@ -196,6 +200,16 @@ graph_update_memory_role :: proc(db: ^GraphDB, node_id: i64, role: string) {
     sq.stmt_exec(&s)
 }
 
+// graph_update_return_type stores the extracted return type string for a node.
+graph_update_return_type :: proc(db: ^GraphDB, node_id: i64, return_type: string) {
+    s, ok := sq.db_prepare(db.conn, "UPDATE nodes SET return_type=? WHERE id=?;")
+    if !ok { return }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, return_type)
+    sq.stmt_bind_i64(&s, 2, node_id)
+    sq.stmt_exec(&s)
+}
+
 // graph_update_violations attaches a JSON array of lint rule IDs to a node.
 graph_update_violations :: proc(db: ^GraphDB, node_id: i64, violations_json: string) {
     s, ok := sq.db_prepare(db.conn, "UPDATE nodes SET lint_violations=? WHERE id=?;")
@@ -239,21 +253,22 @@ graph_find_node_in_file :: proc(db: ^GraphDB, name: string, file: string) -> i64
 @(private)
 scan_node_info :: proc(s: ^sq.Stmt) -> GraphNodeInfo {
     return GraphNodeInfo{
-        id          = sq.stmt_col_i64(s, 0),
-        name        = sq.stmt_col_text(s, 1),
-        kind        = sq.stmt_col_text(s, 2),
-        file        = sq.stmt_col_text(s, 3),
-        line        = sq.stmt_col_int(s, 4),
-        memory_role = sq.stmt_col_text(s, 5),
+        id              = sq.stmt_col_i64(s, 0),
+        name            = sq.stmt_col_text(s, 1),
+        kind            = sq.stmt_col_text(s, 2),
+        file            = sq.stmt_col_text(s, 3),
+        line            = sq.stmt_col_int(s, 4),
+        memory_role     = sq.stmt_col_text(s, 5),
         lint_violations = sq.stmt_col_text(s, 6),
-        signature   = sq.stmt_col_text(s, 7),
+        signature       = sq.stmt_col_text(s, 7),
+        return_type     = sq.stmt_col_text(s, 8),
     }
 }
 
 // graph_get_node returns a single node by name.
 graph_get_node :: proc(db: ^GraphDB, name: string) -> (GraphNodeInfo, bool) {
     s, ok := sq.db_prepare(db.conn,
-        `SELECT id,name,kind,file,line,memory_role,lint_violations,signature
+        `SELECT id,name,kind,file,line,memory_role,lint_violations,signature,return_type
          FROM nodes WHERE name=? LIMIT 1;`)
     if !ok { return {}, false }
     defer sq.stmt_finalize(&s)
@@ -266,7 +281,7 @@ graph_get_node :: proc(db: ^GraphDB, name: string) -> (GraphNodeInfo, bool) {
 graph_get_callers :: proc(db: ^GraphDB, node_id: i64) -> [dynamic]GraphNodeInfo {
     result := make([dynamic]GraphNodeInfo)
     s, ok := sq.db_prepare(db.conn,
-        `SELECT n.id,n.name,n.kind,n.file,n.line,n.memory_role,n.lint_violations,n.signature
+        `SELECT n.id,n.name,n.kind,n.file,n.line,n.memory_role,n.lint_violations,n.signature,n.return_type
          FROM nodes n JOIN edges e ON e.source_id=n.id
          WHERE e.target_id=? AND e.kind='calls';`)
     if !ok { return result }
@@ -280,7 +295,7 @@ graph_get_callers :: proc(db: ^GraphDB, node_id: i64) -> [dynamic]GraphNodeInfo 
 graph_get_callees :: proc(db: ^GraphDB, node_id: i64) -> [dynamic]GraphNodeInfo {
     result := make([dynamic]GraphNodeInfo)
     s, ok := sq.db_prepare(db.conn,
-        `SELECT n.id,n.name,n.kind,n.file,n.line,n.memory_role,n.lint_violations,n.signature
+        `SELECT n.id,n.name,n.kind,n.file,n.line,n.memory_role,n.lint_violations,n.signature,n.return_type
          FROM nodes n JOIN edges e ON e.target_id=n.id
          WHERE e.source_id=? AND e.kind='calls';`)
     if !ok { return result }
@@ -303,7 +318,7 @@ graph_get_impact :: proc(db: ^GraphDB, node_id: i64, depth: int) -> [dynamic]Gra
             FROM edges e JOIN impact i ON e.source_id=i.id
             WHERE i.depth < %d AND e.kind='calls'
         )
-        SELECT DISTINCT n.id,n.name,n.kind,n.file,n.line,n.memory_role,n.lint_violations,n.signature
+        SELECT DISTINCT n.id,n.name,n.kind,n.file,n.line,n.memory_role,n.lint_violations,n.signature,n.return_type
         FROM nodes n JOIN impact i ON n.id=i.id;`, depth)
     s, ok := sq.db_prepare(db.conn, sql)
     if !ok { return result }
@@ -313,11 +328,25 @@ graph_get_impact :: proc(db: ^GraphDB, node_id: i64, depth: int) -> [dynamic]Gra
     return result
 }
 
+// graph_find_file_allocator_vars returns variable nodes in a specific file that
+// have memory_role='allocator' (e.g. explicit "name: mem.Allocator" declarations).
+graph_find_file_allocator_vars :: proc(db: ^GraphDB, file_path: string) -> [dynamic]GraphNodeInfo {
+    result := make([dynamic]GraphNodeInfo)
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT id,name,kind,file,line,memory_role,lint_violations,signature,return_type
+         FROM nodes WHERE kind='variable' AND memory_role='allocator' AND file=?;`)
+    if !ok { return result }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, file_path)
+    for sq.stmt_step(&s) { append(&result, scan_node_info(&s)) }
+    return result
+}
+
 // graph_find_allocators returns all nodes tagged with memory_role='allocator'.
 graph_find_allocators :: proc(db: ^GraphDB) -> [dynamic]GraphNodeInfo {
     result := make([dynamic]GraphNodeInfo)
     s, ok := sq.db_prepare(db.conn,
-        `SELECT id,name,kind,file,line,memory_role,lint_violations,signature
+        `SELECT id,name,kind,file,line,memory_role,lint_violations,signature,return_type
          FROM nodes WHERE memory_role='allocator';`)
     if !ok { return result }
     defer sq.stmt_finalize(&s)
@@ -354,7 +383,7 @@ graph_find_all_references :: proc(db: ^GraphDB, name: string) -> [dynamic]GraphE
 graph_search_nodes :: proc(db: ^GraphDB, query: string, limit: int) -> [dynamic]GraphNodeInfo {
     result := make([dynamic]GraphNodeInfo)
     sql := fmt.tprintf(
-        `SELECT id,name,kind,file,line,memory_role,lint_violations,signature
+        `SELECT id,name,kind,file,line,memory_role,lint_violations,signature,return_type
          FROM nodes WHERE name LIKE ? LIMIT %d;`, limit)
     s, ok := sq.db_prepare(db.conn, sql)
     if !ok { return result }
@@ -363,6 +392,66 @@ graph_search_nodes :: proc(db: ^GraphDB, query: string, limit: int) -> [dynamic]
     sq.stmt_bind_text(&s, 1, pattern)
     for sq.stmt_step(&s) { append(&result, scan_node_info(&s)) }
     return result
+}
+
+// graph_evict_file removes all nodes, edges, and unresolved_refs for a file path.
+// Used during incremental rebuild to clean up deleted or changed files.
+graph_evict_file :: proc(db: ^GraphDB, file_path: string) {
+    // Collect node ids for this file.
+    ids := make([dynamic]i64, context.temp_allocator)
+    s, ok := sq.db_prepare(db.conn, "SELECT id FROM nodes WHERE file=?;")
+    if ok {
+        sq.stmt_bind_text(&s, 1, file_path)
+        for sq.stmt_step(&s) { append(&ids, sq.stmt_col_i64(&s, 0)) }
+        sq.stmt_finalize(&s)
+    }
+    for id in ids {
+        de, de_ok := sq.db_prepare(db.conn, "DELETE FROM edges WHERE source_id=? OR target_id=?;")
+        if de_ok {
+            sq.stmt_bind_i64(&de, 1, id)
+            sq.stmt_bind_i64(&de, 2, id)
+            sq.stmt_exec(&de)
+            sq.stmt_finalize(&de)
+        }
+        ur, ur_ok := sq.db_prepare(db.conn, "DELETE FROM unresolved_refs WHERE source_id=?;")
+        if ur_ok {
+            sq.stmt_bind_i64(&ur, 1, id)
+            sq.stmt_exec(&ur)
+            sq.stmt_finalize(&ur)
+        }
+    }
+    dn, dn_ok := sq.db_prepare(db.conn, "DELETE FROM nodes WHERE file=?;")
+    if dn_ok {
+        sq.stmt_bind_text(&dn, 1, file_path)
+        sq.stmt_exec(&dn)
+        sq.stmt_finalize(&dn)
+    }
+    df, df_ok := sq.db_prepare(db.conn, "DELETE FROM files WHERE path=?;")
+    if df_ok {
+        sq.stmt_bind_text(&df, 1, file_path)
+        sq.stmt_exec(&df)
+        sq.stmt_finalize(&df)
+    }
+}
+
+// graph_known_file_hashes returns a map of path → content_hash for all indexed files.
+// Caller owns the map and all strings; free with graph_free_file_hashes.
+graph_known_file_hashes :: proc(db: ^GraphDB) -> map[string]string {
+    result := make(map[string]string)
+    s, ok := sq.db_prepare(db.conn, "SELECT path, content_hash FROM files;")
+    if !ok { return result }
+    defer sq.stmt_finalize(&s)
+    for sq.stmt_step(&s) {
+        k := sq.stmt_col_text(&s, 0)
+        v := sq.stmt_col_text(&s, 1)
+        result[k] = v
+    }
+    return result
+}
+
+graph_free_file_hashes :: proc(m: ^map[string]string) {
+    for k, v in m^ { delete(k); delete(v) }
+    delete(m^)
 }
 
 // graph_ensure_dir creates the directory for db_path if it does not exist.
