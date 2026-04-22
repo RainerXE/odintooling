@@ -150,8 +150,8 @@ analyze_file :: proc(
         }
     }
 
-    // C001: Memory allocation without defer free (OdinLint AST walker)
-    if rule_enabled("C001", "correctness", opts) {
+    // C001 + C101: AST walker rules (share one parse)
+    if rule_enabled("C001", "correctness", opts) || rule_enabled("C101", "correctness", opts) {
         ast_root, parse_ok := parseFile(ts_parser^, file_path)
         if !parse_ok {
             violations += emit_or_collect(
@@ -160,8 +160,21 @@ analyze_file :: proc(
                 collector)
             return violations, true
         }
-        for d in dedupDiagnostics(c001Matcher(file_path, &ast_root)) {
-            violations += emit_or_collect(d, collector)
+        if rule_enabled("C001", "correctness", opts) {
+            for d in dedupDiagnostics(c001Matcher(file_path, &ast_root)) {
+                violations += emit_or_collect(d, collector)
+            }
+        }
+        if rule_enabled("C101", "correctness", opts) {
+            c101_content, c101_err := os.read_entire_file_from_path(file_path, context.allocator)
+            if c101_err == nil {
+                defer delete(c101_content)
+                c101_lines := strings.split(string(c101_content), "\n")
+                defer delete(c101_lines)
+                for d in dedupDiagnostics(c101_run(file_path, &ast_root, c101_lines)) {
+                    violations += emit_or_collect(d, collector)
+                }
+            }
         }
     }
 
