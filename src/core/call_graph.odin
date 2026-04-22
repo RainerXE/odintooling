@@ -277,6 +277,12 @@ graph_get_node :: proc(db: ^GraphDB, name: string) -> (GraphNodeInfo, bool) {
     return {}, false
 }
 
+// graph_free_node_info frees all heap-allocated strings inside a GraphNodeInfo.
+graph_free_node_info :: proc(n: GraphNodeInfo) {
+    delete(n.name); delete(n.kind); delete(n.file)
+    delete(n.memory_role); delete(n.lint_violations); delete(n.signature); delete(n.return_type)
+}
+
 // graph_get_callers returns all proc nodes that have a 'calls' edge to node_id.
 graph_get_callers :: proc(db: ^GraphDB, node_id: i64) -> [dynamic]GraphNodeInfo {
     result := make([dynamic]GraphNodeInfo)
