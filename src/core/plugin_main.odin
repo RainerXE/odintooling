@@ -26,6 +26,7 @@ package core
 
 import "base:runtime"
 import "core:mem"
+import "core:os"
 import "core:strings"
 
 
@@ -38,12 +39,13 @@ import "core:strings"
 // Kept in sync with OLS_PLUGIN_API_VERSION "1.0".
 
 OLSPluginCapability :: enum u32 {
-	Diagnostics = 0,
-	CodeActions  = 1,
-	Hover        = 2,
-	Completions  = 3,
-	Format       = 4,
-	Rename       = 5,
+	Diagnostics   = 0,
+	CodeActions   = 1,
+	Hover         = 2,
+	Completions   = 3,
+	Format        = 4,
+	Rename        = 5,
+	CallHierarchy = 6,
 }
 OLSPluginCapabilities :: bit_set[OLSPluginCapability;u32]
 
@@ -96,6 +98,21 @@ OLSPluginCodeActionList :: struct #packed {
 	count: i32,
 }
 
+// OLSPluginCallHierarchyCall mirrors OLSCallHierarchyCall in plugin.odin.
+// Used for all 3 call hierarchy hooks (prepare, incoming, outgoing).
+// call_site_line = -1 when not applicable (prepare results).
+OLSPluginCallHierarchyCall :: struct #packed {
+	name:           cstring,
+	uri:            cstring,
+	line:           i32,
+	character:      i32,
+	call_site_line: i32,
+}
+OLSPluginCallHierarchyCallList :: struct #packed {
+	items: [^]OLSPluginCallHierarchyCall,
+	count: i32,
+}
+
 // OLSPluginDescriptor mirrors OLSPlugin in vendor/ols/src/server/plugin.odin.
 OLSPluginDescriptor :: struct {
 	name:            cstring,
@@ -107,7 +124,11 @@ OLSPluginDescriptor :: struct {
 	on_code_actions: proc "c" (doc: ^OLSPluginDocument, range: OLSPluginRange) -> ^OLSPluginCodeActionList,
 	on_hover:        proc "c" (doc: ^OLSPluginDocument, pos: OLSPluginPosition) -> cstring,
 	on_rename:       proc "c" (doc: ^OLSPluginDocument, pos: OLSPluginPosition, new_name: cstring) -> ^OLSPluginCodeActionList,
-	free_result:     proc "c" (ptr: rawptr),
+	on_prepare_call_hierarchy: proc "c" (doc: ^OLSPluginDocument, line: i32, char: i32) -> ^OLSPluginCallHierarchyCallList,
+	on_incoming_calls:         proc "c" (name: cstring, uri: cstring) -> ^OLSPluginCallHierarchyCallList,
+	on_outgoing_calls:         proc "c" (name: cstring, uri: cstring) -> ^OLSPluginCallHierarchyCallList,
+	free_result:               proc "c" (ptr: rawptr),
+	free_call_hierarchy:       proc "c" (ptr: rawptr),
 }
 
 
@@ -117,14 +138,18 @@ OLSPluginDescriptor :: struct {
 _plugin: OLSPluginDescriptor = {
 	name         = "odin-lint",
 	version      = "0.1.0",
-	capabilities = {.Diagnostics},
+	capabilities = {.Diagnostics, .CallHierarchy},
 	init         = _ols_init,
 	shutdown     = _ols_shutdown,
-	on_diagnostics  = _ols_on_diagnostics,
-	on_code_actions = _ols_on_code_actions,
-	on_hover        = nil,
-	on_rename       = nil,
-	free_result     = _ols_free_result,
+	on_diagnostics             = _ols_on_diagnostics,
+	on_code_actions            = _ols_on_code_actions,
+	on_hover                   = nil,
+	on_rename                  = nil,
+	on_prepare_call_hierarchy  = _ols_prepare_call_hierarchy,
+	on_incoming_calls          = _ols_incoming_calls,
+	on_outgoing_calls          = _ols_outgoing_calls,
+	free_result                = _ols_free_result,
+	free_call_hierarchy        = _ols_free_call_hierarchy,
 }
 
 @(private = "file")
@@ -229,7 +254,230 @@ _ols_on_code_actions :: proc "c" (
 }
 
 
+// ── Call hierarchy ─────────────────────────────────────────────────────────────
+
+// _ols_prepare_call_hierarchy extracts the identifier at (line, char) in the
+// document and looks it up in the code graph. Returns nil when no graph exists
+// or no proc is found at that position.
+@(private = "file")
+_ols_prepare_call_hierarchy :: proc "c" (
+	doc:  ^OLSPluginDocument,
+	line: i32,
+	char: i32,
+) -> ^OLSPluginCallHierarchyCallList {
+	context = runtime.default_context()
+	if doc == nil { return nil }
+
+	text := string(doc.text[:doc.text_len]) if doc.text != nil && doc.text_len > 0 else ""
+	if len(text) == 0 { return nil }
+
+	word := _word_at(text, int(line), int(char))
+	if len(word) == 0 { return nil }
+
+	db_path := _graph_db_path_for(string(doc.path))
+	db, ok := graph_open(db_path)
+	if !ok { return nil }
+	defer graph_close(db)
+
+	info, info_ok := graph_get_node(db, word)
+	if !info_ok { return nil }
+	defer graph_free_node_info(info)
+
+	ha      := runtime.heap_allocator()
+	uri_str := _file_uri(info.file)
+
+	item_raw, err1 := mem.alloc(size_of(OLSPluginCallHierarchyCall), align_of(OLSPluginCallHierarchyCall), ha)
+	if err1 != nil { delete(uri_str); return nil }
+	item := cast(^OLSPluginCallHierarchyCall)item_raw
+	item.name           = strings.clone_to_cstring(info.name, ha)
+	item.uri            = strings.clone_to_cstring(uri_str, ha)
+	item.line           = i32(max(info.line - 1, 0))
+	item.character      = 0
+	item.call_site_line = -1
+	delete(uri_str)
+
+	list_raw, err2 := mem.alloc(size_of(OLSPluginCallHierarchyCallList), align_of(OLSPluginCallHierarchyCallList), ha)
+	if err2 != nil {
+		mem.free(item_raw, ha)
+		return nil
+	}
+	list := cast(^OLSPluginCallHierarchyCallList)list_raw
+	list.items = cast([^]OLSPluginCallHierarchyCall)item_raw
+	list.count = 1
+	return list
+}
+
+// _ols_incoming_calls returns all callers of the named proc from the code graph.
+@(private = "file")
+_ols_incoming_calls :: proc "c" (name: cstring, uri: cstring) -> ^OLSPluginCallHierarchyCallList {
+	context = runtime.default_context()
+	if name == nil { return nil }
+
+	db_path := _graph_db_path_for(_uri_to_path(string(uri)))
+	db, ok := graph_open(db_path)
+	if !ok { return nil }
+	defer graph_close(db)
+
+	node_id := graph_find_node(db, string(name))
+	if node_id < 0 { return nil }
+
+	callers := graph_get_callers(db, node_id)
+	defer { for n in callers { graph_free_node_info(n) }; delete(callers) }
+
+	return _build_call_list(callers[:])
+}
+
+// _ols_outgoing_calls returns all callees of the named proc from the code graph.
+@(private = "file")
+_ols_outgoing_calls :: proc "c" (name: cstring, uri: cstring) -> ^OLSPluginCallHierarchyCallList {
+	context = runtime.default_context()
+	if name == nil { return nil }
+
+	db_path := _graph_db_path_for(_uri_to_path(string(uri)))
+	db, ok := graph_open(db_path)
+	if !ok { return nil }
+	defer graph_close(db)
+
+	node_id := graph_find_node(db, string(name))
+	if node_id < 0 { return nil }
+
+	callees := graph_get_callees(db, node_id)
+	defer { for n in callees { graph_free_node_info(n) }; delete(callees) }
+
+	return _build_call_list(callees[:])
+}
+
+@(private = "file")
+_build_call_list :: proc(nodes: []GraphNodeInfo) -> ^OLSPluginCallHierarchyCallList {
+	ha := runtime.heap_allocator()
+	n  := len(nodes)
+	if n == 0 { return nil }
+
+	items_raw, err1 := mem.alloc(size_of(OLSPluginCallHierarchyCall) * n, align_of(OLSPluginCallHierarchyCall), ha)
+	if err1 != nil { return nil }
+	items := cast([^]OLSPluginCallHierarchyCall)items_raw
+
+	for node, i in nodes {
+		uri_str := _file_uri(node.file)
+		items[i] = OLSPluginCallHierarchyCall {
+			name           = strings.clone_to_cstring(node.name, ha),
+			uri            = strings.clone_to_cstring(uri_str, ha),
+			line           = i32(max(node.line - 1, 0)),
+			character      = 0,
+			call_site_line = -1,
+		}
+		delete(uri_str)
+	}
+
+	list_raw, err2 := mem.alloc(size_of(OLSPluginCallHierarchyCallList), align_of(OLSPluginCallHierarchyCallList), ha)
+	if err2 != nil {
+		mem.free(items_raw, ha)
+		return nil
+	}
+	list := cast(^OLSPluginCallHierarchyCallList)list_raw
+	list.items = items
+	list.count = i32(n)
+	return list
+}
+
+// _word_at extracts the Odin identifier at (line, col) in text (0-indexed).
+@(private = "file")
+_word_at :: proc(text: string, line, col: int) -> string {
+	// Find line start offset.
+	cur_line := 0
+	i := 0
+	for i < len(text) && cur_line < line {
+		if text[i] == '\n' { cur_line += 1 }
+		i += 1
+	}
+	if cur_line < line { return "" }
+	line_start := i
+	// Find end of line.
+	line_end := line_start
+	for line_end < len(text) && text[line_end] != '\n' && text[line_end] != '\r' {
+		line_end += 1
+	}
+	line_text := text[line_start:line_end]
+	if col >= len(line_text) { return "" }
+	// Scan backward for word start.
+	start := col
+	for start > 0 && _is_ident(rune(line_text[start-1])) { start -= 1 }
+	// Scan forward for word end.
+	end := col
+	for end < len(line_text) && _is_ident(rune(line_text[end])) { end += 1 }
+	if end <= start { return "" }
+	return line_text[start:end]
+}
+
+@(private = "file")
+_is_ident :: proc(r: rune) -> bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
+}
+
+// _graph_db_path_for returns the graph DB path by walking up from file_path
+// looking for .codegraph/odin_lint_graph.db.  Falls back to GRAPH_DB_PATH (cwd-relative).
+@(private = "file")
+_graph_db_path_for :: proc(file_path: string) -> string {
+	// Find the last separator to get the directory.
+	dir_end := len(file_path)
+	for dir_end > 0 && file_path[dir_end-1] != '/' && file_path[dir_end-1] != '\\' {
+		dir_end -= 1
+	}
+	dir := file_path[:dir_end]
+	for len(dir) > 1 {
+		candidate := strings.concatenate({dir, "/", GRAPH_DB_PATH})
+		if os.is_file(candidate) { return candidate }
+		delete(candidate)
+		// Go up one level.
+		new_end := len(dir) - 1
+		for new_end > 0 && dir[new_end-1] != '/' && dir[new_end-1] != '\\' {
+			new_end -= 1
+		}
+		if new_end >= len(dir) { break }
+		dir = dir[:new_end]
+	}
+	return GRAPH_DB_PATH
+}
+
+// _file_uri converts a file path to a "file://..." URI string.
+// Absolute paths produce "file:///abs/path"; relative paths produce "file://rel/path".
+@(private = "file")
+_file_uri :: proc(path: string) -> string {
+	if len(path) > 0 && path[0] == '/' {
+		return strings.concatenate({"file://", path})
+	}
+	return strings.concatenate({"file://", path})
+}
+
+// _uri_to_path strips the "file://" prefix from a file URI.
+@(private = "file")
+_uri_to_path :: proc(uri: string) -> string {
+	if strings.has_prefix(uri, "file:///") { return uri[len("file://"):] }
+	if strings.has_prefix(uri, "file://")  { return uri[len("file://"):] }
+	return uri
+}
+
+
 // ── Memory management ──────────────────────────────────────────────────────────
+
+// _ols_free_call_hierarchy frees an OLSPluginCallHierarchyCallList.
+// All 3 call hierarchy handlers (prepare, incoming, outgoing) return this type.
+@(private = "file")
+_ols_free_call_hierarchy :: proc "c" (ptr: rawptr) {
+	context = runtime.default_context()
+	if ptr == nil { return }
+	ha   := runtime.heap_allocator()
+	list := cast(^OLSPluginCallHierarchyCallList)ptr
+	if list.items != nil {
+		for i in 0..<int(list.count) {
+			item := list.items[i]
+			if item.name != nil { mem.free(rawptr(item.name), ha) }
+			if item.uri  != nil { mem.free(rawptr(item.uri),  ha) }
+		}
+		mem.free(rawptr(list.items), ha)
+	}
+	mem.free(ptr, ha)
+}
 
 // _ols_free_result is called by OLS when it is done with a result list.
 // ptr must be the ^OLSPluginDiagnosticList pointer returned by on_diagnostics.
