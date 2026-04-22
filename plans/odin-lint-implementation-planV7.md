@@ -682,14 +682,14 @@ M7   Graph Enrichment for LLM Tooling + Refactoring  ⬜ PLANNED
   C012-T unlock (shares memory_role infrastructure)
   Incremental graph rebuild: file-hash cache + eviction (--export-symbols fast path)
   ↳ Requires M6.9 package-scope foundation + M5.6 graph DB
-M7.1 OLS Refactoring + Advanced Rules             🔄 IN PROGRESS (April 21 2026)
+M7.1 OLS Refactoring + Advanced Rules             ✅ COMPLETE (April 22 2026)
   ✅ C012-T1: explicit mem.Allocator var naming (fired when name lacks alloc/allocator)
   ✅ C012-T3: allocator-return without _owned (graph-enriched, needs memory_role DB)
   ✅ rename_symbol MCP tool (find_all_references → FixEdit set) — COMPLETE in M6
   ✅ LSP Call Hierarchy (VS Code "Show Call Hierarchy" on Odin procs) — COMPLETE April 22 2026
   ✅ C101 Context Integrity (context.allocator assigned without defer restore) — COMPLETE April 22 2026
-  ⬜ C201 Unchecked Result Guard (ignored error returns)
-  ⬜ C202 Switch Exhaustiveness (incomplete enum switches)
+  ↷ C201 Unchecked Result Guard — DEFERRED: requires OLS type resolution to distinguish error returns from ok/found bools; pure heuristic has unacceptable FP rate
+  ↷ C202 Switch Exhaustiveness — DEFERRED: requires OLS enum type resolution to enumerate case values; not feasible without type info
   ⬜ C019 STY-TypeMarker (BLOCKED until C012 Phase 2 + convention agreement)
 
 M8 Frejay / Agent Integration API                 ⬜ PLANNED (after M7.1)
@@ -2318,7 +2318,7 @@ no schema changes required.
 | 6.7 | C019 type marker suffixes | DEFERRED — needs C012 Phase 2 type inference + convention agreement | ↷ |
 | 6.9 | Package-scope linting foundation | Four scope levels defined; B002 package name consistency; B003 subfolder name clash | ✅ |
 | 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock, incremental rebuild | ✅ |
-| 7.1 | OLS refactoring + advanced rules | LSP call hierarchy, C101/C201/C202, C012-T, C019 | 🔄 C012-T1+T3 + call hierarchy done |
+| 7.1 | OLS refactoring + advanced rules | LSP call hierarchy, C101/C201/C202, C012-T, C019 | ✅ C012-T1+T3, call hierarchy, C101 — C201/C202/C019 deferred (need OLS types) |
 | 8   | Frejay/agent integration API | errorClass in JSON, lint_workspace, list_rules, get_callers/callees, schema version | ⬜ |
 
 ---
