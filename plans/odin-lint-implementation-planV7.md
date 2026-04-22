@@ -686,11 +686,39 @@ M7.1 OLS Refactoring + Advanced Rules             🔄 IN PROGRESS (April 21 202
   ✅ C012-T1: explicit mem.Allocator var naming (fired when name lacks alloc/allocator)
   ✅ C012-T3: allocator-return without _owned (graph-enriched, needs memory_role DB)
   ✅ rename_symbol MCP tool (find_all_references → FixEdit set) — COMPLETE in M6
-  ⬜ LSP Call Hierarchy (VS Code "Show Call Hierarchy" on Odin procs)
+  ✅ LSP Call Hierarchy (VS Code "Show Call Hierarchy" on Odin procs) — COMPLETE April 22 2026
   ⬜ C101 Context Integrity (control-flow, context.allocator restore check)
   ⬜ C201 Unchecked Result Guard (ignored error returns)
   ⬜ C202 Switch Exhaustiveness (incomplete enum switches)
   ⬜ C019 STY-TypeMarker (BLOCKED until C012 Phase 2 + convention agreement)
+
+M8 Frejay / Agent Integration API                 ⬜ PLANNED (after M7.1)
+  ↳ Prerequisite: M7.1 complete; Frejay v0.1 stable enough to test against
+  Gap 1 — errorClass field in JSON output
+    Add errorClass to --format json (and new --format frejay alias)
+    Taxonomy: correctness_memory_leak, correctness_double_free, ffi_resource_leak,
+    migration_deprecated_import, migration_deprecated_fmt, style_naming_proc,
+    style_naming_type, style_naming_local_var, style_naming_pkg_var,
+    style_naming_visibility, style_ownership_naming, dead_code_unused_proc,
+    dead_code_unused_const, structure_unmatched_brace, structure_package_name,
+    structure_subfolder_clash. Format: {tier}_{category}_{detail}, 1:1 with rule IDs.
+  Gap 2 — compile_check: OUT OF SCOPE for odin-lint (lives in Frejay OdinCompilerVerifier
+    via VProcessService; odin-lint has no odin build integration)
+  Gap 3 — Schema version contract
+    Add "schema_version": "odin-lint-symbols/1.1" to symbols.json root
+    Advertise in server_card.json at .well-known/mcp
+    Bump minor version on any breaking graph schema change going forward
+  Gap 4 — lint_workspace(path, rules?) batch MCP tool
+    Run full lint scan on a directory; return all diagnostics as single JSON array
+    Schema: [{file, rule_id, error_class, tier, line, col, message, fix_hint}]
+    Essentially: odin-lint ./src/ --format json surfaced over MCP
+    Critical for Frejay ExperienceStore bulk trace collection (D-68)
+  Gap 5 — list_rules() MCP tool
+    Return full rule catalog: id, tier, error_class, description, fix_hint, enabled_by_default
+    Lets Frejay RuleInjectionPolicy (D-59) bootstrap from odin-lint's own catalog
+  LSP parity — get_callers(name) + get_callees(name) dedicated MCP tools
+    Currently only available bundled in get_dna_context; agents need targeted queries
+    Backed by existing graph_get_callers / graph_get_callees in call_graph.odin
 ```
 
 ---
@@ -2290,7 +2318,8 @@ no schema changes required.
 | 6.7 | C019 type marker suffixes | DEFERRED — needs C012 Phase 2 type inference + convention agreement | ↷ |
 | 6.9 | Package-scope linting foundation | Four scope levels defined; B002 package name consistency; B003 subfolder name clash | ✅ |
 | 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock, incremental rebuild | ✅ |
-| 7.1 | OLS refactoring + advanced rules | LSP call hierarchy, C101/C201/C202, C012-T, C019 | 🔄 C012-T1+T3 done |
+| 7.1 | OLS refactoring + advanced rules | LSP call hierarchy, C101/C201/C202, C012-T, C019 | 🔄 C012-T1+T3 + call hierarchy done |
+| 8   | Frejay/agent integration API | errorClass in JSON, lint_workspace, list_rules, get_callers/callees, schema version | ⬜ |
 
 ---
 
