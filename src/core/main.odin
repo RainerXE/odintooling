@@ -324,6 +324,30 @@ analyze_file :: proc(
         }
     }
 
+    // C019: Type marker suffix conventions (opt-in via [naming] c019 = true)
+    if rule_enabled("C019", "style", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            lines := strings.split(string(content), "\n")
+            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+            if tree_ok {
+                defer ts_tree_delete(tree)
+                root := getRootNode(tree)
+                if !ts_node_is_null(root) {
+                    q, q_ok := load_query_src(ts_parser.adapter.language, TYPE_MARKER_SCM, "type_marker.scm")
+                    if q_ok {
+                        diags := c019_scm_run(file_path, root, lines, &q)
+                        unload_query(&q)
+                        for d in dedupDiagnostics(diags) {
+                            violations += emit_or_collect(d, collector)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     return violations, false
 }
 

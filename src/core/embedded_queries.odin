@@ -11,3 +11,4 @@ ODIN2026_SCM      :: #load("../../ffi/tree_sitter/queries/odin2026_migration.scm
 FFI_SAFETY_SCM    :: #load("../../ffi/tree_sitter/queries/ffi_safety.scm",        string)
 DECLARATIONS_SCM  :: #load("../../ffi/tree_sitter/queries/declarations.scm",      string)
 REFERENCES_SCM    :: #load("../../ffi/tree_sitter/queries/references.scm",        string)
+TYPE_MARKER_SCM   :: #load("../../ffi/tree_sitter/queries/type_marker.scm",       string)

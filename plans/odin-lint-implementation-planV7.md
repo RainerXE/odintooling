@@ -690,7 +690,11 @@ M7.1 OLS Refactoring + Advanced Rules             ✅ COMPLETE (April 22 2026)
   ✅ C101 Context Integrity (context.allocator assigned without defer restore) — COMPLETE April 22 2026
   ↷ C201 Unchecked Result Guard — DEFERRED: requires OLS type resolution to distinguish error returns from ok/found bools; pure heuristic has unacceptable FP rate
   ↷ C202 Switch Exhaustiveness — DEFERRED: requires OLS enum type resolution to enumerate case values; not feasible without type info
-  ⬜ C019 STY-TypeMarker (BLOCKED until C012 Phase 2 + convention agreement)
+  ✅ C019 STY-TypeMarker Phase 1 — COMPLETE April 22 2026
+     Conventions: _ptr ^T/rawptr, _slice []T, _dyn [dynamic]T, _arr [N]T, _map map[K]V,
+     _alloc *.Allocator, _cstr cstring, _fn proc type, _buf [^]T multi-pointer
+     Scope: local vars + parameters; struct fields excluded; opt-in via [naming] c019=true
+     Phase 2 (OLS): inferred := from opaque proc calls, Maybe(T)
 
 M8 Frejay / Agent Integration API                 ⬜ PLANNED (after M7.1)
   ↳ Prerequisite: M7.1 complete; Frejay v0.1 stable enough to test against
@@ -2315,7 +2319,7 @@ no schema changes required.
 | 6 | Extended rules + Refactoring | C016-C018 naming, C014-C015 dead code, rename_symbol MCP | ✅ |
 | 6.5 | Structural rules (B-category) | B001 unmatched brace — token scan, error tier | ✅ |
 | 6.6 | C001 FP reduction (AST layer) | Fix escape-hatch bugs, `_init` heuristic, direct delete detection | ✅ |
-| 6.7 | C019 type marker suffixes | DEFERRED — needs C012 Phase 2 type inference + convention agreement | ↷ |
+| 6.7 | C019 type marker suffixes | Phase 1 complete: explicit + inferred heuristic, 9 type kinds | ✅ |
 | 6.9 | Package-scope linting foundation | Four scope levels defined; B002 package name consistency; B003 subfolder name clash | ✅ |
 | 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock, incremental rebuild | ✅ |
 | 7.1 | OLS refactoring + advanced rules | LSP call hierarchy, C101/C201/C202, C012-T, C019 | ✅ C012-T1+T3, call hierarchy, C101 — C201/C202/C019 deferred (need OLS types) |
