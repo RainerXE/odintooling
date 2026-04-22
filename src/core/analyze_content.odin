@@ -47,13 +47,16 @@ analyze_content :: proc(
 	lines := strings.split(content, "\n")
 	defer delete(lines)
 
-	// ── C001: Memory allocation without defer free (AST walker) ──────────────
+	// ── C001 + C101: AST walker rules ────────────────────────────────────────
 	ast_root, ast_ok := parseToAST(ts.adapter, content)
 	if ast_ok {
 		for d in dedupDiagnostics(c001_matcher(file_path, &ast_root, lines)) {
 			if d.diag_type != .NONE && d.diag_type != .INTERNAL_ERROR {
 				append(diags, d)
 			}
+		}
+		for d in dedupDiagnostics(c101_run(file_path, &ast_root, lines)) {
+			append(diags, d)
 		}
 	}
 

@@ -182,6 +182,7 @@ print_help :: proc() {
     fmt.println("  C010  correctness  Small_Array superseded by [dynamic; N]T")
     fmt.println("  C011  correctness  FFI C resource allocated without paired cleanup")
     fmt.println("  C012  style        Semantic ownership naming hints (opt-in)")
+    fmt.println("  C101  correctness  context.allocator assigned without defer restore")
     fmt.println()
     fmt.println("Options:")
     fmt.println("  --version              Print version and grammar info")
@@ -213,4 +214,5 @@ print_list_rules :: proc() {
     fmt.println("C010\tcorrectness\tSmall_Array superseded by [dynamic; N]T")
     fmt.println("C011\tcorrectness\tFFI C resource allocated without paired cleanup")
     fmt.println("C012\tstyle\tSemantic ownership naming hints (opt-in)")
+    fmt.println("C101\tcorrectness\tcontext.allocator assigned without defer restore")
 }

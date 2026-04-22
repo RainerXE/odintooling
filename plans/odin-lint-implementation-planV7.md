@@ -687,7 +687,7 @@ M7.1 OLS Refactoring + Advanced Rules             🔄 IN PROGRESS (April 21 202
   ✅ C012-T3: allocator-return without _owned (graph-enriched, needs memory_role DB)
   ✅ rename_symbol MCP tool (find_all_references → FixEdit set) — COMPLETE in M6
   ✅ LSP Call Hierarchy (VS Code "Show Call Hierarchy" on Odin procs) — COMPLETE April 22 2026
-  ⬜ C101 Context Integrity (control-flow, context.allocator restore check)
+  ✅ C101 Context Integrity (context.allocator assigned without defer restore) — COMPLETE April 22 2026
   ⬜ C201 Unchecked Result Guard (ignored error returns)
   ⬜ C202 Switch Exhaustiveness (incomplete enum switches)
   ⬜ C019 STY-TypeMarker (BLOCKED until C012 Phase 2 + convention agreement)
