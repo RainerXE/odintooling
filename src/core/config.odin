@@ -35,7 +35,8 @@ OdinLintConfig :: struct {
     naming_c016: bool,            // C016 local snake_case  (default: true)
     naming_c017: bool,            // C017 global camelCase  (default: false — opt-in)
     naming_c018: bool,            // C018 proc visibility   (default: false — opt-in, conflicts with C003)
-    naming_c020: bool,            // C020 short names       (default: false — opt-in)
+    naming_c019: bool,            // C019 type marker suffixes (default: false — opt-in)
+    naming_c020: bool,            // C020 short names          (default: false — opt-in)
     naming_c020_min_length: int,  // C020 threshold: flag names shorter than this (default: 3)
     naming_c020_allowed: string,  // C020 comma-separated allowlist (default: "i,j,k,x,y,z,n,ok,err,db,id")
 
@@ -56,6 +57,7 @@ default_config :: proc() -> OdinLintConfig {
         naming_c016            = true,
         naming_c017            = false,
         naming_c018            = false,
+        naming_c019            = false,
         naming_c020            = false,
         naming_c020_min_length = 3,
         naming_c020_allowed    = "i,j,k,x,y,z,n,ok,err,db,id",
@@ -179,6 +181,7 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             case "c016": cfg.naming_c016 = val == "true"
             case "c017": cfg.naming_c017 = val == "true"
             case "c018": cfg.naming_c018 = val == "true"
+            case "c019": cfg.naming_c019 = val == "true"
             case "c020": cfg.naming_c020 = val == "true"
             case "c020_min_length":
                 if n, ok := strconv.parse_int(val); ok { cfg.naming_c020_min_length = n }
@@ -220,6 +223,8 @@ config_domain_enabled :: proc(rule_id: string, cfg: OdinLintConfig) -> bool {
         return effective.naming_c017
     case "C018":
         return effective.naming_c018
+    case "C019":
+        return effective.naming_c019
     case "C020":
         return effective.naming_c020
     }
@@ -246,9 +251,9 @@ print_config_summary :: proc(cfg: OdinLintConfig) {
     fmt.eprintfln("config: odin-lint.toml loaded")
     fmt.eprintfln("  domains: ffi=%v odin_2026=%v semantic_naming=%v dead_code=%v",
         cfg.ffi_domain, cfg.odin_2026_domain, cfg.semantic_naming_domain, cfg.dead_code_domain)
-    fmt.eprintfln("  naming:  c016=%v c017=%v c018=%v c020=%v (min=%d allowed=%s)",
+    fmt.eprintfln("  naming:  c016=%v c017=%v c018=%v c019=%v c020=%v (min=%d allowed=%s)",
         cfg.naming_c016, cfg.naming_c017, cfg.naming_c018,
-        cfg.naming_c020, cfg.naming_c020_min_length, cfg.naming_c020_allowed)
+        cfg.naming_c019, cfg.naming_c020, cfg.naming_c020_min_length, cfg.naming_c020_allowed)
     if cfg.odin_version != "" {
         fmt.eprintfln("  target odin_version: %s", cfg.odin_version)
     }
