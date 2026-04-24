@@ -62,12 +62,12 @@ _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocato
     strings.write_string(&sb, `,"callers":[`)
     for n, idx in callers {
         if idx > 0 { strings.write_string(&sb, ",") }
-        fmt.sbprintf(&sb, "%s", _gj(n.name))
+        fmt.sbprintf(&sb, `{{"name":%s,"file":%s,"line":%d}`, _gj(n.name), _gj(n.file), n.line)
     }
     strings.write_string(&sb, `],"callees":[`)
     for n, idx in callees {
         if idx > 0 { strings.write_string(&sb, ",") }
-        fmt.sbprintf(&sb, "%s", _gj(n.name))
+        fmt.sbprintf(&sb, `{{"name":%s,"file":%s,"line":%d}`, _gj(n.name), _gj(n.file), n.line)
     }
 
     // Include allocator-typed package variables from the same file for context.
@@ -451,19 +451,11 @@ _export_symbols_handler :: proc(params: json.Value, allocator: runtime.Allocator
 
     sb := strings.builder_make()
     defer strings.builder_destroy(&sb)
-    strings.write_string(&sb, `{"files_indexed":`)
-    fmt.sbprint(&sb, r.files_indexed)
-    strings.write_string(&sb, `,"nodes":`)
-    fmt.sbprint(&sb, r.nodes_written)
-    strings.write_string(&sb, `,"edges":`)
-    fmt.sbprint(&sb, r.edges_written)
-    strings.write_string(&sb, `,"unresolved":`)
-    fmt.sbprint(&sb, r.unresolved)
-    strings.write_string(&sb, `,"db_path":`)
-    strings.write_string(&sb, _gj(r.db_path))
-    strings.write_string(&sb, `,"symbols_path":`)
-    strings.write_string(&sb, _gj(r.symbols_path))
-    strings.write_string(&sb, "}")
+    cached_str := "true" if r.cached else "false"
+    fmt.sbprintf(&sb,
+        `{{"files_indexed":%d,"nodes":%d,"edges":%d,"unresolved":%d,"cached":%s,"db_path":%s,"symbols_path":%s}`,
+        r.files_indexed, r.nodes_written, r.edges_written, r.unresolved,
+        cached_str, _gj(r.db_path), _gj(r.symbols_path))
     return fmt.aprintf("%s", strings.to_string(sb)), false
 }
 
@@ -562,6 +554,61 @@ _get_callees_handler :: proc(params: json.Value, allocator: runtime.Allocator) -
     for n, idx in callees {
         if idx > 0 { strings.write_string(&sb, ",") }
         fmt.sbprintf(&sb, `{{"name":%s,"file":%s,"line":%d}`, _gj(n.name), _gj(n.file), n.line)
+    }
+    strings.write_string(&sb, `]}`)
+    return fmt.aprintf("%s", strings.to_string(sb)), false
+}
+
+// =============================================================================
+// search_symbols — FTS5-powered symbol search
+// =============================================================================
+
+make_search_symbols_tool :: proc() -> mcp.RegisteredTool {
+    return mcp.RegisteredTool{
+        defn = mcp.ToolDefinition{
+            name        = "search_symbols",
+            description = "Search for symbols (procs, types, constants, variables) by name using full-text search. Returns up to `limit` matches ranked by relevance.",
+            input_schema = `{
+                "type": "object",
+                "properties": {
+                    "query":   {"type": "string",  "description": "Name fragment to search for (prefix or substring)"},
+                    "limit":   {"type": "integer", "description": "Max results to return (default 20, max 100)"},
+                    "db_path": {"type": "string"}
+                },
+                "required": ["query"]
+            }`,
+        },
+        handler = _search_symbols_handler,
+    }
+}
+
+@(private="file")
+_search_symbols_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+    query, err := _extract_string_param(params, "query")
+    if err != "" { return err, true }
+    if len(query) == 0 { return `{"symbols":[],"count":0}`, false }
+
+    raw_limit := _graph_opt_int(params, "limit", 20)
+    limit     := min(max(raw_limit, 1), 100)
+    db_path   := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
+
+    db, ok := core.graph_open(db_path)
+    if !ok { return fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path), true }
+    defer core.graph_close(db)
+
+    nodes := core.graph_search_nodes(db, query, limit)
+    defer { _free_nodes(nodes[:]); delete(nodes) }
+
+    sb := strings.builder_make()
+    defer strings.builder_destroy(&sb)
+    fmt.sbprintf(&sb, `{{"query":%s,"count":%d,"symbols":[`, _gj(query), len(nodes))
+    for n, idx in nodes {
+        if idx > 0 { strings.write_string(&sb, ",") }
+        role       := n.memory_role     if n.memory_role     != "" else "neutral"
+        violations := n.lint_violations if n.lint_violations != "" else "[]"
+        fmt.sbprintf(&sb,
+            `{{"name":%s,"kind":%s,"file":%s,"line":%d,"memory_role":%s,"lint_violations":%s}`,
+            _gj(n.name), _gj(n.kind), _gj(n.file), n.line, _gj(role), violations)
     }
     strings.write_string(&sb, `]}`)
     return fmt.aprintf("%s", strings.to_string(sb)), false
