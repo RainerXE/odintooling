@@ -42,7 +42,7 @@ json_write_string :: proc(b: ^strings.Builder, s: string) {
 }
 
 // emit_json writes all diagnostics as a JSON array to stdout.
-// Schema: [{"file":str,"line":int,"column":int,"rule":str,"tier":str,"message":str,"fix":str?}]
+// Schema: [{"file":str,"line":int,"column":int,"rule_id":str,"error_class":str,"tier":str,"message":str,"fix":str?}]
 emit_json :: proc(diags: []Diagnostic) {
     b := strings.builder_make()
     defer strings.builder_destroy(&b)
@@ -54,8 +54,10 @@ emit_json :: proc(diags: []Diagnostic) {
         strings.write_string(&b, `"file":`)
         json_write_string(&b, d.file)
         fmt.sbprintf(&b, `,"line":%d,"column":%d`, d.line, d.column)
-        strings.write_string(&b, `,"rule":`)
+        strings.write_string(&b, `,"rule_id":`)
         json_write_string(&b, d.rule_id)
+        strings.write_string(&b, `,"error_class":`)
+        json_write_string(&b, rule_id_to_error_class(d.rule_id))
         strings.write_string(&b, `,"tier":`)
         json_write_string(&b, d.tier)
         strings.write_string(&b, `,"message":`)

@@ -184,6 +184,8 @@ print_help :: proc() {
     fmt.println("  C012  style        Semantic ownership naming hints (opt-in)")
     fmt.println("  C019  style        Type marker suffix conventions (opt-in, [naming] c019=true)")
     fmt.println("  C101  correctness  context.allocator assigned without defer restore")
+    fmt.println("  C201  correctness  Error return value ignored (unchecked result)")
+    fmt.println("  C203  correctness  Defer in inner block fires before outer scope uses the handle")
     fmt.println()
     fmt.println("Options:")
     fmt.println("  --version              Print version and grammar info")
@@ -217,4 +219,6 @@ print_list_rules :: proc() {
     fmt.println("C012\tstyle\tSemantic ownership naming hints (opt-in)")
     fmt.println("C019\tstyle\tType marker suffix conventions (opt-in, [naming] c019=true in toml)")
     fmt.println("C101\tcorrectness\tcontext.allocator assigned without defer restore")
+    fmt.println("C201\tcorrectness\tError return value ignored (unchecked result)")
+    fmt.println("C203\tcorrectness\tDefer in inner block fires before outer scope uses the handle")
 }

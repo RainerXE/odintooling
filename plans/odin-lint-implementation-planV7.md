@@ -670,7 +670,7 @@ M6.6 C001 False Positive Reduction (AST layer)   ✅ COMPLETE (April 21 2026)
   Tier 2b: fix is_free_call / has_manual_cleanup (direct delete detection)     ✅
   Remaining C001 FPs deferred — require package-scope or return-type info (M6.9/M7)
 M6.7 C019 STY-TypeMarker                           ⬜ DEFERRED → post-C012 Phase 2 (M7.1+)
-M6.9 Package-Scope Linting Foundation             ⬜ NEXT
+M6.9 Package-Scope Linting Foundation             ✅ COMPLETE (April 21 2026)
   Define four analysis scopes (see Section 14)
   Group files by package (directory + matching package declaration)
   B002 STR-PackageName: file has wrong package declaration (majority wins)
@@ -696,34 +696,55 @@ M7.1 OLS Refactoring + Advanced Rules             ✅ COMPLETE (April 22 2026)
      Scope: local vars + parameters; struct fields excluded; opt-in via [naming] c019=true
      Phase 2 (OLS): inferred := from opaque proc calls, Maybe(T)
 
-M8 Frejay / Agent Integration API                 ⬜ PLANNED (after M7.1)
+M8 Frejay / Agent Integration API                 ✅ COMPLETE (April 22 2026)
   ↳ Prerequisite: M7.1 complete; Frejay v0.1 stable enough to test against
-  Gap 1 — errorClass field in JSON output
-    Add errorClass to --format json (and new --format frejay alias)
-    Taxonomy: correctness_memory_leak, correctness_double_free, ffi_resource_leak,
-    migration_deprecated_import, migration_deprecated_fmt, style_naming_proc,
-    style_naming_type, style_naming_local_var, style_naming_pkg_var,
-    style_naming_visibility, style_ownership_naming, dead_code_unused_proc,
-    dead_code_unused_const, structure_unmatched_brace, structure_package_name,
-    structure_subfolder_clash. Format: {tier}_{category}_{detail}, 1:1 with rule IDs.
+  Gap 1 — errorClass field in JSON output                             ✅ DONE
+    error_class added to --format json output (output.odin) and MCP _diags_to_json
+    Taxonomy mapping in src/core/error_class.odin (rule_id_to_error_class proc)
+    Format: {tier}_{category}_{detail}, 1:1 with rule IDs. 18 rules mapped.
   Gap 2 — compile_check: OUT OF SCOPE for odin-lint (lives in Frejay OdinCompilerVerifier
     via VProcessService; odin-lint has no odin build integration)
-  Gap 3 — Schema version contract
-    Add "schema_version": "odin-lint-symbols/1.1" to symbols.json root
-    Advertise in server_card.json at .well-known/mcp
+  Gap 3 — Schema version contract                                     ✅ DONE
+    symbols.json root key renamed to "schema_version": "odin-lint-symbols/1.1"
     Bump minor version on any breaking graph schema change going forward
-  Gap 4 — lint_workspace(path, rules?) batch MCP tool
-    Run full lint scan on a directory; return all diagnostics as single JSON array
-    Schema: [{file, rule_id, error_class, tier, line, col, message, fix_hint}]
-    Essentially: odin-lint ./src/ --format json surfaced over MCP
-    Critical for Frejay ExperienceStore bulk trace collection (D-68)
-  Gap 5 — list_rules() MCP tool
-    Return full rule catalog: id, tier, error_class, description, fix_hint, enabled_by_default
-    Lets Frejay RuleInjectionPolicy (D-59) bootstrap from odin-lint's own catalog
-  LSP parity — get_callers(name) + get_callees(name) dedicated MCP tools
-    Currently only available bundled in get_dna_context; agents need targeted queries
-    Backed by existing graph_get_callers / graph_get_callees in call_graph.odin
-```
+  Gap 4 — lint_workspace(path, rules?) batch MCP tool                 ✅ DONE
+    src/mcp/tool_workspace.odin; collects files recursively, runs analyze_file per file
+    Schema: [{file, rule_id, error_class, tier, line, col, message, fix}]
+  Gap 5 — list_rules() MCP tool                                       ✅ DONE
+    src/mcp/tool_workspace.odin; returns all 18 rules with full catalog fields
+    Fields: id, tier, error_class, description, fix_hint, enabled_by_default
+  LSP parity — get_callers(name) + get_callees(name) dedicated MCP tools ✅ DONE
+    src/mcp/tool_graph.odin; dedicated handlers backed by graph_get_callers/graph_get_callees
+    Return: {proc, caller_count, callers:[{name,file,line}]} and equivalent for callees
+  Gap 2 (revised) — run_odin_check(path, extra_flags?) MCP tool          ✅ DONE
+    src/mcp/tool_workspace.odin; spawns `odin check` via os.process_exec
+    Parses compiler output (file(line:col) Error/Warning/Note: msg) into structured JSON
+    Return: {ok, exit_code, error_count, warning_count, diagnostics:[...], raw_output}
+
+M9 Toolchain Configuration + C201 Unchecked Error Returns           ✅ COMPLETE (April 22 2026)
+  [tools] TOML section — odin_path, ols_path                            ✅ DONE
+    src/core/config.odin: tools_odin_path, tools_ols_path fields
+    effective_odin_path / effective_ols_path helpers; odin_path param in run_odin_check
+  TypeResolveContext — lightweight type resolution bridge               ✅ DONE
+    src/core/type_resolver.odin: stdlib curated list + graph DB lookup
+    proc_returns_error(ctx, name) → checks Error word in return_type
+    OLS stub reserved (always false); graph DB path: graph_get_node → return_type
+  C201 Unchecked Error Return                                           ✅ DONE
+    ffi/tree_sitter/queries/unchecked_result.scm
+    src/core/c201-COR-UncheckedResult.odin
+    Parent check: call_expression in block (plain) or member_expression in block (qualified)
+    5/5 tests passing; 0 false positives on own codebase
+    error_class: correctness_unchecked_result; added to CLI --list-rules + MCP list_rules
+
+M10 C203 Defer Scope Trap                                             ✅ COMPLETE (April 24 2026)
+  C203 Defer Scope Trap — Odin defer is block-scoped (unlike Go)        ✅ DONE
+    src/core/c203-COR-DeferScope.odin — pure AST walker, no SCM query needed
+    Detects: defer f(x) in inner block + outer_struct.field = x in same block
+    Grandparent-of-block check: skips procedure body (defer there is always safe)
+    Heuristic: LHS contains '.' (member access → outer scope target)
+    6/6 tests passing; 0 false positives on own codebase
+    error_class: correctness_defer_scope_trap; added to CLI --list-rules + MCP list_rules
+    Directly derived from the real Odin defer bug in the C201 graph DB code
 
 ---
 
@@ -2323,7 +2344,7 @@ no schema changes required.
 | 6.9 | Package-scope linting foundation | Four scope levels defined; B002 package name consistency; B003 subfolder name clash | ✅ |
 | 7 | Graph enrichment for LLM + refactoring | Variable roles, proc return types, richer MCP context, C012-T unlock, incremental rebuild | ✅ |
 | 7.1 | OLS refactoring + advanced rules | LSP call hierarchy, C101/C201/C202, C012-T, C019 | ✅ C012-T1+T3, call hierarchy, C101 — C201/C202/C019 deferred (need OLS types) |
-| 8   | Frejay/agent integration API | errorClass in JSON, lint_workspace, list_rules, get_callers/callees, schema version | ⬜ |
+| 8   | Frejay/agent integration API | errorClass in JSON, lint_workspace, list_rules, get_callers/callees, schema version | ✅ |
 
 ---
 
