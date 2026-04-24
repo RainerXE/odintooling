@@ -118,4 +118,21 @@ analyze_content :: proc(
 			unload_query(&q)
 		}
 	}
+
+	// C201: Unchecked error return (stdlib-only in in-memory path; no graph DB here)
+	{
+		q, q_ok := load_query_src(ts.adapter.language, UNCHECKED_RESULT_SCM, "unchecked_result.scm")
+		if q_ok {
+			for d in dedupDiagnostics(c201_scm_run(file_path, root, lines, &q, nil)) {
+				append(diags, d)
+			}
+			unload_query(&q)
+		}
+	}
+
+	// C203: Defer scope trap — defer in inner block assigns handle to outer scope
+	for d in dedupDiagnostics(c203_run(file_path, root, lines)) {
+		append(diags, d)
+	}
+
 }

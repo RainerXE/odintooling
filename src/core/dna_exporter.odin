@@ -551,7 +551,7 @@ _pass5_write_symbols_json :: proc(db: ^GraphDB, out_path: string) {
     sb := strings.builder_make()
     defer strings.builder_destroy(&sb)
 
-    strings.write_string(&sb, `{"schema":"odin-lint-symbols/1.0","procedures":[`)
+    strings.write_string(&sb, `{"schema_version":"odin-lint-symbols/1.1","procedures":[`)
 
     s, ok := sq.db_prepare(db.conn,
         `SELECT id,name,file,line,memory_role,lint_violations,signature,return_type FROM nodes WHERE kind='proc';`)
@@ -673,10 +673,25 @@ _is_builtin :: proc(name: string) -> bool {
 
 @(private)
 _json_str :: proc(s: string) -> string {
-    if !strings.contains_any(s, `"\`) { return fmt.tprintf(`"%s"`, s) }
-    e1, _ := strings.replace_all(s,  `\`, `\\`)
-    e2, _ := strings.replace_all(e1, `"`, `\"`)
-    return fmt.tprintf(`"%s"`, e2)
+    sb := strings.builder_make(context.temp_allocator)
+    strings.write_byte(&sb, '"')
+    for c in s {
+        switch c {
+        case '"':  strings.write_string(&sb, `\"`)
+        case '\\': strings.write_string(&sb, `\\`)
+        case '\n': strings.write_string(&sb, `\n`)
+        case '\r': strings.write_string(&sb, `\r`)
+        case '\t': strings.write_string(&sb, `\t`)
+        case:
+            if c < 0x20 {
+                fmt.sbprintf(&sb, `\u%04x`, int(c))
+            } else {
+                strings.write_rune(&sb, c)
+            }
+        }
+    }
+    strings.write_byte(&sb, '"')
+    return strings.to_string(sb)
 }
 
 // _extract_proc_signature returns the text from the proc_name position up to (but
