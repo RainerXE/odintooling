@@ -81,6 +81,7 @@ main :: proc() {
     mcp.server_register_tool(&s, make_rename_symbol_tool())
     mcp.server_register_tool(&s, make_get_callers_tool())
     mcp.server_register_tool(&s, make_get_callees_tool())
+    mcp.server_register_tool(&s, make_search_symbols_tool())
 
     mcp.server_run(&s) // blocks until stdin EOF
 }

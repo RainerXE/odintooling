@@ -202,7 +202,12 @@ export_symbols :: proc(
     }
 
     // -----------------------------------------------------------------------
-    // Pass 6 — Write symbols.json.
+    // Pass 6 — Rebuild FTS5 index for fast symbol search.
+    // -----------------------------------------------------------------------
+    graph_rebuild_fts(db)
+
+    // -----------------------------------------------------------------------
+    // Pass 7 — Write symbols.json.
     // -----------------------------------------------------------------------
     _pass5_write_symbols_json(db, SYMBOLS_JSON_PATH)
     result.nodes_written = _count_table(db, "nodes")
@@ -452,14 +457,19 @@ _pass4_attach_violations :: proc(
 ) {
     // Compile SCM queries once; reuse across all files.
     lang := ts_parser.adapter.language
-    q_c002, q_c002_ok := load_query_src(lang, MEMORY_SAFETY_SCM,  "memory_safety.scm")
-    q_c003, q_c003_ok := load_query_src(lang, NAMING_RULES_SCM,   "naming_rules.scm")
-    q_c009, q_c009_ok := load_query_src(lang, ODIN2026_SCM,       "odin2026_migration.scm")
-    q_c011, q_c011_ok := load_query_src(lang, FFI_SAFETY_SCM,     "ffi_safety.scm")
+    q_c002, q_c002_ok := load_query_src(lang, MEMORY_SAFETY_SCM,     "memory_safety.scm")
+    q_c003, q_c003_ok := load_query_src(lang, NAMING_RULES_SCM,      "naming_rules.scm")
+    q_c009, q_c009_ok := load_query_src(lang, ODIN2026_SCM,          "odin2026_migration.scm")
+    q_c011, q_c011_ok := load_query_src(lang, FFI_SAFETY_SCM,        "ffi_safety.scm")
+    q_c201, q_c201_ok := load_query_src(lang, UNCHECKED_RESULT_SCM,  "unchecked_result.scm")
     defer if q_c002_ok { unload_query(&q_c002) }
     defer if q_c003_ok { unload_query(&q_c003) }
     defer if q_c009_ok { unload_query(&q_c009) }
     defer if q_c011_ok { unload_query(&q_c011) }
+    defer if q_c201_ok { unload_query(&q_c201) }
+
+    // TypeResolveContext for C201: use graph DB (procs already indexed in Pass 1+2).
+    type_ctx := TypeResolveContext{db = db}
 
     for file_path in files {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
@@ -468,7 +478,7 @@ _pass4_attach_violations :: proc(
 
         collector := make([dynamic]Diagnostic)
 
-        // C001 — AST walker (needs its own parse via parseToAST)
+        // C001 + C101 — AST walker rules (share one parse)
         ast_root, ast_ok := parseToAST(ts_parser.adapter, src)
         if ast_ok {
             lines := strings.split(src, "\n")
@@ -477,10 +487,13 @@ _pass4_attach_violations :: proc(
                     append(&collector, d)
                 }
             }
+            for d in dedupDiagnostics(c101_run(file_path, &ast_root, lines)) {
+                append(&collector, d)
+            }
             delete(lines)
         }
 
-        // SCM rules — parse tree-sitter once, run all queries
+        // SCM + AST-walk rules — parse tree-sitter once, run all queries
         tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, src)
         if tree_ok {
             root  := getRootNode(tree)
@@ -508,6 +521,15 @@ _pass4_attach_violations :: proc(
                     for d in dedupDiagnostics(c011_scm_run(file_path, root, lines, &q_c011)) {
                         append(&collector, d)
                     }
+                }
+                if q_c201_ok {
+                    for d in dedupDiagnostics(c201_scm_run(file_path, root, lines, &q_c201, &type_ctx)) {
+                        append(&collector, d)
+                    }
+                }
+                // C203 — pure AST walker, no SCM query needed
+                for d in dedupDiagnostics(c203_run(file_path, root, lines)) {
+                    append(&collector, d)
                 }
             }
             delete(lines)

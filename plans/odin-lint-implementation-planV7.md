@@ -675,13 +675,16 @@ M6.9 Package-Scope Linting Foundation             ✅ COMPLETE (April 21 2026)
   Group files by package (directory + matching package declaration)
   B002 STR-PackageName: file has wrong package declaration (majority wins)
   B003 STR-SubfolderPackage: subfolder shares package name with parent
-M7   Graph Enrichment for LLM Tooling + Refactoring  ⬜ PLANNED
-  Proper variable indexing (top-level only, memory_role for Allocator-typed)
-  Proc return-type tracking in graph (enables allocator-return detection)
-  Enrich get_dna_context MCP tool with variable roles
-  C012-T unlock (shares memory_role infrastructure)
-  Incremental graph rebuild: file-hash cache + eviction (--export-symbols fast path)
-  ↳ Requires M6.9 package-scope foundation + M5.6 graph DB
+M7   Graph Enrichment for LLM Tooling + Refactoring  ✅ COMPLETE (April 24 2026)
+  Variable + proc indexing with memory_role tagging                   ✅ DONE (M5.6)
+  Proc return-type tracking (enables allocator-return + C201 graph)  ✅ DONE (M5.6)
+  Incremental graph rebuild: file-hash cache + eviction               ✅ DONE (M5.6)
+  get_dna_context: callers/callees now {name, file, line} objects     ✅ DONE (April 24 2026)
+  Pass 4 complete coverage: C101 + C201 + C203 added to lint_violations ✅ DONE (April 24 2026)
+  FTS5 virtual table (nodes_fts) + graph_rebuild_fts at export end    ✅ DONE (April 24 2026)
+  search_symbols MCP tool — FTS5-backed prefix/substring symbol search ✅ DONE (April 24 2026)
+  export_symbols MCP response: cached field added                     ✅ DONE (April 24 2026)
+  C012-T unlock: C012-T1+T3 done in M7.1; full unlock needs OLS types ↷ DEFERRED
 M7.1 OLS Refactoring + Advanced Rules             ✅ COMPLETE (April 22 2026)
   ✅ C012-T1: explicit mem.Allocator var naming (fired when name lacks alloc/allocator)
   ✅ C012-T3: allocator-return without _owned (graph-enriched, needs memory_role DB)
