@@ -55,7 +55,7 @@ _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocato
     role       := node.memory_role if node.memory_role != "" else "neutral"
     violations := node.lint_violations if node.lint_violations != "" else "[]"
     fmt.sbprintf(&sb,
-        `{"proc":{"name":%s,"file":%s,"line":%d,"memory_role":%s,"return_type":%s,"signature":%s,"lint_violations":%s}`,
+        `{{"proc":{{"name":%s,"file":%s,"line":%d,"memory_role":%s,"return_type":%s,"signature":%s,"lint_violations":%s}`,
         _gj(node.name), _gj(node.file), node.line, _gj(role),
         _gj(node.return_type), _gj(node.signature), violations)
 
@@ -76,7 +76,7 @@ _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocato
     strings.write_string(&sb, `],"allocator_vars":[`)
     for n, idx in allocator_vars {
         if idx > 0 { strings.write_string(&sb, ",") }
-        fmt.sbprintf(&sb, `{"name":%s,"line":%d}`, _gj(n.name), n.line)
+        fmt.sbprintf(&sb, `{{"name":%s,"line":%d}`, _gj(n.name), n.line)
     }
     strings.write_string(&sb, `]}`)
     return fmt.aprintf("%s", strings.to_string(sb)), false
@@ -125,10 +125,10 @@ _get_impact_radius_handler :: proc(params: json.Value, allocator: runtime.Alloca
 
     sb := strings.builder_make()
     defer strings.builder_destroy(&sb)
-    fmt.sbprintf(&sb, `{"proc":%s,"depth":%d,"affected":[`, _gj(proc_name), depth)
+    fmt.sbprintf(&sb, `{{"proc":%s,"depth":%d,"affected":[`, _gj(proc_name), depth)
     for n, idx in affected {
         if idx > 0 { strings.write_string(&sb, ",") }
-        fmt.sbprintf(&sb, `{"name":%s,"file":%s,"line":%d,"kind":%s}`,
+        fmt.sbprintf(&sb, `{{"name":%s,"file":%s,"line":%d,"kind":%s}`,
             _gj(n.name), _gj(n.file), n.line, _gj(n.kind))
     }
     strings.write_string(&sb, `]}`)
@@ -171,7 +171,7 @@ _find_allocators_handler :: proc(params: json.Value, allocator: runtime.Allocato
     strings.write_string(&sb, `{"allocators":[`)
     for n, idx in nodes {
         if idx > 0 { strings.write_string(&sb, ",") }
-        fmt.sbprintf(&sb, `{"name":%s,"file":%s,"line":%d}`, _gj(n.name), _gj(n.file), n.line)
+        fmt.sbprintf(&sb, `{{"name":%s,"file":%s,"line":%d}`, _gj(n.name), _gj(n.file), n.line)
     }
     strings.write_string(&sb, `]}`)
     return fmt.aprintf("%s", strings.to_string(sb)), false
@@ -217,10 +217,10 @@ _find_all_references_handler :: proc(params: json.Value, allocator: runtime.Allo
 
     sb := strings.builder_make()
     defer strings.builder_destroy(&sb)
-    fmt.sbprintf(&sb, `{"symbol":%s,"reference_count":%d,"references":[`, _gj(symbol), len(refs))
+    fmt.sbprintf(&sb, `{{"symbol":%s,"reference_count":%d,"references":[`, _gj(symbol), len(refs))
     for r, idx in refs {
         if idx > 0 { strings.write_string(&sb, ",") }
-        fmt.sbprintf(&sb, `{"caller":%s,"file":%s,"line":%d,"kind":%s}`,
+        fmt.sbprintf(&sb, `{{"caller":%s,"file":%s,"line":%d,"kind":%s}`,
             _gj(r.source_name), _gj(r.file), r.line, _gj(r.kind))
     }
     strings.write_string(&sb, `]}`)
@@ -268,7 +268,7 @@ _rename_symbol_handler :: proc(params: json.Value, allocator: runtime.Allocator)
     defer core.graph_free_rename_locations(&locs)
 
     if len(locs) == 0 {
-        return fmt.aprintf(`{"edits":[],"edit_count":0,"note":"symbol '%s' not found in graph"}`, old_name), false
+        return fmt.aprintf(`{{"edits":[],"edit_count":0,"note":"symbol '%s' not found in graph"}`, old_name), false
     }
 
     sb := strings.builder_make()
@@ -366,7 +366,7 @@ _run_lint_denoise_handler :: proc(params: json.Value, allocator: runtime.Allocat
     for d, idx in collector {
         if idx > 0 { strings.write_string(&sb, ",") }
         fmt.sbprintf(&sb,
-            `{"rule":%s,"tier":%s,"line":%d,"column":%d,"message":%s,"fix":%s}`,
+            `{{"rule":%s,"tier":%s,"line":%d,"column":%d,"message":%s,"fix":%s}`,
             _gj(d.rule_id), _gj(d.tier), d.line, d.column, _gj(d.message), _gj(d.fix))
     }
     fmt.sbprintf(&sb, `],"violation_count":%d}`, len(collector))
@@ -412,7 +412,7 @@ _get_symbol_handler :: proc(params: json.Value, allocator: runtime.Allocator) ->
     role       := node.memory_role if node.memory_role != "" else "neutral"
     violations := node.lint_violations if node.lint_violations != "" else "[]"
     return fmt.aprintf(
-        `{"name":%s,"kind":%s,"file":%s,"line":%d,"signature":%s,"memory_role":%s,"lint_violations":%s}`,
+        `{{"name":%s,"kind":%s,"file":%s,"line":%d,"signature":%s,"memory_role":%s,"lint_violations":%s}`,
         _gj(node.name), _gj(node.kind), _gj(node.file), node.line,
         _gj(node.signature), _gj(role), violations), false
 }
@@ -449,10 +449,122 @@ _export_symbols_handler :: proc(params: json.Value, allocator: runtime.Allocator
     r := core.export_symbols(targets, &_ts_parser, db_path)
     if !r.ok { return "export_symbols pipeline failed", true }
 
-    return fmt.aprintf(
-        `{"files_indexed":%d,"nodes":%d,"edges":%d,"unresolved":%d,"db_path":%s,"symbols_path":%s}`,
-        r.files_indexed, r.nodes_written, r.edges_written, r.unresolved,
-        _gj(r.db_path), _gj(r.symbols_path)), false
+    sb := strings.builder_make()
+    defer strings.builder_destroy(&sb)
+    strings.write_string(&sb, `{"files_indexed":`)
+    fmt.sbprint(&sb, r.files_indexed)
+    strings.write_string(&sb, `,"nodes":`)
+    fmt.sbprint(&sb, r.nodes_written)
+    strings.write_string(&sb, `,"edges":`)
+    fmt.sbprint(&sb, r.edges_written)
+    strings.write_string(&sb, `,"unresolved":`)
+    fmt.sbprint(&sb, r.unresolved)
+    strings.write_string(&sb, `,"db_path":`)
+    strings.write_string(&sb, _gj(r.db_path))
+    strings.write_string(&sb, `,"symbols_path":`)
+    strings.write_string(&sb, _gj(r.symbols_path))
+    strings.write_string(&sb, "}")
+    return fmt.aprintf("%s", strings.to_string(sb)), false
+}
+
+// =============================================================================
+// get_callers — dedicated caller lookup (LSP parity)
+// =============================================================================
+
+make_get_callers_tool :: proc() -> mcp.RegisteredTool {
+    return mcp.RegisteredTool{
+        defn = mcp.ToolDefinition{
+            name        = "get_callers",
+            description = "Return all procedures that directly call a named procedure. Equivalent to LSP 'incoming calls'.",
+            input_schema = `{
+                "type": "object",
+                "properties": {
+                    "proc_name": {"type": "string", "description": "Exact procedure name"},
+                    "db_path":   {"type": "string"}
+                },
+                "required": ["proc_name"]
+            }`,
+        },
+        handler = _get_callers_handler,
+    }
+}
+
+@(private="file")
+_get_callers_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+    proc_name, err := _extract_string_param(params, "proc_name")
+    if err != "" { return err, true }
+    db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
+
+    db, ok := core.graph_open(db_path)
+    if !ok { return fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path), true }
+    defer core.graph_close(db)
+
+    node, found := core.graph_get_node(db, proc_name)
+    if !found { return fmt.aprintf("proc '%s' not found in graph", proc_name), true }
+    defer _free_node(&node)
+
+    callers := core.graph_get_callers(db, node.id)
+    defer { _free_nodes(callers[:]); delete(callers) }
+
+    sb := strings.builder_make()
+    defer strings.builder_destroy(&sb)
+    fmt.sbprintf(&sb, `{{"proc":%s,"caller_count":%d,"callers":[`, _gj(proc_name), len(callers))
+    for n, idx in callers {
+        if idx > 0 { strings.write_string(&sb, ",") }
+        fmt.sbprintf(&sb, `{{"name":%s,"file":%s,"line":%d}`, _gj(n.name), _gj(n.file), n.line)
+    }
+    strings.write_string(&sb, `]}`)
+    return fmt.aprintf("%s", strings.to_string(sb)), false
+}
+
+// =============================================================================
+// get_callees — dedicated callee lookup (LSP parity)
+// =============================================================================
+
+make_get_callees_tool :: proc() -> mcp.RegisteredTool {
+    return mcp.RegisteredTool{
+        defn = mcp.ToolDefinition{
+            name        = "get_callees",
+            description = "Return all procedures directly called by a named procedure. Equivalent to LSP 'outgoing calls'.",
+            input_schema = `{
+                "type": "object",
+                "properties": {
+                    "proc_name": {"type": "string", "description": "Exact procedure name"},
+                    "db_path":   {"type": "string"}
+                },
+                "required": ["proc_name"]
+            }`,
+        },
+        handler = _get_callees_handler,
+    }
+}
+
+@(private="file")
+_get_callees_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+    proc_name, err := _extract_string_param(params, "proc_name")
+    if err != "" { return err, true }
+    db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
+
+    db, ok := core.graph_open(db_path)
+    if !ok { return fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path), true }
+    defer core.graph_close(db)
+
+    node, found := core.graph_get_node(db, proc_name)
+    if !found { return fmt.aprintf("proc '%s' not found in graph", proc_name), true }
+    defer _free_node(&node)
+
+    callees := core.graph_get_callees(db, node.id)
+    defer { _free_nodes(callees[:]); delete(callees) }
+
+    sb := strings.builder_make()
+    defer strings.builder_destroy(&sb)
+    fmt.sbprintf(&sb, `{{"proc":%s,"callee_count":%d,"callees":[`, _gj(proc_name), len(callees))
+    for n, idx in callees {
+        if idx > 0 { strings.write_string(&sb, ",") }
+        fmt.sbprintf(&sb, `{{"name":%s,"file":%s,"line":%d}`, _gj(n.name), _gj(n.file), n.line)
+    }
+    strings.write_string(&sb, `]}`)
+    return fmt.aprintf("%s", strings.to_string(sb)), false
 }
 
 // =============================================================================

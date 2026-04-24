@@ -43,6 +43,10 @@ OdinLintConfig :: struct {
     // Target settings.
     odin_version: string, // e.g. "dev-2026-04"
 
+    // Tool paths — empty string means "search PATH".
+    tools_odin_path: string, // path to odin executable
+    tools_ols_path:  string, // path to our OLS fork
+
     // Internal: whether a toml file was found and loaded.
     loaded: bool,
 }
@@ -190,9 +194,15 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             }
         case "target":
             if key == "odin_version" {
-                // Strip surrounding quotes if present.
                 v := strings.trim(val, "\"'")
                 cfg.odin_version = strings.clone(v)
+            }
+        case "tools":
+            switch key {
+            case "odin_path":
+                cfg.tools_odin_path = strings.clone(strings.trim(val, "\"'"))
+            case "ols_path":
+                cfg.tools_ols_path = strings.clone(strings.trim(val, "\"'"))
             }
         }
     }
@@ -231,6 +241,20 @@ config_domain_enabled :: proc(rule_id: string, cfg: OdinLintConfig) -> bool {
     return true // all other rules: not domain-gated
 }
 
+// effective_odin_path returns the odin executable to use.
+// Respects [tools] odin_path from config; falls back to "odin" (PATH lookup).
+effective_odin_path :: proc(cfg: OdinLintConfig) -> string {
+    if cfg.tools_odin_path != "" { return cfg.tools_odin_path }
+    return "odin"
+}
+
+// effective_ols_path returns the ols executable to use.
+// Respects [tools] ols_path from config; falls back to "ols" (PATH lookup).
+effective_ols_path :: proc(cfg: OdinLintConfig) -> string {
+    if cfg.tools_ols_path != "" { return cfg.tools_ols_path }
+    return "ols"
+}
+
 // filepath_dir returns the directory component of a path (everything before the
 // last '/'). Returns "." if there is no directory component.
 @(private)
@@ -256,5 +280,10 @@ print_config_summary :: proc(cfg: OdinLintConfig) {
         cfg.naming_c019, cfg.naming_c020, cfg.naming_c020_min_length, cfg.naming_c020_allowed)
     if cfg.odin_version != "" {
         fmt.eprintfln("  target odin_version: %s", cfg.odin_version)
+    }
+    if cfg.tools_odin_path != "" || cfg.tools_ols_path != "" {
+        fmt.eprintfln("  tools: odin=%s ols=%s",
+            cfg.tools_odin_path if cfg.tools_odin_path != "" else "(PATH)",
+            cfg.tools_ols_path  if cfg.tools_ols_path  != "" else "(PATH)")
     }
 }

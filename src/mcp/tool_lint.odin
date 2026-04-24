@@ -143,7 +143,7 @@ _lint_fix_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (
 // ── JSON serialisation helpers ────────────────────────────────────────────────
 
 // _diags_to_json serialises a []Diagnostic slice to a JSON array string.
-@(private="file")
+@(private)
 _diags_to_json :: proc(diags: []core.Diagnostic, allocator: runtime.Allocator) -> string {
     b := strings.builder_make(allocator)
     strings.write_byte(&b, '[')
@@ -157,6 +157,8 @@ _diags_to_json :: proc(diags: []core.Diagnostic, allocator: runtime.Allocator) -
         fmt.sbprint(&b, d.column)
         strings.write_string(&b, `,"rule_id":`)
         _json_str(&b, d.rule_id)
+        strings.write_string(&b, `,"error_class":`)
+        _json_str(&b, core.rule_id_to_error_class(d.rule_id))
         strings.write_string(&b, `,"tier":`)
         _json_str(&b, d.tier)
         strings.write_string(&b, `,"message":`)
@@ -212,7 +214,7 @@ _extract_string_param :: proc(params: json.Value, key: string) -> (value: string
 }
 
 // _json_str writes a JSON-escaped quoted string into b.
-@(private="file")
+@(private)
 _json_str :: proc(b: ^strings.Builder, s: string) {
     strings.write_byte(b, '"')
     for c in s {
