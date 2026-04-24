@@ -54,6 +54,8 @@ CREATE INDEX IF NOT EXISTS idx_nodes_kind    ON nodes(kind);
 CREATE INDEX IF NOT EXISTS idx_edges_source  ON edges(source_id);
 CREATE INDEX IF NOT EXISTS idx_edges_target  ON edges(target_id);
 CREATE INDEX IF NOT EXISTS idx_edges_kind    ON edges(kind);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(name, qualified_name);
 `
 
 // =============================================================================
@@ -435,17 +437,31 @@ graph_free_rename_locations :: proc(locs: ^[dynamic]RenameLocation) {
     delete(locs^)
 }
 
-// graph_search_nodes does a prefix-match search on node names.
-// FTS5 full-text search is planned for a later milestone; this uses LIKE for now.
+// graph_rebuild_fts rebuilds the FTS5 index from the current nodes table.
+// Call once after all inserts are done (end of export pipeline).
+graph_rebuild_fts :: proc(db: ^GraphDB) {
+    // Clear existing FTS rows, then repopulate from nodes.
+    sq.db_exec(db.conn, "DELETE FROM nodes_fts;")
+    sq.db_exec(db.conn,
+        `INSERT INTO nodes_fts(rowid, name, qualified_name)
+         SELECT id, name, COALESCE(qualified_name, '') FROM nodes;`)
+}
+
+// graph_search_nodes searches node names using FTS5.
+// Returns up to `limit` matching nodes, ranked by FTS relevance.
 graph_search_nodes :: proc(db: ^GraphDB, query: string, limit: int) -> [dynamic]GraphNodeInfo {
     result := make([dynamic]GraphNodeInfo)
     sql := fmt.tprintf(
-        `SELECT id,name,kind,file,line,memory_role,lint_violations,signature,return_type
-         FROM nodes WHERE name LIKE ? LIMIT %d;`, limit)
+        `SELECT n.id,n.name,n.kind,n.file,n.line,n.memory_role,n.lint_violations,n.signature,n.return_type
+         FROM nodes_fts fts
+         JOIN nodes n ON fts.rowid = n.id
+         WHERE nodes_fts MATCH ? LIMIT %d;`, limit)
     s, ok := sq.db_prepare(db.conn, sql)
     if !ok { return result }
     defer sq.stmt_finalize(&s)
-    pattern := fmt.tprintf("%%%s%%", query)
+    // FTS5 MATCH pattern: prefix all terms with * for substring matching
+    safe_query := strings.replace_all(query, `"`, `""`) or_else query
+    pattern    := fmt.tprintf(`"%s"*`, safe_query)
     sq.stmt_bind_text(&s, 1, pattern)
     for sq.stmt_step(&s) { append(&result, scan_node_info(&s)) }
     return result
