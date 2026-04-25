@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test_m9_config.sh — verify [tools] section in odin-lint.toml is parsed correctly.
+# test_m9_config.sh — verify [tools] section in olt.toml is parsed correctly.
 # Creates a temp project dir with a known TOML and checks odin-lint honours it.
 
 set -euo pipefail
@@ -36,7 +36,7 @@ package main
 main :: proc() {}
 ODIN
 
-# ── Test 1: no odin-lint.toml — default config (no [tools] section) ──────────
+# ── Test 1: no olt.toml — default config (no [tools] section) ──────────
 echo ""
 echo "── No config file ──"
 out=$("$BINARY" "$TMPDIR/main.odin" 2>&1 || true)
@@ -48,7 +48,7 @@ echo ""
 echo "── [tools] odin_path = valid path ──"
 ODIN_EXE=$(command -v odin 2>/dev/null || true)
 if [ -n "$ODIN_EXE" ]; then
-    cat > "$TMPDIR/odin-lint.toml" << TOML
+    cat > "$TMPDIR/olt.toml" << TOML
 [tools]
 odin_path = "$ODIN_EXE"
 ols_path  = "/tmp/nonexistent-ols"
@@ -66,7 +66,7 @@ fi
 # ── Test 3: [tools] with bogus odin_path — should not crash odin-lint itself ──
 echo ""
 echo "── [tools] odin_path = bogus path ──"
-cat > "$TMPDIR/odin-lint.toml" << 'TOML'
+cat > "$TMPDIR/olt.toml" << 'TOML'
 [tools]
 odin_path = "/nonexistent/odin-binary"
 TOML
@@ -77,7 +77,7 @@ check "bogus odin_path does not crash odin-lint itself" \
 # ── Test 4: [tools] + [domains] coexist ──────────────────────────────────────
 echo ""
 echo "── [tools] + [domains] coexist ──"
-cat > "$TMPDIR/odin-lint.toml" << 'TOML'
+cat > "$TMPDIR/olt.toml" << 'TOML'
 [domains]
 ffi = false
 
@@ -92,7 +92,7 @@ check "[tools] and [domains] can coexist in same toml" \
 # ── Test 5: effective_odin_path falls back to "odin" when no config ───────────
 echo ""
 echo "── effective_odin_path fallback ──"
-rm -f "$TMPDIR/odin-lint.toml"
+rm -f "$TMPDIR/olt.toml"
 out=$("$BINARY" "$TMPDIR/main.odin" 2>&1 || true)
 check "no toml: runs with PATH odin (no crash)" \
     "$(echo "$out" | grep -qiv "panic\|runtime error" && echo true || echo false)"

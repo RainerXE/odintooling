@@ -13,7 +13,7 @@ import sq "../../vendor/odin-sqlite3"
 // calls it. These are dead code candidates safe to delete.
 //
 // Requires the code graph to be built first (--export-symbols).
-// Enabled via [domains] dead_code = true in odin-lint.toml.
+// Enabled via [domains] dead_code = true in olt.toml.
 //
 // Category: DEAD CODE (info tier, opt-in)
 // =============================================================================

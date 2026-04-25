@@ -471,7 +471,7 @@ _main :: proc() -> int {
     if opts.explain_rule != "" {
         docs, found := explain_rule(opts.explain_rule)
         if !found {
-            fmt.eprintfln("error: unknown rule '%s'. Run 'odin-lint --list-rules' for available rules.",
+            fmt.eprintfln("error: unknown rule '%s'. Run 'olt --list-rules' for available rules.",
                 opts.explain_rule)
             return 2
         }
@@ -480,11 +480,11 @@ _main :: proc() -> int {
     }
 
     if len(opts.targets) == 0 {
-        fmt.eprintln("error: no target specified. Run 'odin-lint --help' for usage.")
+        fmt.eprintln("error: no target specified. Run 'olt --help' for usage.")
         return 2
     }
 
-    // Load project config (odin-lint.toml or auto-detection).
+    // Load project config (olt.toml or auto-detection).
     opts.config = load_project_config(opts.targets[:])
 
     // --export-symbols: build code graph and write symbols.json, then exit.

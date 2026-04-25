@@ -136,7 +136,7 @@ OLSPluginDescriptor :: struct {
 
 @(private = "file")
 _plugin: OLSPluginDescriptor = {
-	name         = "odin-lint",
+	name         = "olt",
 	version      = "0.1.0",
 	capabilities = {.Diagnostics, .CallHierarchy},
 	init         = _ols_init,
@@ -544,7 +544,7 @@ _diags_to_ols_list :: proc(diags: []Diagnostic) -> ^OLSPluginDiagnosticList {
 			},
 			severity = sev,
 			code     = strings.clone_to_cstring(d.rule_id, ha),
-			source   = "odin-lint",
+			source   = "olt",
 			message  = msg_cstr,
 			has_fix  = d.has_fix,
 			fix_hint = var_hint,
