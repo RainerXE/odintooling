@@ -660,7 +660,7 @@ M6   Extended Rules + Refactoring        ✅ COMPLETE (April 22 2026)
   C013 DEA-UnusedImport                           ✅ SKIPPED (Odin compiler catches this — by design)
   C012-T type-gated semantic naming               ✅ T1+T3 done in M7.1; T2 deferred to M12
   C019 type marker suffixes Phase 1               ✅ COMPLETE in M7.1 (April 22 2026)
-  C019 Phase 2 (inferred := types)                ⬜ Ready for M12 (conventions already defined in Phase 1; uses graph return_type)
+  C019 Phase 2 (inferred := types)                ✅ COMPLETE in M12 (April 25 2026)
   rename_symbol MCP tool                          ✅ COMPLETE in M7.1 (April 22 2026)
   LSP Call Hierarchy                              ✅ COMPLETE in M7.1 (April 22 2026)
 M6.5 Structural Rules (B-category)      ✅ COMPLETE (April 21 2026)
