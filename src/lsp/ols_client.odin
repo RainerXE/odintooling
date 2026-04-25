@@ -39,8 +39,8 @@ ols_start :: proc(ols_path: string) -> (proc_: OLSProcess, ok: bool) {
 	stdout_r, stdout_w, err2 := os.pipe()
 	if err2 != nil {
 		fmt.eprintfln("odin-lint-lsp: os.pipe() for OLS stdout failed: %v", err2)
-		os.close(stdin_r)
-		os.close(stdin_w)
+		os.close(stdin_r) // odin-lint:ignore C201
+		os.close(stdin_w) // odin-lint:ignore C201
 		return
 	}
 
@@ -54,16 +54,16 @@ ols_start :: proc(ols_path: string) -> (proc_: OLSProcess, ok: bool) {
 	p, perr := os.process_start(desc)
 	if perr != nil {
 		fmt.eprintfln("odin-lint-lsp: failed to start OLS at '%s': %v", ols_path, perr)
-		os.close(stdin_r)
-		os.close(stdin_w)
-		os.close(stdout_r)
-		os.close(stdout_w)
+		os.close(stdin_r)  // odin-lint:ignore C201
+		os.close(stdin_w)  // odin-lint:ignore C201
+		os.close(stdout_r) // odin-lint:ignore C201
+		os.close(stdout_w) // odin-lint:ignore C201
 		return
 	}
 
 	// Close the ends we don't use in this process.
-	os.close(stdin_r)  // OLS owns the read-end of its stdin
-	os.close(stdout_w) // OLS owns the write-end of its stdout
+	os.close(stdin_r)  // odin-lint:ignore C201  OLS owns the read-end of its stdin
+	os.close(stdout_w) // odin-lint:ignore C201  OLS owns the write-end of its stdout
 
 	proc_ = OLSProcess{
 		process  = p,
@@ -99,7 +99,7 @@ ols_stop :: proc(p: ^OLSProcess) {
 	exit_notif := `{"jsonrpc":"2.0","method":"exit"}`
 	ols_write(p, transmute([]u8)string(exit_notif))
 	_ = os.process_kill(p.process)
-	os.close(p.stdin_w)
-	os.close(p.stdout_r)
+	os.close(p.stdin_w)  // odin-lint:ignore C201
+	os.close(p.stdout_r) // odin-lint:ignore C201
 	p.started = false
 }

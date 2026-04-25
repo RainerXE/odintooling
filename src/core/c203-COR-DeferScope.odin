@@ -22,7 +22,7 @@ import "core:strings"
 // Category: CORRECTNESS — enabled by default
 // =============================================================================
 
-C203Rule :: proc() -> Rule {
+c203_rule :: proc() -> Rule {
 	return Rule{
 		id       = "C203",
 		tier     = "correctness",

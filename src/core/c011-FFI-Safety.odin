@@ -12,7 +12,7 @@ import "core:strings"
 // Category: CORRECTNESS
 // =============================================================================
 
-C011Rule :: proc() -> Rule {
+c011_rule :: proc() -> Rule {
     return Rule{
         id       = "C011",
         tier     = "correctness",

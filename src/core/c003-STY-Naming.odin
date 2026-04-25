@@ -31,7 +31,7 @@ NAMING_ALL_ENABLED :: NamingRuleFlags{c003=true, c007=true, c016=true, c017=true
 // NAMING_DEFAULTS enables only the rules that are on by default.
 NAMING_DEFAULTS :: NamingRuleFlags{c003=true, c007=true, c016=true, c017=false, c018=false, c020=false}
 
-C003Rule :: proc() -> Rule {
+c003_rule :: proc() -> Rule {
     return Rule{
         id       = "C003",
         tier     = "style",

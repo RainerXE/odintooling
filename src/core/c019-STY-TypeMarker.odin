@@ -93,7 +93,7 @@ c019_kind_label :: proc(kind: C019TypeKind) -> string {
 // Rule entry point
 // ---------------------------------------------------------------------------
 
-C019Rule :: proc() -> Rule {
+c019_rule :: proc() -> Rule {
     return Rule{
         id       = "C019",
         tier     = "style",
