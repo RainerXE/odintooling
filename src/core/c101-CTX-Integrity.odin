@@ -30,7 +30,7 @@ import "core:strings"
 //
 // =============================================================================
 
-C101Rule :: proc() -> Rule {
+c101_rule :: proc() -> Rule {
     return Rule{
         id       = "C101",
         tier     = "correctness",

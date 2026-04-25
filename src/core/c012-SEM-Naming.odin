@@ -27,7 +27,7 @@ import "core:strings"
 // Category: STYLE (opt-in semantic hint)
 // =============================================================================
 
-C012Rule :: proc() -> Rule {
+c012_rule :: proc() -> Rule {
     return Rule{
         id       = "C012",
         tier     = "style",

@@ -7,7 +7,7 @@ package core
 // Implementation deferred to M3.4+.
 // =============================================================================
 
-C008Rule :: proc() -> Rule {
+c008_rule :: proc() -> Rule {
     return Rule{
         id       = "C008",
         tier     = "style",

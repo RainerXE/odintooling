@@ -7,7 +7,7 @@ package core
 // consistent naming. Implementation deferred to M3.4+.
 // =============================================================================
 
-C004Rule :: proc() -> Rule {
+c004_rule :: proc() -> Rule {
     return Rule{
         id       = "C004",
         tier     = "style",
