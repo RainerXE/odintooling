@@ -26,7 +26,7 @@ import "core:strings"
 //   4. The line is a code comment
 //
 // SUPPRESSION:
-//   context.allocator = my_alloc  // odin-lint:ignore C101
+//   context.allocator = my_alloc  // olt:ignore C101
 //
 // =============================================================================
 

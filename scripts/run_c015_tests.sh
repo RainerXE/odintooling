@@ -4,14 +4,14 @@
 #
 # C015 is a graph-query rule: requires --export-symbols to build the call graph,
 # then does a word-boundary text scan to find unreferenced private symbols.
-# Enabled via [domains] dead_code = true in odin-lint.toml.
+# Enabled via [domains] dead_code = true in olt.toml.
 
 echo "Running C015 Test Suite..."
 echo "=========================="
 mkdir -p test_results/c015_results
 
 FIXTURE_DIR="tests/C015_DEA_UNUSEDCONST"
-TOML="$FIXTURE_DIR/odin-lint.toml"
+TOML="$FIXTURE_DIR/olt.toml"
 
 cat > "$TOML" <<'EOF'
 [domains]
@@ -25,7 +25,7 @@ failed_tests=0
 # --- Pass fixture ---
 echo "Testing: c015_fixture_pass.odin"
 output_pass="test_results/c015_results/c015_fixture_pass_results.txt"
-./artifacts/odin-lint --export-symbols "$FIXTURE_DIR/c015_fixture_pass.odin" \
+./artifacts/olt --export-symbols "$FIXTURE_DIR/c015_fixture_pass.odin" \
     --db /tmp/c015_pass_test.db > "$output_pass" 2>&1
 if ! grep -q "C015 \[dead_code\]" "$output_pass"; then
     echo "  PASS: No C015 violations (as expected)"
@@ -40,7 +40,7 @@ rm -f /tmp/c015_pass_test.db
 # --- Fail fixture ---
 echo "Testing: c015_fixture_fail.odin"
 output_fail="test_results/c015_results/c015_fixture_fail_results.txt"
-./artifacts/odin-lint --export-symbols "$FIXTURE_DIR/c015_fixture_fail.odin" \
+./artifacts/olt --export-symbols "$FIXTURE_DIR/c015_fixture_fail.odin" \
     --db /tmp/c015_fail_test.db > "$output_fail" 2>&1
 if grep -q "C015 \[dead_code\]" "$output_fail"; then
     count=$(grep -c "C015 \[dead_code\]" "$output_fail")

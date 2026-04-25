@@ -35,8 +35,8 @@ import "core:strings"
 //   8. An inline suppression comment is present (see below)
 //
 // SUPPRESSION — add to the allocation line or the line before:
-//   buf := make([]u8, n)  // odin-lint:ignore C001 caller owns this
-//   // odin-lint:ignore C001 intentional — arena-managed
+//   buf := make([]u8, n)  // olt:ignore C001 caller owns this
+//   // olt:ignore C001 intentional — arena-managed
 //   buf := make([]u8, n)
 //
 // FILE EXCLUSIONS — automatically skipped paths:
@@ -253,7 +253,7 @@ check_block :: proc(
                     "Allocation '%s' may transfer ownership to '%s' — verify callee handles cleanup, or add 'defer delete(%s)'",
                     alloc.var_name, callee, alloc.var_name)
                 fix   = fmt.aprintf(
-                    "If '%s' takes ownership: add '// odin-lint:ignore C001'. If not: add 'defer delete(%s)'",
+                    "If '%s' takes ownership: add '// olt:ignore C001'. If not: add 'defer delete(%s)'",
                     callee, alloc.var_name)
                 dtype = DiagnosticType.INFO
             }

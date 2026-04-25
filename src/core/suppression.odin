@@ -12,25 +12,30 @@ import "core:strings"
 // that allow users to disable specific linting rules on individual lines.
 //
 // Suppression Format:
-//   // odin-lint:ignore RULE_ID [reason]
+//   // olt:ignore RULE_ID [reason]
 //   // odin-lint: ignore RULE_ID [reason]
-//   // odin-lint:ignore RULE_ID,ANOTHER_RULE [reason]
+//   // olt:ignore RULE_ID,ANOTHER_RULE [reason]
 //
 // Examples:
-//   buf := make([]u8, n)  // odin-lint:ignore C001 caller owns this
-//   // odin-lint:ignore C001,C002 intentional arena pattern
+//   buf := make([]u8, n)  // olt:ignore C001 caller owns this
+//   // olt:ignore C001,C002 intentional arena pattern
 //   data := make([]int, 100)
 // =============================================================================
 
-// is_suppression_comment returns true when the line contains an
-// odin-lint:ignore suppression marker in any of the accepted forms.
+// is_suppression_comment returns true when the line contains a suppression
+// marker in any of the accepted forms.  Both "olt:ignore" (current) and
+// "odin-lint:ignore" (legacy) are valid.
 is_suppression_comment :: proc(text: string) -> bool {
-    return strings.contains(text, "//odin-lint:ignore")   ||
-           strings.contains(text, "// odin-lint:ignore")  ||
-           strings.contains(text, "//odin-lint: ignore")  ||
-           strings.contains(text, "// odin-lint: ignore") ||
-           // tolerate common capitalisation variants
-           strings.contains(text, "//Odin-Lint:Ignore")   ||
+    return strings.contains(text, "//olt:ignore")          ||
+           strings.contains(text, "// olt:ignore")         ||
+           strings.contains(text, "//olt: ignore")         ||
+           strings.contains(text, "// olt: ignore")        ||
+           // legacy: odin-lint:ignore — kept for backwards compatibility
+           strings.contains(text, "//odin-lint:ignore")    ||
+           strings.contains(text, "// odin-lint:ignore")   ||
+           strings.contains(text, "//odin-lint: ignore")   ||
+           strings.contains(text, "// odin-lint: ignore")  ||
+           strings.contains(text, "//Odin-Lint:Ignore")    ||
            strings.contains(text, "// Odin-Lint:Ignore")
 }
 
@@ -44,30 +49,19 @@ extract_suppressed_rules :: proc(line: string) -> []string {
     marker_pos := -1
     marker_len := 0
     
-    // Check all possible suppression comment formats
-    if strings.index(line, "//odin-lint:ignore") >= 0 {
-        marker_pos = strings.index(line, "//odin-lint:ignore")
-        marker_len = len("//odin-lint:ignore")
+    // Check current (olt:ignore) and legacy (odin-lint:ignore) forms
+    markers := [?]string{
+        "//olt:ignore", "// olt:ignore", "//olt: ignore", "// olt: ignore",
+        "//odin-lint:ignore", "// odin-lint:ignore",
+        "//odin-lint: ignore", "// odin-lint: ignore",
+        "//Odin-Lint:Ignore", "// Odin-Lint:Ignore",
     }
-    if marker_pos == -1 && strings.index(line, "// odin-lint:ignore") >= 0 {
-        marker_pos = strings.index(line, "// odin-lint:ignore")
-        marker_len = len("// odin-lint:ignore")
-    }
-    if marker_pos == -1 && strings.index(line, "//odin-lint: ignore") >= 0 {
-        marker_pos = strings.index(line, "//odin-lint: ignore")
-        marker_len = len("//odin-lint: ignore")
-    }
-    if marker_pos == -1 && strings.index(line, "// odin-lint: ignore") >= 0 {
-        marker_pos = strings.index(line, "// odin-lint: ignore")
-        marker_len = len("// odin-lint: ignore")
-    }
-    if marker_pos == -1 && strings.index(line, "//Odin-Lint:Ignore") >= 0 {
-        marker_pos = strings.index(line, "//Odin-Lint:Ignore")
-        marker_len = len("//Odin-Lint:Ignore")
-    }
-    if marker_pos == -1 && strings.index(line, "// Odin-Lint:Ignore") >= 0 {
-        marker_pos = strings.index(line, "// Odin-Lint:Ignore")
-        marker_len = len("// Odin-Lint:Ignore")
+    for marker in markers {
+        if idx := strings.index(line, marker); idx >= 0 {
+            marker_pos = idx
+            marker_len = len(marker)
+            break
+        }
     }
     
     if marker_pos == -1 do return result[:]

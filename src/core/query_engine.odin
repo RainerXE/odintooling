@@ -28,7 +28,7 @@ load_query_src :: proc(language: rawptr, src: string, label: string = "<embedded
 
     error_offset: u32
     error_type:   TSQueryError
-    handle := ts_query_new(language, source_ptr, u32(len(src)), &error_offset, &error_type) // odin-lint:ignore C011 handle transferred into returned CompiledQuery struct
+    handle := ts_query_new(language, source_ptr, u32(len(src)), &error_offset, &error_type) // olt:ignore C011 handle transferred into returned CompiledQuery struct
 
     if handle == nil || error_type != .None {
         fmt.eprintfln("[query_engine] SCM compile error in %s at byte %d: %v",

@@ -1,19 +1,19 @@
 /*
-	odin-lint MCP Server
+	olt MCP Server
 	File: src/mcp/main.odin
 
-	Exposes odin-lint analysis as MCP tools for Claude Code and other
+	Exposes olt analysis as MCP tools for Claude Code and other
 	MCP clients. Built as a standalone executable with pure Odin — no
 	Node.js or external runtime required.
 
 	Build:
-	    ./scripts/build_mcp.sh  →  artifacts/odin-lint-mcp
+	    ./scripts/build_mcp.sh  →  artifacts/olt-mcp
 
 	Claude Code registration (~/.claude/mcp_servers.json or project .mcp.json):
 	    {
 	      "mcpServers": {
-	        "odin-lint": {
-	          "command": "/path/to/artifacts/odin-lint-mcp",
+	        "olt": {
+	          "command": "/path/to/artifacts/olt-mcp",
 	          "args": []
 	        }
 	      }
@@ -53,14 +53,14 @@ _ts_ready:  bool
 main :: proc() {
     p, ok := core.initTreeSitterParser()
     if !ok {
-        fmt.eprintln("odin-lint-mcp: failed to initialise tree-sitter parser")
+        fmt.eprintln("olt-mcp: failed to initialise tree-sitter parser")
         os.exit(1)
     }
     _ts_parser = p
     _ts_ready  = true
 
     s: mcp.MCPServer
-    mcp.server_init(&s, "odin-lint", core.ODIN_LINT_VERSION)
+    mcp.server_init(&s, "olt", core.ODIN_LINT_VERSION)
 
     // Tier 1 — lint tools
     mcp.server_register_tool(&s, make_lint_file_tool())
