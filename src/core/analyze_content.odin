@@ -135,4 +135,15 @@ analyze_content :: proc(
 		append(diags, d)
 	}
 
+	// C025: append(slice, v) missing address-of operator
+	{
+		q, q_ok := load_query_src(ts.adapter.language, GO_COMPAT_SCM, "go_compat.scm")
+		if q_ok {
+			for d in dedupDiagnostics(c025_run(file_path, root, lines, &q)) {
+				append(diags, d)
+			}
+			unload_query(&q)
+		}
+	}
+
 }
