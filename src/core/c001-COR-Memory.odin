@@ -105,10 +105,14 @@ c001Matcher :: proc(file_path: string, node: ^ASTNode) -> []Diagnostic {
 // c001_matcher is the primary entry point.
 // file_lines may be passed in if the caller already has the file cached;
 // when empty the file is read once here and shared with all child calls.
+// show_ownership_hints: when true, emits INFO for allocations passed to
+// a function call (potential ownership transfer). Set false via TOML
+// [correctness] c001_ownership_hints = false to silence these hints.
 c001_matcher :: proc(
-    file_path:  string,
-    node:       ^ASTNode,
-    file_lines: []string,
+    file_path:            string,
+    node:                 ^ASTNode,
+    file_lines:           []string,
+    show_ownership_hints: bool = true,
 ) -> []Diagnostic {
     if should_exclude_file(file_path) do return {}
 
@@ -132,13 +136,13 @@ c001_matcher :: proc(
     all_diags: [dynamic]Diagnostic
 
     if node.node_type == "block" {
-        for d in check_block(node, file_path, lines) {
+        for d in check_block(node, file_path, lines, show_ownership_hints) {
             append(&all_diags, d)
         }
     }
 
     for &child in node.children {
-        for d in c001_matcher(file_path, &child, lines) {
+        for d in c001_matcher(file_path, &child, lines, show_ownership_hints) {
             append(&all_diags, d)
         }
     }
@@ -152,9 +156,10 @@ c001_matcher :: proc(
 // ---------------------------------------------------------------------------
 
 check_block :: proc(
-    block:      ^ASTNode,
-    file_path:  string,
-    file_lines: []string,
+    block:                ^ASTNode,
+    file_path:            string,
+    file_lines:           []string,
+    show_ownership_hints: bool = true,
 ) -> []Diagnostic {
     // Tier 2: init-and-hold heuristic.
     // Procs named *_init, init_*, or init allocate module-lifetime state.
@@ -237,6 +242,21 @@ check_block :: proc(
         if ctx.is_perf_critical {
             msg   = "[C001] Allocation in performance-critical block — verify this is intentional"
             dtype = DiagnosticType.CONTEXTUAL
+        }
+
+        // Ownership-transfer hint: if the allocated variable is passed to a
+        // function call in the same scope, it may be handing off ownership.
+        // Downgrade to INFO so the user can verify rather than getting a false alarm.
+        if dtype == .VIOLATION && show_ownership_hints {
+            if callee := c001_find_callee_with_arg(alloc.var_name, block, file_lines, alloc.line); callee != "" {
+                msg   = fmt.aprintf(
+                    "Allocation '%s' may transfer ownership to '%s' — verify callee handles cleanup, or add 'defer delete(%s)'",
+                    alloc.var_name, callee, alloc.var_name)
+                fix   = fmt.aprintf(
+                    "If '%s' takes ownership: add '// odin-lint:ignore C001'. If not: add 'defer delete(%s)'",
+                    callee, alloc.var_name)
+                dtype = DiagnosticType.INFO
+            }
         }
 
         append(&diags, Diagnostic{
@@ -650,5 +670,113 @@ c001_message :: proc() -> string {
 
 c001_fix_hint :: proc() -> string {
     return "Add 'defer free()' or 'defer delete()' immediately after this allocation"
+}
+
+// ---------------------------------------------------------------------------
+// Ownership-transfer detection
+// ---------------------------------------------------------------------------
+
+// c001_find_callee_with_arg scans block children after alloc_line for a
+// function call that passes var_name as an argument. Returns the short
+// callee name (e.g. "initStressTest") or "" if no such call is found.
+@(private)
+c001_find_callee_with_arg :: proc(
+    var_name:   string,
+    block:      ^ASTNode,
+    file_lines: []string,
+    alloc_line: int,
+) -> string {
+    if var_name == "" || var_name == "_" { return "" }
+    for &child in block.children {
+        if child.start_line <= alloc_line { continue }
+        end := min(child.end_line, len(file_lines))
+        for l := child.start_line; l <= end; l += 1 {
+            if l < 1 || l > len(file_lines) { continue }
+            line := file_lines[l-1]
+            if !strings.contains(line, var_name) { continue }
+            if !strings.contains(line, "(") { continue }
+            // Skip lines where var_name is the assignment target.
+            trimmed := strings.trim_left(line, " \t")
+            if strings.has_prefix(trimmed, var_name) {
+                rest := strings.trim_left(trimmed[len(var_name):], " \t")
+                if len(rest) > 0 && (rest[0] == '=' || (len(rest) > 1 && rest[1] == '=')) {
+                    continue
+                }
+            }
+            if callee := c001_extract_callee(line, var_name); callee != "" {
+                return callee
+            }
+        }
+    }
+    return ""
+}
+
+// c001_extract_callee returns the short function name of the call whose
+// argument list contains var_name on the given source line.
+// e.g. line="renderer.initStressTest(font, fallbacks)", var_name="fallbacks" → "initStressTest"
+@(private)
+c001_extract_callee :: proc(line: string, var_name: string) -> string {
+    // Find var_name with word boundaries.
+    var_pos := -1
+    offset  := 0
+    for offset < len(line) {
+        idx := strings.index(line[offset:], var_name)
+        if idx < 0 { break }
+        abs := offset + idx
+        before_ok := abs == 0 || !is_ident_byte(line[abs-1])
+        after_end := abs + len(var_name)
+        after_ok  := after_end >= len(line) || !is_ident_byte(line[after_end])
+        if before_ok && after_ok { var_pos = abs; break }
+        offset = abs + 1
+    }
+    if var_pos < 0 { return "" }
+
+    // Find the opening '(' to the left of var_name.
+    paren := -1
+    depth := 0
+    for i := var_pos - 1; i >= 0; i -= 1 {
+        switch line[i] {
+        case ')': depth += 1
+        case '(':
+            if depth == 0 { paren = i; break }
+            depth -= 1
+        }
+        if paren >= 0 { break }
+    }
+    if paren < 0 { return "" }
+
+    // Extract the identifier immediately before '('.
+    fn_end := paren - 1
+    for fn_end >= 0 && (line[fn_end] == ' ' || line[fn_end] == '\t') { fn_end -= 1 }
+    if fn_end < 0 { return "" }
+
+    fn_start := fn_end
+    for fn_start > 0 && is_ident_byte(line[fn_start-1]) { fn_start -= 1 }
+
+    name := line[fn_start : fn_end+1]
+    if len(name) == 0 || !is_ident_byte(name[0]) { return "" }
+
+    // Built-in and read-only functions never take ownership — filter them out
+    // to avoid spurious "may transfer ownership to len/fmt/log" hints.
+    switch name {
+    // Built-in procs that read but never take ownership
+    case "len", "cap", "size_of", "align_of", "offset_of",
+         "assert", "panic", "print", "println", "printf",
+         "eprintln", "eprintf", "fprintf", "fprintln",
+         "append", "copy", "delete", "free",
+         "transmute", "cast", "auto_cast",
+         "min", "max", "abs", "clamp", "swizzle":
+        return ""
+    // Primitive type names used as casts: byte(x), u8(x), int(x), etc.
+    case "byte", "u8", "u16", "u32", "u64", "u128",
+         "i8", "i16", "i32", "i64", "i128",
+         "f16", "f32", "f64", "f16le", "f16be",
+         "f32le", "f32be", "f64le", "f64be",
+         "int", "uint", "uintptr", "rawptr",
+         "bool", "b8", "b16", "b32", "b64",
+         "rune", "string", "cstring":
+        return ""
+    }
+    return name
 }
 

@@ -669,6 +669,12 @@ M6.6 C001 False Positive Reduction (AST layer)   ✅ COMPLETE (April 21 2026)
   Tier 1: fix has_allocator_arg, context.allocator detection, multi-line make ✅
   Tier 2: _init proc name heuristic                                            ✅
   Tier 2b: fix is_free_call / has_manual_cleanup (direct delete detection)     ✅
+  C001 ownership-transfer hints (April 25 2026)                       ✅ DONE
+    Allocations passed to a function call downgrade from VIOLATION → INFO
+    Message: "Allocation 'x' may transfer ownership to 'f' — verify callee handles cleanup"
+    Opt-out: [correctness] c001_ownership_hints = false in odin-lint.toml
+    Blacklist of read-only built-ins (len, cap, fmt.*, type casts) prevents FPs
+    RuiShin: 67 violations → 55 VIOLATION + 12 INFO (well-targeted hints)
   Remaining C001 FPs deferred — require package-scope or return-type info (M6.9/M7)
 M6.7 C019 STY-TypeMarker Phase 1        ✅ COMPLETE in M7.1 (April 22 2026)
 M6.9 Package-Scope Linting Foundation   ✅ COMPLETE (April 21 2026)
