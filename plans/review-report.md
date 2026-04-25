@@ -5,11 +5,11 @@
 
 ## Summary
 
-| Severity | Count | Fixed (this pass) |
-|----------|-------|-------------------|
-| HIGH     | 4     | TBD               |
-| MEDIUM   | 7     | TBD               |
-| LOW      | 4     | TBD               |
+| Severity | Count | Fixed (April 25 2026) |
+|----------|-------|----------------------|
+| HIGH     | 4     | ✅ All 4 fixed        |
+| MEDIUM   | 7     | ✅ All 7 fixed        |
+| LOW      | 4     | ✅ L1, L3 (was already safe), L4 fixed; L2 resolved by H4 |
 
 The codebase has good defensive structure — nil checks are consistent, defer
 is used correctly in most places, and the graph DB open/close pattern is

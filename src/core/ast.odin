@@ -113,3 +113,8 @@ visitAST :: proc(node: ^ASTNode, visitor: ASTVisitor) {
     // Leave node
     visitor.leave_node(node)
 }
+// is_ident_byte returns true if b is a valid Odin identifier character.
+// Canonical version — avoids duplicating this helper across rule files.
+is_ident_byte :: proc(b: u8) -> bool {
+    return b == '_' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}

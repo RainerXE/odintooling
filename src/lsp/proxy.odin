@@ -108,9 +108,11 @@ _handle_publish_diagnostics :: proc(state: ^ProxyState, ols_msg: []u8) {
 		core.analyze_content(file_path, content, &state.ts_parser, &our_diags)
 	}
 
-	// Merge and send.
+	// Merge and send.  Both returned strings are heap-allocated; delete after use.
 	our_items := diags_to_lsp_items(our_diags[:])
+	defer if len(our_items) > 0 { delete(our_items) }
 	merged    := merge_publish_diagnostics(ols_msg, our_items)
+	defer delete(merged)
 	_write_to_editor_str(merged)
 }
 
@@ -190,6 +192,15 @@ main :: proc() {
 
 	// Editor closed the connection — shut down cleanly.
 	ols_stop(&state.ols)
+
+	// Free document cache and proxy state.
+	// NOTE: tree-sitter is NOT thread-safe. state.ts_parser is only accessed
+	// from Thread B (analyze_content). Thread A must never call analyze_content.
+	// If Thread A ever needs analysis, protect ts_parser with a separate mutex.
+	for uri, content in state.doc_cache { delete(uri); delete(content) }
+	delete(state.doc_cache)
+	free(state)
+	free(tb_data)
 }
 
 // =============================================================================
