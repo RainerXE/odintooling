@@ -108,11 +108,14 @@ c019_message  :: proc() -> string { return "variable name does not match its typ
 c019_fix_hint :: proc() -> string { return "Append the required suffix (e.g. _ptr, _slice, _map, _alloc)" }
 
 // c019_scm_run processes the type_marker.scm query results and emits diagnostics.
+// db is optional (nil = Phase 1 only). When provided, Phase 2 graph lookup is
+// attempted for inferred := assignments whose type cannot be determined from syntax.
 c019_scm_run :: proc(
     file_path:  string,
     root_node:  TSNode,
     file_lines: []string,
     q:          ^CompiledQuery,
+    db:         ^GraphDB = nil,
 ) -> []Diagnostic {
     results := run_query(q, root_node, file_lines)
     defer free_query_results(results)
@@ -126,7 +129,7 @@ c019_scm_run :: proc(
     diags        := make([dynamic]Diagnostic)
 
     for result in results {
-        id_node, name, kind := c019_extract_and_classify(result, file_lines) or_continue
+        id_node, name, kind := c019_extract_and_classify(result, file_lines, db) or_continue
         if kind == .Value || kind == .Unknown { continue }
 
         pt   := ts_node_start_point(id_node)
@@ -169,10 +172,13 @@ c019_scm_run :: proc(
 // c019_extract_and_classify takes a query result, determines whether the
 // captured identifier is a variable NAME (not a type identifier), and
 // returns the identifier node, its text, and its classified type kind.
+// db is optional — when non-nil, Phase 2 graph lookup is attempted for
+// inferred := assignments whose type cannot be determined from syntax alone.
 @(private)
 c019_extract_and_classify :: proc(
     result:     QueryResult,
     file_lines: []string,
+    db:         ^GraphDB = nil,
 ) -> (id_node: TSNode, name: string, kind: C019TypeKind, ok: bool) {
     var_node,   is_var   := result.captures["c019_var"]
     param_node, is_param := result.captures["c019_param"]
@@ -220,8 +226,16 @@ c019_extract_and_classify :: proc(
     lhs := line[col:assign_pos]
     if strings.contains(lhs, ",") { return {}, "", .Unknown, false }
 
-    rhs := strings.trim(line[assign_pos+2:], " \t")
-    return active, ident, c019_classify_inferred(rhs), true
+    rhs        := strings.trim(line[assign_pos+2:], " \t")
+    inferred   := c019_classify_inferred(rhs)
+
+    // Phase 2: if Phase 1 couldn't determine the type and we have a graph DB,
+    // try to look up the called proc's return type.
+    if inferred == .Unknown && db != nil {
+        inferred = c019_classify_from_graph(db, rhs)
+    }
+
+    return active, ident, inferred, true
 }
 
 // c019_find_type_colon returns the index of the ':' used as a type separator,
@@ -321,5 +335,86 @@ c019_classify_inferred :: proc(rhs: string) -> C019TypeKind {
     // cstring cast / conversion
     if strings.has_prefix(r, "cstring(") { return .CString }
 
-    return .Unknown  // proc calls, field access, etc. — need OLS
+    return .Unknown  // proc calls, field access, etc. — need graph or OLS
+}
+
+// =============================================================================
+// Phase 2 — graph-backed return type resolution
+// =============================================================================
+
+// c019_classify_from_graph looks up the proc being called in the graph DB
+// and classifies the type from its stored return_type.
+// Returns .Unknown when the proc is not in the graph or type is ambiguous.
+@(private)
+c019_classify_from_graph :: proc(db: ^GraphDB, rhs: string) -> C019TypeKind {
+    if db == nil { return .Unknown }
+    proc_name := c019_call_proc_name(rhs)
+    if proc_name == "" { return .Unknown }
+
+    node, found := graph_get_node(db, proc_name)
+    if !found { return .Unknown }
+    defer graph_free_node_info(node)
+
+    rt := node.return_type
+    if rt == "" { return .Unknown }
+
+    type_text := c019_unwrap_return_type(rt)
+    if type_text == "" { return .Unknown }
+
+    kind := c019_classify_explicit(type_text)
+    if kind == .Value { return .Unknown } // value return → no suffix needed; skip
+    return kind
+}
+
+// c019_call_proc_name extracts the bare proc name from an RHS call expression.
+// "get_player()"    → "get_player"
+// "os.open(path)"   → "open"
+// "1 + 2"           → ""  (not a call)
+@(private)
+c019_call_proc_name :: proc(rhs: string) -> string {
+    paren := strings.index(rhs, "(")
+    if paren < 0 { return "" }
+    fn_expr := strings.trim_space(rhs[:paren])
+    if len(fn_expr) == 0 { return "" }
+    // Reject if fn_expr contains spaces or operators — it's not a plain call
+    for ch in fn_expr {
+        if ch == ' ' || ch == '+' || ch == '-' || ch == '*' || ch == '!' { return "" }
+    }
+    if dot := strings.last_index(fn_expr, "."); dot >= 0 {
+        return fn_expr[dot+1:]
+    }
+    return fn_expr
+}
+
+// c019_unwrap_return_type extracts the first (primary) type from a return
+// type string as produced by _extract_return_type in dna_exporter.odin.
+//
+// Examples:
+//   "^Player"              → "^Player"
+//   "(result: ^Player)"    → "^Player"
+//   "(^Player, bool)"      → "^Player"  (first item; caller already skipped multi-assign)
+//   "(ok: bool)"           → ""         (bool return → .Value; skip)
+@(private)
+c019_unwrap_return_type :: proc(rt: string) -> string {
+    s := strings.trim_space(rt)
+
+    // Strip outer parens
+    if len(s) >= 2 && s[0] == '(' && s[len(s)-1] == ')' {
+        s = strings.trim_space(s[1:len(s)-1])
+    }
+
+    // Take first item before comma
+    if comma := strings.index(s, ","); comma >= 0 {
+        s = strings.trim_space(s[:comma])
+    }
+
+    // Strip named return: "name: ^Type" → "^Type"
+    if colon := strings.index(s, ":"); colon >= 0 {
+        after := colon + 1
+        if after < len(s) && s[after] != ':' && s[after] != '=' {
+            s = strings.trim_space(s[after:])
+        }
+    }
+
+    return s
 }
