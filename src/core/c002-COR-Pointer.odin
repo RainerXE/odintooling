@@ -56,14 +56,18 @@ Position :: struct {
 }
 
 // c002_scm_block_scope returns the start_byte of the innermost enclosing
-// `block` node for a given node.  Using block-level scope means two defer frees
-// of the same name in different `if` branches (different blocks) are not flagged,
-// while two defer frees in the same block ARE flagged.  Returns 0 if no block found.
+// scope boundary for a given node.  A scope boundary is either a `block` node
+// or a `switch_case` node.  Including `switch_case` is critical: in Odin's
+// grammar, case bodies have no wrapping block — statements are direct children
+// of switch_case.  Without this, two defers of the same name in sibling case
+// branches (different variables, same name) share the outer block scope key
+// and are falsely flagged as double-frees.
+// Returns 0 if no scope boundary is found.
 c002_scm_block_scope :: proc(node: TSNode) -> u32 {
     current := ts_node_parent(node)
     for !ts_node_is_null(current) {
         type_str := string(ts_node_type(current))
-        if type_str == "block" {
+        if type_str == "block" || type_str == "switch_case" {
             return ts_node_start_byte(current)
         }
         current = ts_node_parent(current)
@@ -95,6 +99,11 @@ c002_scm_matcher :: proc(
     for result in results {
         freed_node, ok := result.captures["freed_var"]
         if !ok { continue }
+
+        // Skip if this is NOT the first argument in the call — e.g. in
+        // `delete(data, allocator)` both `data` and `allocator` match the
+        // query pattern, but only `data` is the resource being freed.
+        if !c002_is_first_call_arg(freed_node) { continue }
 
         name := c002_extract_ident_text_from_tsnode(freed_node, file_lines)
         if name == "" || name == "_" { continue }
@@ -167,4 +176,48 @@ c002_extract_ident_text_from_tsnode :: proc(node: TSNode, lines: []string) -> st
         }
     }
     return rest[:end]
+}
+
+// c002_is_first_call_arg returns true when freed_var_node is the first
+// positional argument in its enclosing call_expression.  This filters out
+// false positives where a secondary argument (e.g. the `allocator` in
+// `delete(data, allocator)`) is incorrectly captured as a freed resource.
+@(private)
+c002_is_first_call_arg :: proc(freed_var_node: TSNode) -> bool {
+    // Walk up to the call_expression (may be direct or inside member_expression).
+    parent := ts_node_parent(freed_var_node)
+    if ts_node_is_null(parent) { return true }
+
+    call_node: TSNode
+    switch string(ts_node_type(parent)) {
+    case "call_expression":
+        call_node = parent
+    case "member_expression":
+        gp := ts_node_parent(parent)
+        if ts_node_is_null(gp) { return true }
+        if string(ts_node_type(gp)) != "call_expression" { return true }
+        call_node = gp
+    case:
+        return true // not in a call — assume fine
+    }
+
+    // Compare start bytes of all children between '(' and freed_var.
+    // If any expression-type child appears before freed_var_node, it's not first.
+    freed_start := ts_node_start_byte(freed_var_node)
+    n           := ts_node_child_count(call_node)
+    past_paren  := false
+
+    for i: u32 = 0; i < n; i += 1 {
+        child := ts_node_child(call_node, i)
+        if ts_node_is_null(child) { continue }
+        ct := string(ts_node_type(child))
+        if ct == "(" { past_paren = true; continue }
+        if ct == ")" || !past_paren { continue }
+        if ct == "," { continue } // separator, not an argument
+
+        child_start := ts_node_start_byte(child)
+        if child_start < freed_start { return false } // earlier arg exists
+        if child_start == freed_start { return true  } // this IS freed_var
+    }
+    return true
 }
