@@ -406,11 +406,14 @@ analyze_file :: proc(
     }
 
     // C019: Type marker suffix conventions (opt-in via [naming] c019 = true)
+    // Phase 1: explicit types and recognisable RHS patterns (no graph needed)
+    // Phase 2: inferred := proc calls — looks up return type in graph DB
     if rule_enabled("C019", "style", opts) {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
         if err == nil {
             defer delete(content)
-            lines := strings.split(string(content), "\n")
+            c019_lines := strings.split(string(content), "\n")
+            defer delete(c019_lines)
             tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
             if tree_ok {
                 defer ts_tree_delete(tree)
@@ -418,7 +421,16 @@ analyze_file :: proc(
                 if !ts_node_is_null(root) {
                     q, q_ok := load_query_src(ts_parser.adapter.language, TYPE_MARKER_SCM, "type_marker.scm")
                     if q_ok {
-                        diags := c019_scm_run(file_path, root, lines, &q)
+                        // Phase 2: open graph DB if available for return type lookup
+                        c019_db: ^GraphDB
+                        db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
+                        if os.is_file(db_path) {
+                            if db, db_ok := graph_open(db_path); db_ok {
+                                c019_db = db
+                            }
+                        }
+                        defer if c019_db != nil { graph_close(c019_db) }
+                        diags := c019_scm_run(file_path, root, c019_lines, &q, c019_db)
                         unload_query(&q)
                         for d in dedupDiagnostics(diags) {
                             violations += emit_or_collect(d, collector)
