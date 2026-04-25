@@ -161,7 +161,9 @@ analyze_file :: proc(
             return violations, true
         }
         if rule_enabled("C001", "correctness", opts) {
-            for d in dedupDiagnostics(c001Matcher(file_path, &ast_root)) {
+            ownership_hints := opts.config.c001_ownership_hints
+            if !opts.config.loaded { ownership_hints = true } // default on
+            for d in dedupDiagnostics(c001_matcher(file_path, &ast_root, {}, ownership_hints)) {
                 violations += emit_or_collect(d, collector)
             }
         }

@@ -496,7 +496,7 @@ _pass4_attach_violations :: proc(
         ast_root, ast_ok := parseToAST(ts_parser.adapter, src)
         if ast_ok {
             lines := strings.split(src, "\n")
-            for d in dedupDiagnostics(c001_matcher(file_path, &ast_root, lines)) {
+            for d in dedupDiagnostics(c001_matcher(file_path, &ast_root, lines, true)) {
                 if d.diag_type != .NONE && d.diag_type != .INTERNAL_ERROR {
                     append(&collector, d)
                 }
