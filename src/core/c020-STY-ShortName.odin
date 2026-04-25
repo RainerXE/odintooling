@@ -14,7 +14,7 @@ import "core:strings"
 // search. Loop indices (i, j, k) and coordinate variables (x, y, z) are
 // idiomatic exceptions and belong on the allowed list.
 //
-// Configuration in odin-lint.toml:
+// Configuration in olt.toml:
 //
 //   [naming]
 //   c020             = true        # enable rule (opt-in)

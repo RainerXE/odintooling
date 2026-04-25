@@ -1,18 +1,17 @@
 #!/bin/bash
 
-echo "Building odin-lint with tree-sitter integration..."
+echo "Building olt (Odin Language Tools)..."
 
-# Build the main application with tree-sitter static library linking
-odin build src/core -out:artifacts/odin-lint \
+odin build src/core -out:artifacts/olt \
     -extra-linker-flags:"ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
     ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
     ffi/sqlite/libsqlite3.a"
 
 if [ $? -eq 0 ]; then
     echo "✅ Build successful!"
-    echo "Executable: artifacts/odin-lint"
+    echo "Executable: artifacts/olt"
     echo ""
-    echo "To test: ./artifacts/odin-lint --help"
+    echo "To test: ./artifacts/olt --help"
 else
     echo "❌ Build failed!"
     echo ""

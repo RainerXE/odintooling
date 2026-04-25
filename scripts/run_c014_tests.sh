@@ -4,9 +4,9 @@
 #
 # C014 is a graph-query rule: requires --export-symbols to build the call graph
 # first, then queries it for private procs with no incoming call edges.
-# Enabled via [domains] dead_code = true in odin-lint.toml.
+# Enabled via [domains] dead_code = true in olt.toml.
 #
-# A temporary odin-lint.toml is placed in the fixture directory before each run
+# A temporary olt.toml is placed in the fixture directory before each run
 # and cleaned up afterwards so the dead_code domain is active.
 
 echo "Running C014 Test Suite..."
@@ -14,7 +14,7 @@ echo "=========================="
 mkdir -p test_results/c014_results
 
 FIXTURE_DIR="tests/C014_DEA_UNUSEDPROC"
-TOML="$FIXTURE_DIR/odin-lint.toml"
+TOML="$FIXTURE_DIR/olt.toml"
 
 # Write the enabling toml into the fixture directory.
 cat > "$TOML" <<'EOF'
@@ -29,7 +29,7 @@ failed_tests=0
 # --- Pass fixture ---
 echo "Testing: c014_fixture_pass.odin"
 output_pass="test_results/c014_results/c014_fixture_pass_results.txt"
-./artifacts/odin-lint --export-symbols "$FIXTURE_DIR/c014_fixture_pass.odin" \
+./artifacts/olt --export-symbols "$FIXTURE_DIR/c014_fixture_pass.odin" \
     --db /tmp/c014_pass_test.db > "$output_pass" 2>&1
 if ! grep -q "C014 \[dead_code\]" "$output_pass"; then
     echo "  PASS: No C014 violations (as expected)"
@@ -44,7 +44,7 @@ rm -f /tmp/c014_pass_test.db
 # --- Fail fixture ---
 echo "Testing: c014_fixture_fail.odin"
 output_fail="test_results/c014_results/c014_fixture_fail_results.txt"
-./artifacts/odin-lint --export-symbols "$FIXTURE_DIR/c014_fixture_fail.odin" \
+./artifacts/olt --export-symbols "$FIXTURE_DIR/c014_fixture_fail.odin" \
     --db /tmp/c014_fail_test.db > "$output_fail" 2>&1
 if grep -q "C014 \[dead_code\]" "$output_fail"; then
     count=$(grep -c "C014 \[dead_code\]" "$output_fail")

@@ -14,7 +14,7 @@ import sq "../../vendor/odin-sqlite3"
 // across all project files after the graph is built.
 //
 // Requires the code graph to be built first (--export-symbols).
-// Enabled via [domains] dead_code = true in odin-lint.toml.
+// Enabled via [domains] dead_code = true in olt.toml.
 //
 // Limitation: names that coincidentally appear in comments, string literals, or
 // as substrings of other identifiers are exempt due to word-boundary checking.

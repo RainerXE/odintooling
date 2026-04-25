@@ -53,7 +53,7 @@ diags_to_lsp_items :: proc(diags: []core.Diagnostic) -> string {
 		fmt.sbprint(&sb, sev)
 		strings.write_string(&sb, `,"code":"`)
 		strings.write_string(&sb, d.rule_id)
-		strings.write_string(&sb, `","source":"odin-lint","message":"`)
+		strings.write_string(&sb, `","source":"olt","message":"`)
 		_lsp_write_escaped(&sb, d.message)
 		strings.write_byte(&sb, '"')
 		if d.fix != "" {

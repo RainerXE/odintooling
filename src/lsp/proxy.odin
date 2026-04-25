@@ -1,5 +1,5 @@
 /*
-	odin-lint-lsp — LSP Proxy Server
+	olt-lsp — LSP Proxy Server
 	File: src/lsp/proxy.odin
 
 	Acts as the single LSP endpoint for editors. Forwards all traffic
@@ -7,14 +7,14 @@
 	diagnostics into every textDocument/publishDiagnostics notification.
 
 	Editor setup (VS Code settings.json example):
-	    "odin.languageServer.path": "/path/to/artifacts/odin-lint-lsp"
+	    "odin.languageServer.path": "/path/to/artifacts/olt-lsp"
 
-	The OLS binary path is configured via odin-lint.toml:
+	The OLS binary path is configured via olt.toml:
 	    [tools]
 	    ols_path = "/path/to/ols"
 
 	Build:
-	    ./scripts/build_lsp.sh  →  artifacts/odin-lint-lsp
+	    ./scripts/build_lsp.sh  →  artifacts/olt-lsp
 
 	Architecture:
 	    Thread A (main):  editor stdin  ──forward──► OLS stdin
@@ -156,22 +156,22 @@ _run_thread_a :: proc(state: ^ProxyState) {
 // =============================================================================
 
 main :: proc() {
-	// Locate OLS binary: read odin-lint.toml if present, fall back to PATH.
+	// Locate OLS binary: read olt.toml if present, fall back to PATH.
 	cfg := core.load_project_config([]string{"."})
 	ols_path := core.effective_ols_path(cfg)
 
 	// Initialise tree-sitter for our analysis.
 	ts_parser, ts_ok := core.initTreeSitterParser()
 	if !ts_ok {
-		fmt.eprintln("odin-lint-lsp: failed to initialise tree-sitter parser")
+		fmt.eprintln("olt-lsp: failed to initialise tree-sitter parser")
 		os.exit(1)
 	}
 
 	// Start OLS subprocess.
 	ols_proc, ols_ok := ols_start(ols_path)
 	if !ols_ok {
-		fmt.eprintfln("odin-lint-lsp: could not start OLS at '%s'", ols_path)
-		fmt.eprintln("  Set [tools] ols_path in odin-lint.toml or ensure 'ols' is in PATH.")
+		fmt.eprintfln("olt-lsp: could not start OLS at '%s'", ols_path)
+		fmt.eprintln("  Set [tools] ols_path in olt.toml or ensure 'ols' is in PATH.")
 		fmt.eprintln("  Vanilla OLS: https://github.com/DanielGavin/ols")
 		os.exit(1)
 	}
@@ -245,8 +245,8 @@ _read_framed :: proc(reader: ^bufio.Reader) -> (bytes: []u8, ok: bool) {
 _write_to_editor :: proc(bytes: []u8) {
 	header := fmt.tprintf("Content-Length: %d\r\n\r\n", len(bytes))
 	w := os.to_writer(os.stdout)
-	io.write_string(w, header) // odin-lint:ignore C201
-	io.write(w, bytes)         // odin-lint:ignore C201
+	io.write_string(w, header) // olt:ignore C201
+	io.write(w, bytes)         // olt:ignore C201
 }
 
 @(private = "file")

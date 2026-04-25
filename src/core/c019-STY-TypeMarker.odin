@@ -33,12 +33,12 @@ import "core:strings"
 //     - Maybe(T) types
 //
 // ENABLING:
-//   Add to odin-lint.toml:
+//   Add to olt.toml:
 //     [naming]
 //     c019 = true
 //
 // SUPPRESSION:
-//   player: ^Player  // odin-lint:ignore C019
+//   player: ^Player  // olt:ignore C019
 //
 // =============================================================================
 

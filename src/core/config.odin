@@ -6,13 +6,13 @@ import "core:strconv"
 import "core:strings"
 
 // =============================================================================
-// odin-lint.toml — project-level configuration
+// olt.toml — project-level configuration
 // =============================================================================
 //
-// Loaded from the closest odin-lint.toml found in the search path.
+// Loaded from the closest olt.toml found in the search path.
 // When absent, domain auto-detection heuristics are applied.
 //
-// Example odin-lint.toml:
+// Example olt.toml:
 //
 //   [domains]
 //   ffi             = true   # enable C011 FFI safety rules
@@ -74,7 +74,7 @@ default_config :: proc() -> OdinLintConfig {
     }
 }
 
-// load_project_config searches for odin-lint.toml in the given directories
+// load_project_config searches for olt.toml in the given directories
 // (or parent dirs of file targets) and the current working directory.
 // Falls back to defaults + auto-detection if no file is found.
 load_project_config :: proc(targets: []string) -> OdinLintConfig {
@@ -95,25 +95,30 @@ load_project_config :: proc(targets: []string) -> OdinLintConfig {
         }
     }
 
-    // Look for odin-lint.toml in each search directory.
+    // Look for olt.toml (preferred) or odin-lint.toml (legacy) in each search directory.
+    toml_names := [?]string{"olt.toml", "odin-lint.toml"}
     for dir in search_dirs {
-        toml_path := strings.join([]string{dir, "odin-lint.toml"}, "/")
-        defer delete(toml_path)
-        if os.is_file(toml_path) {
-            ok := parse_toml_config(toml_path, &cfg)
-            if ok {
-                cfg.loaded = true
-                return cfg
+        for name in toml_names {
+            toml_path := strings.join([]string{dir, name}, "/")
+            defer delete(toml_path)
+            if os.is_file(toml_path) {
+                ok := parse_toml_config(toml_path, &cfg)
+                if ok {
+                    cfg.loaded = true
+                    return cfg
+                }
             }
         }
     }
 
     // Also check current working directory.
-    if os.is_file("odin-lint.toml") {
-        ok := parse_toml_config("odin-lint.toml", &cfg)
-        if ok {
-            cfg.loaded = true
-            return cfg
+    for name in toml_names {
+        if os.is_file(name) {
+            ok := parse_toml_config(name, &cfg)
+            if ok {
+                cfg.loaded = true
+                return cfg
+            }
         }
     }
 
@@ -139,7 +144,7 @@ apply_auto_detection :: proc(cfg: ^OdinLintConfig, search_dirs: []string) {
     }
 }
 
-// parse_toml_config reads and parses an odin-lint.toml file.
+// parse_toml_config reads and parses an olt.toml file.
 // Only the keys we care about are parsed; unknown keys are silently ignored.
 @(private)
 parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
@@ -283,7 +288,7 @@ filepath_dir :: proc(path: string) -> string {
 // Currently called only when a toml file was loaded.
 print_config_summary :: proc(cfg: OdinLintConfig) {
     if !cfg.loaded { return }
-    fmt.eprintfln("config: odin-lint.toml loaded")
+    fmt.eprintfln("config: olt.toml loaded")
     fmt.eprintfln("  domains: ffi=%v odin_2026=%v semantic_naming=%v dead_code=%v",
         cfg.ffi_domain, cfg.odin_2026_domain, cfg.semantic_naming_domain, cfg.dead_code_domain)
     fmt.eprintfln("  naming:  c016=%v c017=%v c018=%v c019=%v c020=%v (min=%d allowed=%s)",

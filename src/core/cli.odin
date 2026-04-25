@@ -18,7 +18,8 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 // CLI — argument parsing, version, help, rule listing
 // =============================================================================
 
-ODIN_LINT_VERSION    :: "0.4.0"
+OLT_VERSION          :: "1.0.0"
+ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
 ODIN_GRAMMAR_VERSION :: "dev-2026-04"
 
 LintOptions :: struct {
@@ -38,7 +39,7 @@ LintOptions :: struct {
     show_help:        bool,
     show_version:     bool,
     list_rules:       bool,
-    config:           OdinLintConfig,  // loaded from odin-lint.toml (or auto-detected)
+    config:           OdinLintConfig,  // loaded from olt.toml (or auto-detected)
 }
 
 // parse_args parses os.args[1:] into LintOptions.
@@ -161,7 +162,7 @@ rule_enabled :: proc(rule_id: string, tier: string, opts: LintOptions) -> bool {
 }
 
 print_version :: proc() {
-    fmt.printfln("odin-lint %s", ODIN_LINT_VERSION)
+    fmt.printfln("olt %s", ODIN_LINT_VERSION)
     fmt.printfln("supports Odin %s (grammar: %s)", ODIN_GRAMMAR_VERSION, ODIN_GRAMMAR_VERSION)
 }
 

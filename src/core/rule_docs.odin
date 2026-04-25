@@ -55,7 +55,7 @@ SILENT — correct pattern:
 ESCAPE HATCHES
   - Returning the allocation transfers ownership to the caller (no violation).
   - Add a suppression comment to silence a specific line:
-      buf := make([]u8, 1024)  // odin-lint:ignore C001 caller owns this
+      buf := make([]u8, 1024)  // olt:ignore C001 caller owns this
 
 FIX
   Add 'defer delete(buf)' for slices/maps/dynamic arrays, or 'defer free(ptr)'
@@ -257,7 +257,7 @@ SILENT — correct patterns:
     }
 
 SUPPRESSION
-    handle := ts_query_new(...)  // odin-lint:ignore C011 handle stored in returned struct
+    handle := ts_query_new(...)  // olt:ignore C011 handle stored in returned struct
 
 FIX
   Add 'defer ts_*_delete(handle)' immediately after allocation.
@@ -297,5 +297,5 @@ SUB-RULES
 NOTE
   C012 emits INFO diagnostics only — they are advisory, not blocking.
   Enable with '--enable-c012' or '--rule C012'.
-  Suppress individual hints with: // odin-lint:ignore C012
+  Suppress individual hints with: // olt:ignore C012
 `
