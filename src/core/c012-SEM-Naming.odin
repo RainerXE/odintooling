@@ -18,7 +18,9 @@ import "core:strings"
 // Fires INFO, never VIOLATION. Disabled by default (pass --enable-c012).
 //
 // Phase 1 (M3.3): Syntactic sub-rules S1–S3 via SCM query engine.
-// Phase 2 (M6):   Type-gated rules S4+ requiring OLS type resolution.
+// T1    (M7.1):   mem.Allocator/runtime.Allocator → needs alloc/allocator in name.
+// T2    (M12):    mem.Arena/virtual.Arena → needs 'arena' in name.
+// T3    (M7.1):   allocator-role proc return → result needs _owned suffix.
 //
 // SCM file: ffi/tree_sitter/queries/c012_rules.scm
 //
@@ -106,6 +108,7 @@ c012_scm_run :: proc(
         }
 
         // C012-T1: explicitly typed mem.Allocator / runtime.Allocator variable
+        // C012-T2: explicitly typed mem.Arena / virtual.Arena variable
         if t1_node, ok := result.captures["c012_t1_var"]; ok {
             var_name := naming_extract_text(t1_node, file_lines)
             if len(var_name) > 0 {
@@ -113,11 +116,13 @@ c012_scm_run :: proc(
                 row := int(pt.row)
                 if row < len(file_lines) {
                     src := file_lines[row]
+
+                    // T1: mem.Allocator / runtime.Allocator → needs alloc/allocator
                     is_alloc_type := strings.contains(src, "mem.Allocator") ||
                                      strings.contains(src, "runtime.Allocator")
-                    has_hint := strings.contains(var_name, "alloc") ||
-                                strings.contains(var_name, "allocator")
-                    if is_alloc_type && !has_hint {
+                    has_alloc_hint := strings.contains(var_name, "alloc") ||
+                                      strings.contains(var_name, "allocator")
+                    if is_alloc_type && !has_alloc_hint {
                         append(&diagnostics, Diagnostic{
                             file      = file_path,
                             line      = row + 1,
@@ -130,6 +135,27 @@ c012_scm_run :: proc(
                             ),
                             has_fix   = true,
                             fix       = fmt.aprintf("Rename '%s' to '%s_alloc'", var_name, var_name),
+                            diag_type = .INFO,
+                        })
+                    }
+
+                    // T2: mem.Arena / virtual.Arena → needs 'arena' in name
+                    is_arena_type := strings.contains(src, "mem.Arena") ||
+                                     strings.contains(src, "virtual.Arena")
+                    has_arena_hint := strings.contains(var_name, "arena")
+                    if is_arena_type && !has_arena_hint {
+                        append(&diagnostics, Diagnostic{
+                            file      = file_path,
+                            line      = row + 1,
+                            column    = int(pt.column) + 1,
+                            rule_id   = "C012",
+                            tier      = "style",
+                            message   = fmt.aprintf(
+                                "Variable '%s' is typed mem.Arena — include 'arena' in the name to signal its role",
+                                var_name,
+                            ),
+                            has_fix   = true,
+                            fix       = fmt.aprintf("Rename '%s' to '%s_arena'", var_name, var_name),
                             diag_type = .INFO,
                         })
                     }
