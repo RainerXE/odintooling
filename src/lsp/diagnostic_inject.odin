@@ -25,79 +25,120 @@ lsp_severity :: proc(tier: string) -> int {
 }
 
 // diags_to_lsp_items builds a JSON fragment — a comma-separated sequence of
-// LSP Diagnostic objects (no surrounding brackets). Returns "" if no diags.
+// LSP Diagnostic objects (no surrounding brackets).
+// Returns "" if no diags. When non-empty, returns a heap-allocated string the
+// caller must delete.
 diags_to_lsp_items :: proc(diags: []core.Diagnostic) -> string {
 	if len(diags) == 0 { return "" }
 	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
 	first := true
 	for d in diags {
 		if d.diag_type == .NONE || d.diag_type == .INTERNAL_ERROR { continue }
 		if !first { strings.write_string(&sb, ",") }
 		first = false
-		line      := max(d.line - 1, 0)     // 0-indexed
-		col       := max(d.column - 1, 0)   // 0-indexed
-		end_col   := col + 20               // rough estimate
-		sev       := lsp_severity(d.tier)
-		msg_esc, _ := strings.replace_all(d.message, `"`, `\"`)
-		fix_esc    := ""
+		line    := max(d.line - 1, 0)
+		col     := max(d.column - 1, 0)
+		end_col := col + 20
+		sev     := lsp_severity(d.tier)
+		strings.write_string(&sb, `{"range":{"start":{"line":`)
+		fmt.sbprint(&sb, line)
+		strings.write_string(&sb, `,"character":`)
+		fmt.sbprint(&sb, col)
+		strings.write_string(&sb, `},"end":{"line":`)
+		fmt.sbprint(&sb, line)
+		strings.write_string(&sb, `,"character":`)
+		fmt.sbprint(&sb, end_col)
+		strings.write_string(&sb, `}},"severity":`)
+		fmt.sbprint(&sb, sev)
+		strings.write_string(&sb, `,"code":"`)
+		strings.write_string(&sb, d.rule_id)
+		strings.write_string(&sb, `","source":"odin-lint","message":"`)
+		_lsp_write_escaped(&sb, d.message)
+		strings.write_byte(&sb, '"')
 		if d.fix != "" {
-			fix_esc, _ = strings.replace_all(d.fix, `"`, `\"`)
-		}
-		fmt.sbprintf(&sb,
-			`{"range":{"start":{"line":%d,"character":%d},"end":{"line":%d,"character":%d}},"severity":%d,"code":"%s","source":"odin-lint","message":"%s"`,
-			line, col, line, end_col, sev, d.rule_id, msg_esc)
-		if fix_esc != "" {
-			fmt.sbprintf(&sb,
-				`,"relatedInformation":[{"location":{"uri":"","range":{"start":{"line":%d,"character":%d},"end":{"line":%d,"character":%d}}},"message":"Fix: %s"}]`,
-				line, col, line, end_col, fix_esc)
+			strings.write_string(&sb, `,"relatedInformation":[{"location":{"uri":"","range":{"start":{"line":`)
+			fmt.sbprint(&sb, line)
+			strings.write_string(&sb, `,"character":`)
+			fmt.sbprint(&sb, col)
+			strings.write_string(&sb, `},"end":{"line":`)
+			fmt.sbprint(&sb, line)
+			strings.write_string(&sb, `,"character":`)
+			fmt.sbprint(&sb, end_col)
+			strings.write_string(&sb, `}}},"message":"Fix: `)
+			_lsp_write_escaped(&sb, d.fix)
+			strings.write_string(&sb, `"}]`)
 		}
 		strings.write_string(&sb, "}")
 	}
-	return strings.to_string(sb)
+	return strings.clone(strings.to_string(sb))
+}
+
+// _lsp_write_escaped writes s to sb with full JSON string escaping
+// per RFC 8259: \, ", and all control characters < 0x20.
+@(private = "file")
+_lsp_write_escaped :: proc(sb: ^strings.Builder, s: string) {
+	for b in transmute([]u8)s {
+		switch b {
+		case '"':  strings.write_string(sb, `\"`)
+		case '\\': strings.write_string(sb, `\\`)
+		case '\n': strings.write_string(sb, `\n`)
+		case '\r': strings.write_string(sb, `\r`)
+		case '\t': strings.write_string(sb, `\t`)
+		case 0..<0x20:
+			// Other control characters → \uXXXX
+			fmt.sbprintf(sb, `\u%04x`, b)
+		case:
+			strings.write_byte(sb, b)
+		}
+	}
 }
 
 // merge_publish_diagnostics takes an OLS publishDiagnostics notification byte
-// slice and returns a new notification string with our diagnostics appended.
-// If our_items is empty, returns the original message unchanged (as string).
+// slice and returns a new heap-allocated notification string with our
+// diagnostics appended. The caller must delete the returned string.
+// If our_items is empty, returns a clone of the original message.
 merge_publish_diagnostics :: proc(ols_bytes: []u8, our_items: string) -> string {
-	if our_items == "" { return string(ols_bytes) }
+	if our_items == "" { return strings.clone(string(ols_bytes)) }
 
 	s := string(ols_bytes)
 
-	// Find the diagnostics array. Structure is always:
-	// ..."diagnostics":[...]}  (last } closes params, then outer {)
 	key := `"diagnostics":[`
 	pos := strings.index(s, key)
-	if pos < 0 {
-		// No diagnostics array found — build a minimal wrapper
-		return s
-	}
-	arr_start := pos + len(key) // points to first char inside [
+	if pos < 0 { return strings.clone(s) }
 
-	// Find the matching ] by tracking nesting depth.
-	depth := 1
+	arr_start := pos + len(key) // first char inside [
+
+	// Find the matching ] tracking depth and skipping chars inside JSON strings.
+	// This prevents ] inside diagnostic message strings from closing the array.
+	depth, in_string, escaped := 1, false, false
 	arr_end := arr_start
 	for arr_end < len(s) && depth > 0 {
-		switch s[arr_end] {
-		case '[': depth += 1
-		case ']': depth -= 1
+		c := s[arr_end]
+		if escaped {
+			escaped = false
+		} else if c == '\\' {
+			escaped = true
+		} else if c == '"' {
+			in_string = !in_string
+		} else if !in_string {
+			if      c == '[' { depth += 1 }
+			else if c == ']' { depth -= 1 }
 		}
 		if depth > 0 { arr_end += 1 }
 	}
-	// arr_end now points at the closing ]
 
-	// Check if array is empty to avoid leading comma.
-	inner := strings.trim_space(s[arr_start:arr_end])
-	separator := ""
-	if len(inner) > 0 { separator = "," }
+	inner     := strings.trim_space(s[arr_start:arr_end])
+	separator := "," if len(inner) > 0 else ""
 
 	sb := strings.builder_make()
-	strings.write_string(&sb, s[:arr_start])       // everything up to and including [
-	strings.write_string(&sb, inner)                // OLS's existing items
+	defer strings.builder_destroy(&sb)
+	strings.write_string(&sb, s[:arr_start])
+	strings.write_string(&sb, inner)
 	strings.write_string(&sb, separator)
 	strings.write_string(&sb, our_items)
-	strings.write_string(&sb, s[arr_end:])          // ] and everything after
-	return strings.to_string(sb)
+	strings.write_string(&sb, s[arr_end:])
+	return strings.clone(strings.to_string(sb))
 }
 
 // extract_publish_uri extracts the document URI from a publishDiagnostics

@@ -559,10 +559,10 @@ _pass4_attach_violations :: proc(
 
             vs, vok := sq.db_prepare(db.conn, `SELECT lint_violations FROM nodes WHERE id=?;`)
             if !vok { continue }
+            defer sq.stmt_finalize(&vs)
             sq.stmt_bind_i64(&vs, 1, node_id)
             existing := ""
             if sq.stmt_step(&vs) { existing = sq.stmt_col_text(&vs, 0) }
-            sq.stmt_finalize(&vs)
 
             new_json: string
             if existing == "" || existing == "null" {

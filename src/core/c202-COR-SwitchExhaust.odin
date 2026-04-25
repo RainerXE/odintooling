@@ -42,6 +42,7 @@ c202_run :: proc(file_path: string, root_node: TSNode, file_lines: []string, db:
 	if db == nil { return nil }
 	diagnostics  := make([dynamic]Diagnostic)
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
+	defer delete(suppressions)
 	c202_walk(file_path, root_node, file_lines, suppressions, db, &diagnostics)
 	return diagnostics[:]
 }
@@ -141,8 +142,9 @@ c202_condition_ident :: proc(switch_node: TSNode, lines: []string) -> string {
 // in `handle_color` earlier on the same line.
 @(private = "file")
 c202_find_var_type :: proc(lines: []string, var_name: string, switch_line: int) -> string {
-	search_from := min(switch_line, len(lines)-1)
-	for i := search_from; i >= 0; i -= 1 {
+	search_from  := min(switch_line, len(lines)-1)
+	search_limit := max(0, search_from - 50) // look back at most 50 lines
+	for i := search_from; i >= search_limit; i -= 1 {
 		line  := lines[i]
 		offset := 0
 		for offset < len(line) {
@@ -152,7 +154,7 @@ c202_find_var_type :: proc(lines: []string, var_name: string, switch_line: int) 
 			offset = abs + 1 // advance past this occurrence for next iteration
 
 			// Word-boundary before: char before must not be an ident char
-			if abs > 0 && c202_is_ident(line[abs-1]) { continue }
+			if abs > 0 && is_ident_byte(line[abs-1]) { continue }
 
 			// What follows the variable name?
 			after := abs + len(var_name)
@@ -223,10 +225,6 @@ c202_collect_case_labels :: proc(case_node: TSNode, lines: []string, covered: ^m
 	}
 }
 
-@(private = "file")
-c202_is_ident :: proc(c: u8) -> bool {
-	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-}
 
 @(private = "file")
 c202_is_valid_type_name :: proc(s: string) -> bool {
