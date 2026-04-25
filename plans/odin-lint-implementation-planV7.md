@@ -685,7 +685,9 @@ M7   Graph Enrichment for LLM Tooling + Refactoring  ✅ COMPLETE (April 24 2026
   FTS5 virtual table (nodes_fts) + graph_rebuild_fts at export end    ✅ DONE (April 24 2026)
   search_symbols MCP tool — FTS5-backed prefix/substring symbol search ✅ DONE (April 24 2026)
   export_symbols MCP response: cached field added                     ✅ DONE (April 24 2026)
-  C012-T unlock: C012-T1+T3 done in M7.1; full unlock needs OLS types ↷ DEFERRED
+  C012-T1 mem.Allocator naming                                        ✅ DONE (M7.1)
+  C012-T2 mem.Arena / virtual.Arena naming → needs 'arena' in name   ✅ DONE (M12 April 25 2026)
+  C012-T3 allocator-role proc return → needs _owned                   ✅ DONE (M7.1)
 M7.1 OLS Refactoring + Advanced Rules             ✅ COMPLETE (April 22 2026)
   ✅ C012-T1: explicit mem.Allocator var naming (fired when name lacks alloc/allocator)
   ✅ C012-T3: allocator-return without _owned (graph-enriched, needs memory_role DB)
