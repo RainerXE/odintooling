@@ -443,6 +443,58 @@ analyze_file :: proc(
         }
     }
 
+    // C025: append(slice, v) missing address-of — use append(&slice, v)
+    if rule_enabled("C025", "correctness", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            c025_lines := strings.split(string(content), "\n")
+            defer delete(c025_lines)
+            tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+            if tree_ok {
+                defer ts_tree_delete(tree)
+                root := getRootNode(tree)
+                if !ts_node_is_null(root) {
+                    q, q_ok := load_query_src(ts_parser.adapter.language, GO_COMPAT_SCM, "go_compat.scm")
+                    if q_ok {
+                        for d in dedupDiagnostics(c025_run(file_path, root, c025_lines, &q)) {
+                            violations += emit_or_collect(d, collector)
+                        }
+                        unload_query(&q)
+                    }
+                }
+            }
+        }
+    }
+
+    // C021 + C022 + C023: Go→Odin migration rules (go_migration domain — off by default)
+    c021_on := rule_enabled("C021", "correctness", opts)
+    c022_on := rule_enabled("C022", "correctness", opts)
+    c023_on := rule_enabled("C023", "correctness", opts)
+    if c021_on || c022_on || c023_on {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            go_lines := strings.split(string(content), "\n")
+            defer delete(go_lines)
+            if c021_on {
+                for d in dedupDiagnostics(c021_run(file_path, go_lines)) {
+                    violations += emit_or_collect(d, collector)
+                }
+            }
+            if c022_on {
+                for d in dedupDiagnostics(c022_run(file_path, go_lines)) {
+                    violations += emit_or_collect(d, collector)
+                }
+            }
+            if c023_on {
+                for d in dedupDiagnostics(c023_run(file_path, go_lines)) {
+                    violations += emit_or_collect(d, collector)
+                }
+            }
+        }
+    }
+
     return violations, false
 }
 

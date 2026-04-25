@@ -13,3 +13,4 @@ DECLARATIONS_SCM  :: #load("../../ffi/tree_sitter/queries/declarations.scm",    
 REFERENCES_SCM    :: #load("../../ffi/tree_sitter/queries/references.scm",        string)
 TYPE_MARKER_SCM       :: #load("../../ffi/tree_sitter/queries/type_marker.scm",       string)
 UNCHECKED_RESULT_SCM  :: #load("../../ffi/tree_sitter/queries/unchecked_result.scm",  string)
+GO_COMPAT_SCM         :: #load("../../ffi/tree_sitter/queries/go_compat.scm",          string)
