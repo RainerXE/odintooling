@@ -649,7 +649,7 @@ M4.5 Autofix Layer                       ✅ COMPLETE (April 13 2026)
 M5   OLS Plugin Integration              ✅ COMPLETE (April 18 2026)
 M5.5 MCP Gateway                         ✅ COMPLETE (April 18 2026)
 M5.6 DNA Impact Analysis + Code Graph    ✅ COMPLETE (April 19 2026)
-M6   Extended Rules + Refactoring        🔧 IN PROGRESS
+M6   Extended Rules + Refactoring        ✅ COMPLETE (April 22 2026)
   C016 STY-LocalNaming (snake_case locals)        ✅ COMPLETE (April 20 2026)
   C017 STY-GlobalNaming (camelCase globals)       ✅ COMPLETE (April 20 2026)
   C018 STY-ProcVisibility (visibility naming)     ✅ COMPLETE (April 20 2026)
@@ -657,11 +657,12 @@ M6   Extended Rules + Refactoring        🔧 IN PROGRESS
   C014 DEA-UnusedProc (dead private procs)        ✅ COMPLETE (April 20 2026)
   C015 DEA-UnusedConst (dead private consts/vars) ✅ COMPLETE (April 21 2026)
   C020 STY-ShortName (short var/param names)      ✅ COMPLETE (April 21 2026)
-  C013 DEA-UnusedImport                           ⬜ SKIPPED (Odin compiler catches this)
-  C012-T type-gated semantic naming               ⬜ PLANNED
-  C019 type marker suffixes                       ⬜ BLOCKED (conventions need discussion)
-  rename_symbol MCP tool                          ⬜ PLANNED
-  LSP Call Hierarchy                              ⬜ PLANNED
+  C013 DEA-UnusedImport                           ✅ SKIPPED (Odin compiler catches this — by design)
+  C012-T type-gated semantic naming               ✅ T1+T3 done in M7.1; T2 deferred to M12
+  C019 type marker suffixes Phase 1               ✅ COMPLETE in M7.1 (April 22 2026)
+  C019 Phase 2 (inferred := types)                ↷ Deferred to M12 (conventions + proxy needed)
+  rename_symbol MCP tool                          ✅ COMPLETE in M7.1 (April 22 2026)
+  LSP Call Hierarchy                              ✅ COMPLETE in M7.1 (April 22 2026)
 M6.5 Structural Rules (B-category)      ✅ COMPLETE (April 21 2026)
   B001 Unmatched Brace / Unclosed Block            ✅ COMPLETE (April 21 2026)
 M6.6 C001 False Positive Reduction (AST layer)   ✅ COMPLETE (April 21 2026)
@@ -669,8 +670,8 @@ M6.6 C001 False Positive Reduction (AST layer)   ✅ COMPLETE (April 21 2026)
   Tier 2: _init proc name heuristic                                            ✅
   Tier 2b: fix is_free_call / has_manual_cleanup (direct delete detection)     ✅
   Remaining C001 FPs deferred — require package-scope or return-type info (M6.9/M7)
-M6.7 C019 STY-TypeMarker                           ⬜ DEFERRED → post-C012 Phase 2 (M7.1+)
-M6.9 Package-Scope Linting Foundation             ✅ COMPLETE (April 21 2026)
+M6.7 C019 STY-TypeMarker Phase 1        ✅ COMPLETE in M7.1 (April 22 2026)
+M6.9 Package-Scope Linting Foundation   ✅ COMPLETE (April 21 2026)
   Define four analysis scopes (see Section 14)
   Group files by package (directory + matching package declaration)
   B002 STR-PackageName: file has wrong package declaration (majority wins)
