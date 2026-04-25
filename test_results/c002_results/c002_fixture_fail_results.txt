@@ -1,11 +1,7 @@
-🔴 tests/C002_COR_POINTER/c002_fixture_fail.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 tests/C002_COR_POINTER/c002_fixture_fail.odin:14:5: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 tests/C002_COR_POINTER/c002_fixture_fail.odin:31:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 tests/C002_COR_POINTER/c002_fixture_fail.odin:32:5: C001 [correctness] Allocation without matching defer free in same scope
 Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
 🔴 tests/C002_COR_POINTER/c002_fixture_fail.odin:18:16: C002 [correctness] Double-free: 'data1' is already freed by a defer in this scope
 Fix: Remove the duplicate 'defer free(data1)'
-5 violation(s) in 1 file(s)
+3 violation(s) in 1 file(s)

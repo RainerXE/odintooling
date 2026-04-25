@@ -10,7 +10,7 @@ import "core:fmt"
 // Category: CORRECTNESS
 // =============================================================================
 
-C009Rule :: proc() -> Rule {
+c009_rule :: proc() -> Rule {
     return Rule{
         id       = "C009",
         tier     = "correctness",

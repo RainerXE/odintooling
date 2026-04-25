@@ -77,7 +77,7 @@ DeferInfo :: struct {
 
 // C001Rule returns the Rule struct for integration with the rule engine.
 // main.odin calls c001_matcher directly for full multi-diagnostic reporting.
-C001Rule :: proc() -> Rule {
+c001_rule :: proc() -> Rule {
     return Rule{
         id       = "C001",
         tier     = "correctness",

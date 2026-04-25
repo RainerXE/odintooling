@@ -26,7 +26,7 @@ import "core:strings"
 // C002Rule returns the Rule struct for the registry.
 // Detection is performed by c002_scm_matcher (called directly from main.odin
 // because it needs TSNode / CompiledQuery parameters beyond Rule.matcher).
-C002Rule :: proc() -> Rule {
+c002_rule :: proc() -> Rule {
     return Rule{
         id       = "C002",
         tier     = "correctness",

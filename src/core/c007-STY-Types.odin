@@ -10,7 +10,7 @@ package core
 // Category: STYLE
 // =============================================================================
 
-C007Rule :: proc() -> Rule {
+c007_rule :: proc() -> Rule {
     return Rule{
         id       = "C007",
         tier     = "style",

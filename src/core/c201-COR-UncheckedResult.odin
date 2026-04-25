@@ -17,7 +17,7 @@ import "core:fmt"
 // Category: CORRECTNESS
 // =============================================================================
 
-C201Rule :: proc() -> Rule {
+c201_rule :: proc() -> Rule {
     return Rule{
         id       = "C201",
         tier     = "correctness",

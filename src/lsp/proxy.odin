@@ -245,8 +245,8 @@ _read_framed :: proc(reader: ^bufio.Reader) -> (bytes: []u8, ok: bool) {
 _write_to_editor :: proc(bytes: []u8) {
 	header := fmt.tprintf("Content-Length: %d\r\n\r\n", len(bytes))
 	w := os.to_writer(os.stdout)
-	io.write_string(w, header)
-	io.write(w, bytes)
+	io.write_string(w, header) // odin-lint:ignore C201
+	io.write(w, bytes)         // odin-lint:ignore C201
 }
 
 @(private = "file")

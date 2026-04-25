@@ -24,7 +24,7 @@ import "core:strings"
 // Category: CORRECTNESS — enabled by default (no false positives on unknown types)
 // =============================================================================
 
-C202Rule :: proc() -> Rule {
+c202_rule :: proc() -> Rule {
 	return Rule{
 		id       = "C202",
 		tier     = "correctness",
