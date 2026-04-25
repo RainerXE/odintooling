@@ -47,6 +47,9 @@ OdinLintConfig :: struct {
     tools_odin_path: string, // path to odin executable
     tools_ols_path:  string, // path to our OLS fork
 
+    // C001 behaviour tuning.
+    c001_ownership_hints: bool, // default true — emit INFO when allocation is passed to a function
+
     // Internal: whether a toml file was found and loaded.
     loaded: bool,
 }
@@ -65,6 +68,7 @@ default_config :: proc() -> OdinLintConfig {
         naming_c020            = false,
         naming_c020_min_length = 3,
         naming_c020_allowed    = "i,j,k,x,y,z,n,ok,err,db,id",
+        c001_ownership_hints   = true,
         odin_version           = "",
         loaded                 = false,
     }
@@ -198,6 +202,11 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             if key == "odin_version" {
                 v := strings.trim(val, "\"'")
                 cfg.odin_version = strings.clone(v)
+            }
+        case "correctness":
+            switch key {
+            case "c001_ownership_hints":
+                cfg.c001_ownership_hints = val != "false" && val != "0"
             }
         case "tools":
             switch key {
