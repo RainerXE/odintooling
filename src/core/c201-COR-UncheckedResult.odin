@@ -42,6 +42,7 @@ c201_scm_run :: proc(
     defer free_query_results(results)
 
     suppressions := collect_suppressions(1, len(file_lines), file_lines)
+    defer delete(suppressions)
     diagnostics  := make([dynamic]Diagnostic)
 
     seen := make(map[string]bool)

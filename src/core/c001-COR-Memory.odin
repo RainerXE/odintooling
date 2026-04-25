@@ -216,6 +216,7 @@ check_block :: proc(
 
     // Use centralized suppression system
     suppressions := collect_suppressions(block.start_line, block.end_line, file_lines)
+    defer delete(suppressions)
     
     // Debug: Print suppression summary
     // summary := suppression_summary(suppressions)

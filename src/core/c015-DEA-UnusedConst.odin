@@ -24,11 +24,6 @@ import sq "../../vendor/odin-sqlite3"
 // Category: DEAD CODE (info tier, opt-in)
 // =============================================================================
 
-@(private="file")
-_is_word_char :: proc(b: byte) -> bool {
-    return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') ||
-           (b >= '0' && b <= '9') || b == '_'
-}
 
 // _count_word_occurrences counts word-boundary occurrences of word in content.
 @(private="file")
@@ -40,8 +35,8 @@ _count_word_occurrences :: proc(content: string, word: string) -> int {
         idx := strings.index(s, word)
         if idx < 0 { break }
         abs  := len(content) - len(s) + idx
-        prev := abs == 0              || !_is_word_char(content[abs-1])
-        next := abs+len(word) >= len(content) || !_is_word_char(content[abs+len(word)])
+        prev := abs == 0              || !is_ident_byte(content[abs-1])
+        next := abs+len(word) >= len(content) || !is_ident_byte(content[abs+len(word)])
         if prev && next { count += 1 }
         s = s[idx+len(word):]
     }

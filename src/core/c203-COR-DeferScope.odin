@@ -39,6 +39,7 @@ c203_fix_hint :: proc() -> string { return "Move defer to the outer scope, or av
 c203_run :: proc(file_path: string, root_node: TSNode, file_lines: []string) -> []Diagnostic {
 	diagnostics  := make([dynamic]Diagnostic)
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
+	defer delete(suppressions)
 	c203_walk(file_path, root_node, file_lines, suppressions, &diagnostics)
 	return diagnostics[:]
 }
@@ -193,8 +194,8 @@ c203_rhs_has_ident :: proc(rhs: string, name: string) -> bool {
 		pos := strings.index(search, name)
 		if pos < 0 { return false }
 		abs  := offset + pos
-		before_ok := abs == 0 || !c203_is_ident_char(rhs[abs-1])
-		after_ok  := abs+len(name) >= len(rhs) || !c203_is_ident_char(rhs[abs+len(name)])
+		before_ok := abs == 0 || !is_ident_byte(rhs[abs-1])
+		after_ok  := abs+len(name) >= len(rhs) || !is_ident_byte(rhs[abs+len(name)])
 		if before_ok && after_ok { return true }
 		offset += pos + 1
 		if offset >= len(rhs) { return false }
@@ -202,7 +203,3 @@ c203_rhs_has_ident :: proc(rhs: string, name: string) -> bool {
 	}
 }
 
-@(private = "file")
-c203_is_ident_char :: proc(c: u8) -> bool {
-	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-}

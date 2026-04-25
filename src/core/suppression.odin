@@ -173,14 +173,15 @@ suppression_summary :: proc(suppressions: map[int][]string) -> string {
     if len(suppressions) == 0 do return "No suppressions found"
     
     lines: [dynamic]string
+    defer delete(lines)
     append_elem(&lines, "Suppression Summary:")
-    
-    // Sort line numbers for consistent output
+
     sorted_lines: [dynamic]int
+    defer delete(sorted_lines)
     for line_num, _ in suppressions {
         append_elem(&sorted_lines, line_num)
     }
-    
+
     // Simple bubble sort for small arrays
     for i in 0..<len(sorted_lines) {
         for j in i+1..<len(sorted_lines) {
@@ -189,13 +190,12 @@ suppression_summary :: proc(suppressions: map[int][]string) -> string {
             }
         }
     }
-    
+
     for line_num in sorted_lines {
-        rules := suppressions[line_num]
+        rules    := suppressions[line_num]
         rule_str := strings.join(rules, ", ")
-        summary_line := fmt.tprintf("  Line %d: suppress %s", line_num, rule_str)
-        append_elem(&lines, summary_line)
+        append_elem(&lines, fmt.tprintf("  Line %d: suppress %s", line_num, rule_str))
     }
-    
+
     return strings.join(lines[:], "\n")
 }

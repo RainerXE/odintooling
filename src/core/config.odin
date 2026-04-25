@@ -188,7 +188,9 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             case "c019": cfg.naming_c019 = val == "true"
             case "c020": cfg.naming_c020 = val == "true"
             case "c020_min_length":
-                if n, ok := strconv.parse_int(val); ok { cfg.naming_c020_min_length = n }
+                if n, ok := strconv.parse_int(val); ok && n >= 1 && n <= 100 {
+                    cfg.naming_c020_min_length = n
+                }
             case "c020_allowed":
                 cfg.naming_c020_allowed = strings.clone(strings.trim(val, "\"'"))
             }

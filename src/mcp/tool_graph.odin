@@ -624,7 +624,9 @@ _search_symbols_handler :: proc(params: json.Value, allocator: runtime.Allocator
 _gj :: proc(s: string) -> string {
     if !strings.contains_any(s, `"\`) { return fmt.tprintf(`"%s"`, s) }
     e1, _ := strings.replace_all(s,  `\`, `\\`)
+    defer delete(e1)
     e2, _ := strings.replace_all(e1, `"`, `\"`)
+    defer delete(e2)
     return fmt.tprintf(`"%s"`, e2)
 }
 
@@ -661,5 +663,6 @@ _free_nodes :: proc(nodes: []core.GraphNodeInfo) {
     for n in nodes {
         delete(n.name); delete(n.kind); delete(n.file)
         delete(n.memory_role); delete(n.lint_violations); delete(n.signature)
+        delete(n.return_type)
     }
 }
