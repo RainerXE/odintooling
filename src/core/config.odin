@@ -47,6 +47,9 @@ OdinLintConfig :: struct {
     tools_odin_path: string, // path to odin executable
     tools_ols_path:  string, // path to our OLS fork
 
+    // Go-compatibility domain — off by default (pure Odin codebases don't need it).
+    go_migration_domain: bool,  // C021–C023 Go→Odin translation rules
+
     // C001 behaviour tuning.
     c001_ownership_hints: bool, // default true — emit INFO when allocation is passed to a function
 
@@ -68,6 +71,7 @@ default_config :: proc() -> OdinLintConfig {
         naming_c020            = false,
         naming_c020_min_length = 3,
         naming_c020_allowed    = "i,j,k,x,y,z,n,ok,err,db,id",
+        go_migration_domain    = false,
         c001_ownership_hints   = true,
         odin_version           = "",
         loaded                 = false,
@@ -188,6 +192,7 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             case "odin_2026":       cfg.odin_2026_domain       = val == "true"
             case "semantic_naming": cfg.semantic_naming_domain = val == "true"
             case "dead_code":       cfg.dead_code_domain       = val == "true"
+            case "go_migration":    cfg.go_migration_domain    = val == "true"
             }
         case "naming":
             switch key {
@@ -253,6 +258,8 @@ config_domain_enabled :: proc(rule_id: string, cfg: OdinLintConfig) -> bool {
         return effective.naming_c019
     case "C020":
         return effective.naming_c020
+    case "C021", "C022", "C023", "C025":
+        return effective.go_migration_domain
     }
     return true // all other rules: not domain-gated
 }
