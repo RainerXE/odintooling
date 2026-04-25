@@ -749,6 +749,33 @@ M10 C203 Defer Scope Trap                                             ✅ COMPLE
     error_class: correctness_defer_scope_trap; added to CLI --list-rules + MCP list_rules
     Directly derived from the real Odin defer bug in the C201 graph DB code
 
+M11 OLS LSP Proxy + Enum-Backed Rules                                 ✅ COMPLETE (April 25 2026)
+  LSP Proxy (artifacts/odin-lint-lsp)                                   ✅ DONE
+    Wraps vanilla OLS as subprocess — no fork required
+    Two-thread architecture: Thread A (editor→OLS), Thread B (OLS→editor + inject)
+    Intercepts textDocument/publishDiagnostics to inject odin-lint diagnostics
+    Caches document content on didOpen/didChange for in-memory analysis
+    OLS path: [tools] ols_path in odin-lint.toml (effective_ols_path fallback to PATH)
+    src/lsp/proxy.odin, ols_client.odin, diagnostic_inject.odin
+    scripts/build_lsp.sh → artifacts/odin-lint-lsp
+    Vanilla OLS: https://github.com/DanielGavin/ols
+  OLS fork deprecated                                                    ✅ DONE
+    vendor/ols/DEPRECATED.md explains migration to proxy approach
+    OLS fork strategy question resolved: no PR needed, no fork maintenance
+  Enum Member Indexing                                                   ✅ DONE
+    enum_members table in graph schema (enum_node_id, member_name, member_idx)
+    graph_insert_enum_member / graph_get_enum_members API
+    Pass 1 extraction: walks enum_declaration children, distinguishes type name
+    from member captures via "::" position heuristic
+    Our codebase: 7 enum types indexed with 40 total members
+  C202 Switch Exhaustiveness                                             ✅ DONE
+    src/core/c202-COR-SwitchExhaust.odin — pure AST walker + graph lookup
+    Variable type inference: scans ALL occurrences of var_name on preceding lines
+    Finds "varname: TypeName" pattern (handles proc params like "proc(c: Color)")
+    #partial switch respected; case _: wildcard respected
+    5/5 tests passing; 0 false positives on own codebase
+    error_class: correctness_switch_exhaustiveness; added to CLI + MCP catalog
+
 ---
 
 ### Current State Assessment — April 13 2026

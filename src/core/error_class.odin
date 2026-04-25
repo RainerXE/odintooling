@@ -13,6 +13,7 @@ rule_id_to_error_class :: proc(rule_id: string) -> string {
     case "C011": return "ffi_resource_leak"
     case "C101": return "correctness_context_integrity"
     case "C201": return "correctness_unchecked_result"
+    case "C202": return "correctness_switch_exhaustiveness"
     case "C203": return "correctness_defer_scope_trap"
     // ── Style ─────────────────────────────────────────────────────────────────
     case "C003": return "style_naming_proc"
