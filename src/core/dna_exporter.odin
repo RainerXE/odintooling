@@ -260,10 +260,24 @@ _pass1_index_declarations :: proc(
         if name_node, has_enum := m.captures["enum_name"]; has_enum {
             name := naming_extract_text(name_node, lines)
             if name == "" { continue }
-            pt        := ts_node_start_point(name_node)
-            line      := int(pt.row) + 1
+            pt   := ts_node_start_point(name_node)
+            line := int(pt.row) + 1
+
+            // Distinguish the enum TYPE NAME from member identifiers:
+            // The type name appears before "::" on its line; members do not.
+            is_type_name := false
+            if int(pt.row) < len(lines) {
+                src_line := lines[pt.row]
+                dc := strings.index(src_line, "::")
+                is_type_name = dc >= 0 && int(pt.column) < dc
+            }
+            if !is_type_name { continue } // skip member captures
+
             qualified := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
-            graph_insert_node(db, name, qualified, "type", file_path, line, "", true)
+            node_id   := graph_insert_node(db, name, qualified, "type", file_path, line, "", true)
+            if node_id >= 0 {
+                _extract_enum_members(db, node_id, name_node, lines)
+            }
             continue
         }
         if path_node, has_import := m.captures["import_path"]; has_import {
@@ -755,4 +769,61 @@ _count_table :: proc(db: ^GraphDB, table: string) -> int {
     defer sq.stmt_finalize(&s)
     if sq.stmt_step(&s) { return sq.stmt_col_int(&s, 0) }
     return 0
+}
+
+// _extract_enum_members collects enum field names from an enum_declaration node.
+//
+// In the Odin tree-sitter grammar, enum members are DIRECT children of
+// enum_declaration alongside the type name identifier. The structure is:
+//
+//   enum_declaration
+//     identifier  "DiagnosticType"   ← the type name (== name_node; skip)
+//     identifier  "NONE"             ← member
+//     identifier  "VIOLATION"        ← member
+//     binary_expression              ← member with explicit value (Red = 1)
+//       identifier "Red"
+//
+// We skip the first identifier (which is name_node itself) and collect all
+// subsequent identifiers and the leading identifier of binary_expressions.
+@(private)
+_extract_enum_members :: proc(db: ^GraphDB, enum_node_id: i64, name_node: TSNode, lines: []string) {
+    parent := ts_node_parent(name_node)
+    if ts_node_is_null(parent) { return }
+
+    // Get the position of the type name so we can skip it.
+    name_pt  := ts_node_start_point(name_node)
+    name_row := int(name_pt.row)
+    name_col := int(name_pt.column)
+
+    member_idx := 0
+    n := ts_node_child_count(parent)
+    for i: u32 = 0; i < n; i += 1 {
+        child := ts_node_child(parent, i)
+        if ts_node_is_null(child) { continue }
+
+        child_type := string(ts_node_type(child))
+        switch child_type {
+        case "identifier":
+            // Skip the type name itself (same position as name_node).
+            cpt := ts_node_start_point(child)
+            if int(cpt.row) == name_row && int(cpt.column) == name_col { continue }
+            member_name := naming_extract_text(child, lines)
+            if member_name != "" {
+                graph_insert_enum_member(db, enum_node_id, member_name, member_idx)
+                member_idx += 1
+            }
+        case "binary_expression":
+            // Explicit value: Red = 1 — first child is the member identifier.
+            if ts_node_child_count(child) > 0 {
+                first := ts_node_child(child, 0)
+                if !ts_node_is_null(first) && string(ts_node_type(first)) == "identifier" {
+                    member_name := naming_extract_text(first, lines)
+                    if member_name != "" {
+                        graph_insert_enum_member(db, enum_node_id, member_name, member_idx)
+                        member_idx += 1
+                    }
+                }
+            }
+        }
+    }
 }

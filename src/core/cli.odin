@@ -185,6 +185,7 @@ print_help :: proc() {
     fmt.println("  C019  style        Type marker suffix conventions (opt-in, [naming] c019=true)")
     fmt.println("  C101  correctness  context.allocator assigned without defer restore")
     fmt.println("  C201  correctness  Error return value ignored (unchecked result)")
+    fmt.println("  C202  correctness  Switch on enum is not exhaustive (requires --export-symbols)")
     fmt.println("  C203  correctness  Defer in inner block fires before outer scope uses the handle")
     fmt.println()
     fmt.println("Options:")
@@ -220,5 +221,6 @@ print_list_rules :: proc() {
     fmt.println("C019\tstyle\tType marker suffix conventions (opt-in, [naming] c019=true in toml)")
     fmt.println("C101\tcorrectness\tcontext.allocator assigned without defer restore")
     fmt.println("C201\tcorrectness\tError return value ignored (unchecked result)")
+    fmt.println("C202\tcorrectness\tSwitch on enum is not exhaustive (requires --export-symbols graph DB)")
     fmt.println("C203\tcorrectness\tDefer in inner block fires before outer scope uses the handle")
 }

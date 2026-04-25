@@ -358,6 +358,33 @@ analyze_file :: proc(
         }
     }
 
+    // C202: Switch exhaustiveness (requires graph DB with enum members)
+    if rule_enabled("C202", "correctness", opts) {
+        db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
+        if os.is_file(db_path) {
+            content, err := os.read_entire_file_from_path(file_path, context.allocator)
+            if err == nil {
+                defer delete(content)
+                c202_lines := strings.split(string(content), "\n")
+                defer delete(c202_lines)
+                tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+                if tree_ok {
+                    defer ts_tree_delete(tree)
+                    root := getRootNode(tree)
+                    if !ts_node_is_null(root) {
+                        db, db_ok := graph_open(db_path)
+                        if db_ok {
+                            defer graph_close(db)
+                            for d in dedupDiagnostics(c202_run(file_path, root, c202_lines, db)) {
+                                violations += emit_or_collect(d, collector)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // C203: Defer scope trap
     if rule_enabled("C203", "correctness", opts) {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)

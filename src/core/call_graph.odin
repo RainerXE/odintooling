@@ -56,6 +56,13 @@ CREATE INDEX IF NOT EXISTS idx_edges_target  ON edges(target_id);
 CREATE INDEX IF NOT EXISTS idx_edges_kind    ON edges(kind);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(name, qualified_name);
+
+CREATE TABLE IF NOT EXISTS enum_members (
+    enum_node_id INTEGER NOT NULL REFERENCES nodes(id),
+    member_name  TEXT    NOT NULL,
+    member_idx   INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_enum_members_node ON enum_members(enum_node_id);
 `
 
 // =============================================================================
@@ -465,6 +472,45 @@ graph_search_nodes :: proc(db: ^GraphDB, query: string, limit: int) -> [dynamic]
     sq.stmt_bind_text(&s, 1, pattern)
     for sq.stmt_step(&s) { append(&result, scan_node_info(&s)) }
     return result
+}
+
+// graph_insert_enum_member stores one member of an enum type node.
+graph_insert_enum_member :: proc(db: ^GraphDB, enum_node_id: i64, member_name: string, idx: int) {
+    s, ok := sq.db_prepare(db.conn,
+        `INSERT OR IGNORE INTO enum_members(enum_node_id, member_name, member_idx) VALUES(?,?,?);`)
+    if !ok { return }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_i64(&s,  1, enum_node_id)
+    sq.stmt_bind_text(&s, 2, member_name)
+    sq.stmt_bind_int(&s,  3, idx)
+    sq.stmt_step(&s)
+}
+
+// graph_get_enum_members returns all member names of the enum type named type_name,
+// in declaration order. Returns nil if the type is not found or has no members.
+graph_get_enum_members :: proc(db: ^GraphDB, type_name: string) -> []string {
+    // Look up the enum type node by name.
+    node_s, ok := sq.db_prepare(db.conn,
+        `SELECT id FROM nodes WHERE name=? AND kind='type' LIMIT 1;`)
+    if !ok { return nil }
+    defer sq.stmt_finalize(&node_s)
+    sq.stmt_bind_text(&node_s, 1, type_name)
+    if !sq.stmt_step(&node_s) { return nil }
+    node_id := sq.stmt_col_i64(&node_s, 0)
+
+    // Fetch members in order.
+    mem_s, ok2 := sq.db_prepare(db.conn,
+        `SELECT member_name FROM enum_members WHERE enum_node_id=? ORDER BY member_idx;`)
+    if !ok2 { return nil }
+    defer sq.stmt_finalize(&mem_s)
+    sq.stmt_bind_i64(&mem_s, 1, node_id)
+
+    members := make([dynamic]string)
+    for sq.stmt_step(&mem_s) {
+        append(&members, sq.stmt_col_text(&mem_s, 0))
+    }
+    if len(members) == 0 { delete(members); return nil }
+    return members[:]
 }
 
 // graph_evict_file removes all nodes, edges, and unresolved_refs for a file path.
