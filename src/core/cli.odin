@@ -18,7 +18,7 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 // CLI — argument parsing, version, help, rule listing
 // =============================================================================
 
-OLT_VERSION          :: "0.8.0"
+OLT_VERSION          :: "0.9.0"
 ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
 ODIN_GRAMMAR_VERSION :: "dev-2026-04"
 
@@ -39,6 +39,8 @@ LintOptions :: struct {
     show_help:        bool,
     show_version:     bool,
     list_rules:       bool,
+    init_mode:        bool,            // --init: run first-run setup wizard
+    install_mode:     bool,            // --install: create symlinks in ~/.local/bin/
     config:           OdinLintConfig,  // loaded from olt.toml (or auto-detected)
 }
 
@@ -57,6 +59,10 @@ parse_args :: proc(args: []string) -> (LintOptions, bool) {
             opts.show_version = true
         case arg == "--list-rules":
             opts.list_rules = true
+        case arg == "--init":
+            opts.init_mode = true
+        case arg == "--install":
+            opts.install_mode = true
         case arg == "--non-recursive":
             opts.recursive = false
         case arg == "--include-vendor":
@@ -199,6 +205,8 @@ print_help :: proc() {
     fmt.println("  --version              Print version and grammar info")
     fmt.println("  --help                 Show this help message")
     fmt.println("  --list-rules           List all rules (tab-separated: id, tier, message)")
+    fmt.println("  --init                 Interactive first-run setup (OLS, olt.toml, install)")
+    fmt.println("  --install              Create symlinks in ~/.local/bin/ for olt, olt-mcp, olt-lsp")
     fmt.println("  --explain C001         Show detailed documentation for a rule")
     fmt.println("  --rule C001,C002       Run only the specified rules")
     fmt.println("  --tier correctness     Run only rules of the given tier (correctness|style)")
