@@ -47,7 +47,7 @@ analyze_content :: proc(
 	lines := strings.split(content, "\n")
 	defer delete(lines)
 
-	// ── C001 + C101: AST walker rules ────────────────────────────────────────
+	// ── C001 + C101 + C029 + C033: AST walker rules ─────────────────────────
 	ast_root, ast_ok := parseToAST(ts.adapter, content)
 	if ast_ok {
 		for d in dedupDiagnostics(c001_matcher(file_path, &ast_root, lines)) {
@@ -56,6 +56,14 @@ analyze_content :: proc(
 			}
 		}
 		for d in dedupDiagnostics(c101_run(file_path, &ast_root, lines)) {
+			append(diags, d)
+		}
+		// C029 + C033 are stdlib_safety domain — run always in in-memory path
+		// (plugin/MCP lint_snippet has no config context; these are low-FP rules)
+		for d in dedupDiagnostics(c029_run(file_path, &ast_root, lines)) {
+			append(diags, d)
+		}
+		for d in dedupDiagnostics(c033_run(file_path, &ast_root, lines)) {
 			append(diags, d)
 		}
 	}
