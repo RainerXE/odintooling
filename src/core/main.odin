@@ -540,9 +540,11 @@ _main :: proc() -> int {
     opts, parse_ok := parse_args(os.args[1:])
     if !parse_ok { return 2 }
 
-    if opts.show_version  { print_version();    return 0 }
-    if opts.show_help     { print_help();       return 0 }
-    if opts.list_rules    { print_list_rules(); return 0 }
+    if opts.show_version  { print_version();              return 0 }
+    if opts.show_help     { print_help();                 return 0 }
+    if opts.list_rules    { print_list_rules();           return 0 }
+    if opts.init_mode     { return run_init_command()               }
+    if opts.install_mode  { return run_install_command()            }
 
     if opts.explain_rule != "" {
         docs, found := explain_rule(opts.explain_rule)
