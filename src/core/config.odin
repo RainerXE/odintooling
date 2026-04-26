@@ -50,6 +50,9 @@ OdinLintConfig :: struct {
     // Go-compatibility domain — off by default (pure Odin codebases don't need it).
     go_migration_domain: bool,  // C021–C023 Go→Odin translation rules
 
+    // Stdlib safety domain — off by default (extend C001 to known stdlib allocators).
+    stdlib_safety_domain: bool, // C029 stdlib alloc + C033 strings.Builder
+
     // C001 behaviour tuning.
     c001_ownership_hints: bool, // default true — emit INFO when allocation is passed to a function
 
@@ -193,6 +196,7 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             case "semantic_naming": cfg.semantic_naming_domain = val == "true"
             case "dead_code":       cfg.dead_code_domain       = val == "true"
             case "go_migration":    cfg.go_migration_domain    = val == "true"
+            case "stdlib_safety":   cfg.stdlib_safety_domain   = val == "true"
             }
         case "naming":
             switch key {
@@ -260,6 +264,8 @@ config_domain_enabled :: proc(rule_id: string, cfg: OdinLintConfig) -> bool {
         return effective.naming_c020
     case "C021", "C022", "C023", "C025":
         return effective.go_migration_domain
+    case "C029", "C033":
+        return effective.stdlib_safety_domain
     }
     return true // all other rules: not domain-gated
 }
