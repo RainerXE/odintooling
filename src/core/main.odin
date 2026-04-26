@@ -519,6 +519,45 @@ analyze_file :: proc(
         }
     }
 
+    // C031: panic() for expected runtime failure (INFO)
+    if rule_enabled("C031", "correctness", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            c031_lines := strings.split(string(content), "\n")
+            defer delete(c031_lines)
+            for d in dedupDiagnostics(c031_run(file_path, c031_lines)) {
+                violations += emit_or_collect(d, collector)
+            }
+        }
+    }
+
+    // C034: unused blank index in for loop (INFO + auto-fix)
+    if rule_enabled("C034", "style", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            c034_lines := strings.split(string(content), "\n")
+            defer delete(c034_lines)
+            for d in dedupDiagnostics(c034_run(file_path, c034_lines)) {
+                violations += emit_or_collect(d, collector)
+            }
+        }
+    }
+
+    // C037: trailing return in void proc (INFO + auto-fix)
+    if rule_enabled("C037", "style", opts) {
+        content, err := os.read_entire_file_from_path(file_path, context.allocator)
+        if err == nil {
+            defer delete(content)
+            c037_lines := strings.split(string(content), "\n")
+            defer delete(c037_lines)
+            for d in dedupDiagnostics(c037_run(file_path, c037_lines)) {
+                violations += emit_or_collect(d, collector)
+            }
+        }
+    }
+
     return violations, false
 }
 
