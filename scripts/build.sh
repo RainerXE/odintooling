@@ -1,22 +1,35 @@
 #!/bin/bash
+# Build olt CLI → artifacts/<platform>/olt
+
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Detect platform
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case "$OS/$ARCH" in
+  darwin/arm64)  PLATFORM="macos-arm64"  ;;
+  darwin/x86_64) PLATFORM="macos-x86_64" ;;
+  linux/aarch64) PLATFORM="linux-arm64"  ;;
+  linux/x86_64)  PLATFORM="linux-x86_64" ;;
+  *)             PLATFORM="$OS-$ARCH"    ;;
+esac
+
+OUT_DIR="$REPO_ROOT/artifacts/$PLATFORM"
+mkdir -p "$OUT_DIR"
+OUT="$OUT_DIR/olt"
 
 echo "Building olt (Odin Language Tools)..."
+echo "  Platform: $PLATFORM"
+echo "  Output:   $OUT"
 
-odin build src/core -out:artifacts/olt \
-    -extra-linker-flags:"ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
-    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
-    ffi/sqlite/libsqlite3.a"
+odin build "$REPO_ROOT/src/core" -out:"$OUT" \
+    -extra-linker-flags:"$REPO_ROOT/ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
+    $REPO_ROOT/ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
+    $REPO_ROOT/ffi/sqlite/libsqlite3.a"
 
-if [ $? -eq 0 ]; then
-    echo "✅ Build successful!"
-    echo "Executable: artifacts/olt"
-    echo ""
-    echo "To test: ./artifacts/olt --help"
-else
-    echo "❌ Build failed!"
-    echo ""
-    echo "If you see linker errors about tree-sitter:"
-    echo "1. Make sure you've built the tree-sitter library: ./scripts/build_external_tree_sitter.sh"
-    echo "2. Check that libtree-sitter.a exists in ffi/tree_sitter/tree-sitter-lib/lib/src/macos/"
-    exit 1
-fi
+echo "✅ Build successful!"
+echo "Executable: $OUT"
+echo ""
+echo "To test: $OUT --help"

@@ -1,39 +1,40 @@
 #!/bin/bash
-# Build olt-lsp — LSP proxy server that wraps vanilla OLS.
-# Output: artifacts/olt-lsp
-#
-# Editor config (VS Code):
-#   "odin.languageServer.path": "/path/to/artifacts/olt-lsp"
-#
-# OLS path config (olt.toml):
-#   [tools]
-#   ols_path = "/path/to/ols"
+# Build olt-lsp LSP proxy → artifacts/<platform>/olt-lsp
+# Editor points to olt-lsp; it wraps vanilla OLS and injects olt diagnostics.
 
-set -e
-
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/.."
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case "$OS/$ARCH" in
+  darwin/arm64)  PLATFORM="macos-arm64"  ;;
+  darwin/x86_64) PLATFORM="macos-x86_64" ;;
+  linux/aarch64) PLATFORM="linux-arm64"  ;;
+  linux/x86_64)  PLATFORM="linux-x86_64" ;;
+  *)             PLATFORM="$OS-$ARCH"    ;;
+esac
+
+OUT_DIR="$REPO_ROOT/artifacts/$PLATFORM"
+mkdir -p "$OUT_DIR"
+OUT="$OUT_DIR/olt-lsp"
 
 echo "Building olt-lsp..."
-mkdir -p artifacts
+echo "  Platform: $PLATFORM"
+echo "  Output:   $OUT"
 
-odin build src/lsp \
-    -out:artifacts/olt-lsp \
-    -extra-linker-flags:"ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
-    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
-    ffi/sqlite/libsqlite3.a"
+odin build "$REPO_ROOT/src/lsp" -out:"$OUT" \
+    -extra-linker-flags:"$REPO_ROOT/ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
+    $REPO_ROOT/ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
+    $REPO_ROOT/ffi/sqlite/libsqlite3.a"
 
-echo ""
 echo "✅ LSP proxy build successful!"
-echo "   Output: artifacts/olt-lsp"
+echo "   Output: $OUT"
 echo ""
 echo "Configure your editor to use olt-lsp as the Odin language server."
-echo "Example VS Code settings.json:"
-echo '  "odin.languageServer.path": "'"$(pwd)/artifacts/olt-lsp"'"'
+echo "  VS Code settings.json:  \"odin.languageServer.path\": \"$OUT\""
 echo ""
-echo "OLS binary path (optional, defaults to PATH lookup):"
-echo "  Add to olt.toml:"
-echo "    [tools]"
-echo "    ols_path = \"/path/to/ols\""
-echo ""
-echo "Vanilla OLS: https://github.com/DanielGavin/ols"
+echo "OLS path (optional — defaults to 'ols' in PATH):"
+echo "  Add to olt.toml:  [tools]  ols_path = \"/path/to/ols\""
+echo "  Vanilla OLS: https://github.com/DanielGavin/ols"

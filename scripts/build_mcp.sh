@@ -1,31 +1,35 @@
 #!/bin/bash
-# Build odin-lint MCP server.
-# Output: artifacts/olt-mcp
+# Build olt-mcp MCP server → artifacts/<platform>/olt-mcp
 
-set -e
-
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/.."
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case "$OS/$ARCH" in
+  darwin/arm64)  PLATFORM="macos-arm64"  ;;
+  darwin/x86_64) PLATFORM="macos-x86_64" ;;
+  linux/aarch64) PLATFORM="linux-arm64"  ;;
+  linux/x86_64)  PLATFORM="linux-x86_64" ;;
+  *)             PLATFORM="$OS-$ARCH"    ;;
+esac
+
+OUT_DIR="$REPO_ROOT/artifacts/$PLATFORM"
+mkdir -p "$OUT_DIR"
+OUT="$OUT_DIR/olt-mcp"
 
 echo "Building olt-mcp..."
-mkdir -p artifacts
+echo "  Platform: $PLATFORM"
+echo "  Output:   $OUT"
 
-odin build src/mcp \
-    -out:artifacts/olt-mcp \
-    -extra-linker-flags:"ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
-    ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
-    ffi/sqlite/libsqlite3.a"
+odin build "$REPO_ROOT/src/mcp" -out:"$OUT" \
+    -extra-linker-flags:"$REPO_ROOT/ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
+    $REPO_ROOT/ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
+    $REPO_ROOT/ffi/sqlite/libsqlite3.a"
 
-echo ""
 echo "✅ MCP server build successful!"
-echo "   Output: artifacts/olt-mcp"
+echo "   Output: $OUT"
 echo ""
 echo "Register in ~/.claude/mcp_servers.json:"
-echo '  {'
-echo '    "mcpServers": {'
-echo '      "olt": {'
-echo "        \"command\": \"$(pwd)/artifacts/olt-mcp\","
-echo '        "args": []'
-echo '      }'
-echo '    }'
-echo '  }'
+echo "  { \"mcpServers\": { \"olt\": { \"command\": \"$OUT\", \"args\": [] } } }"

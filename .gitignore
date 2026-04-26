@@ -1,13 +1,42 @@
-# Build artifacts
+# =============================================================================
+# olt — .gitignore
+# =============================================================================
+
+# ── Binaries (committed per-platform in artifacts/<platform>/) ────────────────
+# Root-level strays
+odin-lint
+olt
+
+# Old flat artifact names (replaced by platform subfolders)
 artifacts/odin-lint
 artifacts/odin-lint-mcp
+artifacts/odin-lint-lsp
 artifacts/odin-lint-plugin.dylib
 artifacts/odin-lint-plugin.so
+artifacts/odin-lint-debug
 artifacts/odin-lint-debug2
+artifacts/odin-lint-debug.dSYM/
 artifacts/odin-lint-debug2.dSYM/
+artifacts/olt
+artifacts/olt-mcp
+artifacts/olt-lsp
 
-# Generated code graph (created by --export-symbols)
+# ── Generated code graph ──────────────────────────────────────────────────────
 .codegraph/
 
-# Stray binary at project root
-odin-lint
+# ── Test results (generated, not source) ─────────────────────────────────────
+test_results/
+
+# ── Developer notes (not for public repo) ────────────────────────────────────
+CLAUDE.md
+SKILL.md
+plans/
+
+# ── macOS metadata ────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+
+# ── Python cache ─────────────────────────────────────────────────────────────
+scripts/__pycache__/
+**/__pycache__/
+*.pyc

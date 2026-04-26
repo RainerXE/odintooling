@@ -1,4 +1,6 @@
 #!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_platform.sh"
 
 # Configuration
 OUTPUT_DIR="test_results/our_codebase"
@@ -26,7 +28,7 @@ find src/core -name "*.odin" -type f | while read -r file; do
     echo "🔍 Testing: $file"
     
     # Run odin-lint on the file
-    output=$(../odin-lint "$file" 2>&1)
+    output=$("$OLT_BINARY" "$file" 2>&1)
     
     # Check if C001 was triggered
     if echo "$output" | grep -q "C001"; then

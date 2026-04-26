@@ -4,7 +4,8 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BINARY="$REPO_ROOT/artifacts/olt"
+source "$SCRIPT_DIR/_platform.sh"
+BINARY="$OLT_BINARY"
 FAIL_FIXTURE="$REPO_ROOT/tests/C025_COR_APPEND_ADDR/c025_fixture_fail.odin"
 PASS_FIXTURE="$REPO_ROOT/tests/C025_COR_APPEND_ADDR/c025_fixture_pass.odin"
 
