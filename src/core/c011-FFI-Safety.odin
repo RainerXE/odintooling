@@ -104,7 +104,7 @@ c011_scm_run :: proc(
     }
 
     suppressions := collect_suppressions(1, len(file_lines), file_lines)
-    defer delete(suppressions)
+    defer free_suppressions(suppressions)
     diagnostics := make([dynamic]Diagnostic)
 
     for key, pos in alloc_sites {

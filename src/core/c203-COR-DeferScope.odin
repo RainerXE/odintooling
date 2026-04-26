@@ -43,7 +43,7 @@ c203_fix_hint :: proc() -> string { return "Move defer to the outer scope, or av
 c203_run :: proc(file_path: string, root_node: TSNode, file_lines: []string) -> []Diagnostic {
 	diagnostics  := make([dynamic]Diagnostic)
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	c203_walk(file_path, root_node, file_lines, suppressions, &diagnostics)
 	return diagnostics[:]
 }

@@ -95,7 +95,8 @@ extract_suppressed_rules :: proc(line: string) -> []string {
     
     // Split by comma to handle multiple rule IDs
     rule_ids := strings.split(rule_part, ",")
-    
+    defer delete(rule_ids)
+
     for &rid in rule_ids {
         // Trim whitespace from each rule ID
         rid = strings.trim(rid, " \t\n\r")
@@ -164,6 +165,14 @@ is_suppressed :: proc(
     return false
 }
 
+// free_suppressions properly frees a suppression map including its slice values.
+// Use `defer free_suppressions(suppressions)` instead of `defer delete(suppressions)`
+// to avoid leaking the backing arrays of the per-line rule-ID slices.
+free_suppressions :: proc(suppressions: map[int][]string) {
+    for _, v in suppressions { delete(v) }
+    delete(suppressions)
+}
+
 // suppression_summary generates a human-readable summary of all suppressions
 // found in the file, useful for debugging and reporting.
 suppression_summary :: proc(suppressions: map[int][]string) -> string {
@@ -191,6 +200,7 @@ suppression_summary :: proc(suppressions: map[int][]string) -> string {
     for line_num in sorted_lines {
         rules    := suppressions[line_num]
         rule_str := strings.join(rules, ", ")
+        defer delete(rule_str)
         append_elem(&lines, fmt.tprintf("  Line %d: suppress %s", line_num, rule_str))
     }
 

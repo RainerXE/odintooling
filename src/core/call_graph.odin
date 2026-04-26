@@ -106,6 +106,7 @@ graph_open :: proc(path: string) -> (db: ^GraphDB, ok: bool) {
     db.path = strings.clone(path)
     if !sq.db_exec_script(db.conn, GRAPH_SCHEMA) {
         sq.db_close(conn)
+        delete(db.path)
         free(db)
         return nil, false
     }

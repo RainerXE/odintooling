@@ -138,9 +138,13 @@ _run_thread_a :: proc(state: ^ProxyState) {
 			if uri != "" && content != "" {
 				sync.mutex_lock(&state.doc_mutex)
 				if old, exists := state.doc_cache[uri]; exists {
+					// Key already owned by map — just replace the value.
 					delete(old)
+					state.doc_cache[uri] = strings.clone(content)
+				} else {
+					// New URI: clone both key and value so they outlive `raw`.
+					state.doc_cache[strings.clone(uri)] = strings.clone(content)
 				}
-				state.doc_cache[uri] = strings.clone(content)
 				sync.mutex_unlock(&state.doc_mutex)
 			}
 		}

@@ -45,7 +45,7 @@ c202_run :: proc(file_path: string, root_node: TSNode, file_lines: []string, db:
 	if db == nil { return nil }
 	diagnostics  := make([dynamic]Diagnostic)
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	c202_walk(file_path, root_node, file_lines, suppressions, db, &diagnostics)
 	return diagnostics[:]
 }

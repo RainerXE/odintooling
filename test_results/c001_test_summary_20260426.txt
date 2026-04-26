@@ -1,4 +1,4 @@
-C001 Test Summary - Sun Apr 26 11:20:32 CEST 2026
+C001 Test Summary - Sun Apr 26 20:32:57 CEST 2026
 =================================
 
   Result: No diagnostics (PASS)
@@ -73,7 +73,7 @@ C001 Test Summary - Sun Apr 26 11:20:32 CEST 2026
   Result: No diagnostics (PASS)
   File: c001_problematic_case.odin
 
-  Result: No diagnostics (PASS)
+  Result: C001 violation detected
   File: c001_proper_defer.odin
 
   Result: C001 violation detected

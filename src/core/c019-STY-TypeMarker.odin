@@ -129,7 +129,7 @@ c019_scm_run :: proc(
     defer delete(seen)
 
     suppressions := collect_suppressions(1, len(file_lines), file_lines)
-    defer delete(suppressions)
+    defer free_suppressions(suppressions)
     diags        := make([dynamic]Diagnostic)
 
     for result in results {

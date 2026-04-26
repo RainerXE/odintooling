@@ -170,7 +170,7 @@ c101_check_proc :: proc(
 
     // Suppression
     suppressions := collect_suppressions(proc_node.start_line, proc_node.end_line, file_lines)
-    defer delete(suppressions)
+    defer free_suppressions(suppressions)
     if is_suppressed("C101", assign_line, suppressions) { return {}, false }
 
     return Diagnostic{

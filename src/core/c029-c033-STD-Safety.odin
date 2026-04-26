@@ -118,7 +118,7 @@ c029_check_block :: proc(block: ^ASTNode, file_path: string, file_lines: []strin
 	if has_arena { return {} }
 
 	suppressions := collect_suppressions(block.start_line, block.end_line, file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 
 	diags := make([dynamic]Diagnostic)
 	for alloc in allocations {
@@ -268,7 +268,7 @@ c033_check_block :: proc(block: ^ASTNode, file_path: string, file_lines: []strin
 	if has_arena { return {} }
 
 	suppressions := collect_suppressions(block.start_line, block.end_line, file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 
 	diags := make([dynamic]Diagnostic)
 	for alloc in allocations {

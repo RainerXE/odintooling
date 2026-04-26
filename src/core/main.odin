@@ -84,8 +84,11 @@ emitDiagnostic :: proc(diag: Diagnostic) {
 }
 
 // dedupDiagnostics removes exact duplicate diagnostics (same file:line:col:rule).
+// Takes OWNERSHIP of the input slice and frees it; callers must delete the returned slice.
 dedupDiagnostics :: proc(diags: []Diagnostic) -> []Diagnostic {
     seen   := make(map[string]bool)
+    defer delete(seen)
+    defer delete(diags)   // free the input — ownership transferred
     result := make([dynamic]Diagnostic)
     for d in diags {
         key := fmt.tprintf("%s:%d:%d:%s", d.file, d.line, d.column, d.rule_id)
