@@ -53,21 +53,29 @@ analyze_content :: proc(
 	// ── C001 + C101 + C029 + C033: AST walker rules ─────────────────────────
 	ast_root, ast_ok := parseToAST(ts.adapter, content)
 	if ast_ok {
-		for d in dedupDiagnostics(c001_matcher(file_path, &ast_root, lines)) {
-			if d.diag_type != .NONE && d.diag_type != .INTERNAL_ERROR {
-				append(diags, d)
+		{
+			dd := dedupDiagnostics(c001_matcher(file_path, &ast_root, lines))
+			defer delete(dd)
+			for d in dd {
+				if d.diag_type != .NONE && d.diag_type != .INTERNAL_ERROR {
+					append(diags, d)
+				}
 			}
 		}
-		for d in dedupDiagnostics(c101_run(file_path, &ast_root, lines)) {
-			append(diags, d)
+		{
+			dd := dedupDiagnostics(c101_run(file_path, &ast_root, lines))
+			defer delete(dd)
+			for d in dd { append(diags, d) }
 		}
-		// C029 + C033 are stdlib_safety domain — run always in in-memory path
-		// (plugin/MCP lint_snippet has no config context; these are low-FP rules)
-		for d in dedupDiagnostics(c029_run(file_path, &ast_root, lines)) {
-			append(diags, d)
+		{
+			dd := dedupDiagnostics(c029_run(file_path, &ast_root, lines))
+			defer delete(dd)
+			for d in dd { append(diags, d) }
 		}
-		for d in dedupDiagnostics(c033_run(file_path, &ast_root, lines)) {
-			append(diags, d)
+		{
+			dd := dedupDiagnostics(c033_run(file_path, &ast_root, lines))
+			defer delete(dd)
+			for d in dd { append(diags, d) }
 		}
 	}
 
@@ -87,9 +95,9 @@ analyze_content :: proc(
 	{
 		q, q_ok := load_query_src(ts.adapter.language, MEMORY_SAFETY_SCM, "memory_safety.scm")
 		if q_ok {
-			for d in dedupDiagnostics(c002_scm_matcher(file_path, root, lines, &q)) {
-				append(diags, d)
-			}
+			dd := dedupDiagnostics(c002_scm_matcher(file_path, root, lines, &q))
+			defer delete(dd)
+			for d in dd { append(diags, d) }
 			unload_query(&q)
 		}
 	}
@@ -98,9 +106,9 @@ analyze_content :: proc(
 	{
 		q, q_ok := load_query_src(ts.adapter.language, NAMING_RULES_SCM, "naming_rules.scm")
 		if q_ok {
-			for d in dedupDiagnostics(naming_scm_run(file_path, root, lines, &q)) {
-				append(diags, d)
-			}
+			dd := dedupDiagnostics(naming_scm_run(file_path, root, lines, &q))
+			defer delete(dd)
+			for d in dd { append(diags, d) }
 			unload_query(&q)
 		}
 	}
@@ -109,11 +117,15 @@ analyze_content :: proc(
 	{
 		q, q_ok := load_query_src(ts.adapter.language, ODIN2026_SCM, "odin2026_migration.scm")
 		if q_ok {
-			for d in dedupDiagnostics(c009_scm_run(file_path, root, lines, &q)) {
-				append(diags, d)
+			{
+				dd := dedupDiagnostics(c009_scm_run(file_path, root, lines, &q))
+				defer delete(dd)
+				for d in dd { append(diags, d) }
 			}
-			for d in dedupDiagnostics(c010_scm_run(file_path, root, lines, &q)) {
-				append(diags, d)
+			{
+				dd := dedupDiagnostics(c010_scm_run(file_path, root, lines, &q))
+				defer delete(dd)
+				for d in dd { append(diags, d) }
 			}
 			unload_query(&q)
 		}
@@ -123,9 +135,9 @@ analyze_content :: proc(
 	{
 		q, q_ok := load_query_src(ts.adapter.language, FFI_SAFETY_SCM, "ffi_safety.scm")
 		if q_ok {
-			for d in dedupDiagnostics(c011_scm_run(file_path, root, lines, &q)) {
-				append(diags, d)
-			}
+			dd := dedupDiagnostics(c011_scm_run(file_path, root, lines, &q))
+			defer delete(dd)
+			for d in dd { append(diags, d) }
 			unload_query(&q)
 		}
 	}
@@ -134,42 +146,50 @@ analyze_content :: proc(
 	{
 		q, q_ok := load_query_src(ts.adapter.language, UNCHECKED_RESULT_SCM, "unchecked_result.scm")
 		if q_ok {
-			for d in dedupDiagnostics(c201_scm_run(file_path, root, lines, &q, nil)) {
-				append(diags, d)
-			}
+			dd := dedupDiagnostics(c201_scm_run(file_path, root, lines, &q, nil))
+			defer delete(dd)
+			for d in dd { append(diags, d) }
 			unload_query(&q)
 		}
 	}
 
-	// C203: Defer scope trap — defer in inner block assigns handle to outer scope
-	for d in dedupDiagnostics(c203_run(file_path, root, lines)) {
-		append(diags, d)
+	// C203: Defer scope trap
+	{
+		dd := dedupDiagnostics(c203_run(file_path, root, lines))
+		defer delete(dd)
+		for d in dd { append(diags, d) }
 	}
 
 	// C025: append(slice, v) missing address-of operator
 	{
 		q, q_ok := load_query_src(ts.adapter.language, GO_COMPAT_SCM, "go_compat.scm")
 		if q_ok {
-			for d in dedupDiagnostics(c025_run(file_path, root, lines, &q)) {
-				append(diags, d)
-			}
+			dd := dedupDiagnostics(c025_run(file_path, root, lines, &q))
+			defer delete(dd)
+			for d in dd { append(diags, d) }
 			unload_query(&q)
 		}
 	}
 
 	// C031: panic() for expected runtime failures (INFO)
-	for d in dedupDiagnostics(c031_run(file_path, lines)) {
-		append(diags, d)
+	{
+		dd := dedupDiagnostics(c031_run(file_path, lines))
+		defer delete(dd)
+		for d in dd { append(diags, d) }
 	}
 
 	// C034: unused blank index in for loop (INFO)
-	for d in dedupDiagnostics(c034_run(file_path, lines)) {
-		append(diags, d)
+	{
+		dd := dedupDiagnostics(c034_run(file_path, lines))
+		defer delete(dd)
+		for d in dd { append(diags, d) }
 	}
 
 	// C037: trailing return in void proc (INFO)
-	for d in dedupDiagnostics(c037_run(file_path, lines)) {
-		append(diags, d)
+	{
+		dd := dedupDiagnostics(c037_run(file_path, lines))
+		defer delete(dd)
+		for d in dd { append(diags, d) }
 	}
 
 }

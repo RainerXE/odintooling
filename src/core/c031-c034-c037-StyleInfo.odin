@@ -68,7 +68,7 @@ c031_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 	}
 
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	diags := make([dynamic]Diagnostic)
 
 	for line, line_idx in file_lines {
@@ -155,7 +155,7 @@ c031_in_exempt_proc :: proc(lines: []string, line_idx: int) -> bool {
 
 c034_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	diags := make([dynamic]Diagnostic)
 
 	for line, line_idx in file_lines {
@@ -202,8 +202,11 @@ c034_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 		if is_suppressed("C034", line_num, suppressions) { continue }
 
 		// Build the fix: remove `, _` from the for line.
-		fixed, _ := strings.replace(code, ", _ in ", " in ", 1)
-		fixed = strings.trim_right(fixed, " \t")
+		// Keep original allocation pointer so defer can free it correctly
+		// (strings.trim_right returns a view into the same memory).
+		fixed_alloc, _ := strings.replace(code, ", _ in ", " in ", 1)
+		defer delete(fixed_alloc)
+		fix_text := strings.trim_right(fixed_alloc, " \t")
 
 		append(&diags, Diagnostic{
 			file      = file_path,
@@ -212,7 +215,7 @@ c034_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 			rule_id   = "C034",
 			tier      = "style",
 			message   = fmt.aprintf("blank index '_, _' is unnecessary — write 'for %s in ...' to iterate values only", val_part),
-			fix       = fmt.aprintf("Change to: %s", strings.trim(fixed, " \t")),
+			fix       = fmt.aprintf("Change to: %s", fix_text),
 			has_fix   = true,
 			diag_type = .INFO,
 		})
@@ -226,7 +229,7 @@ c034_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 
 c037_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	diags := make([dynamic]Diagnostic)
 
 	// Detect: bare `return` as the LAST statement of a void proc body.

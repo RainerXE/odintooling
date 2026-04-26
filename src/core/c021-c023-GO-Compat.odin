@@ -43,7 +43,7 @@ C021_GO_FMT_CALLS :: [?][2]string{
 
 c021_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	diags := make([dynamic]Diagnostic)
 
 	for line, line_idx in file_lines {
@@ -102,7 +102,7 @@ c021_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 
 c022_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	diags := make([dynamic]Diagnostic)
 
 	for line, line_idx in file_lines {
@@ -157,7 +157,7 @@ c022_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 
 c023_run :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	diags := make([dynamic]Diagnostic)
 
 	for line, line_idx in file_lines {
