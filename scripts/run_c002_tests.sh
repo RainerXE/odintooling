@@ -35,7 +35,7 @@ for test_file in "${test_files[@]}"
     output_file="test_results/c002_results/${test_name}_results.txt"
     
     # Run the test and capture output
-    ./artifacts/odin-lint "$test_file" > "$output_file" 2>&1
+    "$BINARY" "$test_file" > "$output_file" 2>&1
     
     # Check if test passed (no C002 diagnostics for pass cases, C002 diagnostics for fail cases)
     if [[ "$test_file" == *"pass"* ]]; then

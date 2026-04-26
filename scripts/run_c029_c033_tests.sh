@@ -5,7 +5,8 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BINARY="$REPO_ROOT/artifacts/olt"
+source "$SCRIPT_DIR/_platform.sh"
+BINARY="$OLT_BINARY"
 
 PASS=0
 FAIL=0

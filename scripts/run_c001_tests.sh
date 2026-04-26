@@ -28,7 +28,7 @@ for file in $(find tests/C001_COR_MEMORY -name "*.odin" | sort); do
     echo "Testing: $(basename $file)"
     
     # Run the test
-    result=$(./artifacts/odin-lint "$file" 2>&1)
+    result=$("$BINARY" "$file" 2>&1)
     
     # Check for C001 violations or no diagnostics
     if echo "$result" | grep -q "C001"; then
