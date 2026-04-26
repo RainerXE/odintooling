@@ -29,7 +29,7 @@ c025_run :: proc(
 	defer free_query_results(results)
 
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	diags := make([dynamic]Diagnostic)
 
 	for result in results {
@@ -128,7 +128,7 @@ c025_is_address_of :: proc(unary_node: TSNode, lines: []string) -> bool {
 // that the SCM query may miss (e.g. in complex expressions).
 c025_line_scan :: proc(file_path: string, file_lines: []string) -> []Diagnostic {
 	suppressions := collect_suppressions(1, len(file_lines), file_lines)
-	defer delete(suppressions)
+	defer free_suppressions(suppressions)
 	diags := make([dynamic]Diagnostic)
 
 	for line, line_idx in file_lines {
