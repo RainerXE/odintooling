@@ -1,3 +1,6 @@
+// embedded_queries.odin — compile-time embedded SCM query sources.
+// All .scm query files are #load-ed into constants here so the binary has no runtime
+// file-system dependencies; add new rules by declaring a new constant and calling load_query_src.
 package core
 
 // Embedded SCM query sources — compiled into the binary at build time.

@@ -1,0 +1,96 @@
+C001 Test Summary - Wed Apr 22 16:25:41 CEST 2026
+=================================
+
+  Result: No diagnostics (PASS)
+  File: c001_all.odin
+
+  Result: No diagnostics (PASS)
+  File: c001_allocation_methods.odin
+
+  Result: Unexpected - needs review
+  File: c001_allocator_detection.odin
+
+  Result: C001 violation detected
+  File: c001_allocator.odin
+
+  Result: C001 violation detected
+  File: c001_basic.odin
+
+  Result: C001 violation detected
+  File: c001_complex.odin
+
+  Result: C001 violation detected
+  File: c001_defer_delete_recognition.odin
+
+  Result: No diagnostics (PASS)
+  File: c001_defer_extraction.odin
+
+  Result: C001 violation detected
+  File: c001_edge_cases.odin
+
+  Result: C001 violation detected
+  File: c001_exclusion.odin
+
+  Result: No diagnostics (PASS)
+  File: c001_fixture_fail.odin
+
+  Result: No diagnostics (PASS)
+  File: c001_fixture_pass.odin
+
+  Result: C001 violation detected
+  File: c001_fixture_simple_fail.odin
+
+  Result: C001 violation detected
+  File: c001_improvements.odin
+
+  Result: C001 violation detected
+  File: c001_make_slice.odin
+
+  Result: Unexpected - needs review
+  File: c001_manual_delete_pass.odin
+
+  Result: C001 violation detected
+  File: c001_min_function.odin
+
+  Result: C001 violation detected
+  File: c001_mixed_cases.odin
+
+  Result: C001 violation detected
+  File: c001_new_allocation.odin
+
+  Result: C001 violation detected
+  File: c001_original_issue_test.odin
+
+  Result: C001 violation detected
+  File: c001_perf_separate.odin
+
+  Result: C001 violation detected
+  File: c001_perf.odin
+
+  Result: C001 violation detected
+  File: c001_performance.odin
+
+  Result: No diagnostics (PASS)
+  File: c001_problematic_case.odin
+
+  Result: No diagnostics (PASS)
+  File: c001_proper_defer.odin
+
+  Result: C001 violation detected
+  File: c001_simple_allocation.odin
+
+  Result: C001 violation detected
+  File: c001_suppression.odin
+
+  Result: C001 violation detected
+  File: c001_test_allocation_detection.odin
+
+
+=================================
+TEST SUMMARY
+=================================
+Total tests: 28
+Passed: 26
+Failed: 2
+Success rate: 92%
+

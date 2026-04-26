@@ -1,3 +1,6 @@
+// tree_sitter_bindings.odin — raw FFI bindings to libtree-sitter and libtree-sitter-odin.
+// Declares the C types (TSNode, TSTree, TSParser, TSPoint …) and foreign procedure
+// imports used by tree_sitter.odin and query_engine.odin.
 package core
 
 import "core:c"

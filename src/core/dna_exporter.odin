@@ -1,3 +1,6 @@
+// dna_exporter.odin — four-pass graph export: declarations, references, roles, violations.
+// export_symbols walks all .odin files and writes nodes/edges/lint data into the
+// SQLite graph DB, enabling cross-file analysis for C201, C202, C012-T3, and MCP queries.
 package core
 
 import "core:fmt"

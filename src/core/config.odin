@@ -1,3 +1,6 @@
+// config.odin — olt.toml project configuration: parsing, defaults, and domain gates.
+// Searches for olt.toml (or legacy odin-lint.toml) walking up from lint targets,
+// then falls back to auto-detection heuristics when no config file is found.
 package core
 
 import "core:fmt"

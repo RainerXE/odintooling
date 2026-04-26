@@ -1,0 +1,3 @@
+export-symbols: 1 files, 3 nodes, 0 edges, 0 unresolved
+  graph db:    /tmp/c015_pass_test.db
+  symbols.json: .codegraph/symbols.json

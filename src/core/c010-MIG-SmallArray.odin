@@ -1,3 +1,6 @@
+// c010-MIG-SmallArray.odin — C010: deprecated Small_Array type detection.
+// Flags usage of the legacy container.Small_Array type that was superseded
+// by the built-in [dynamic; N]T fixed-capacity dynamic-array syntax.
 package core
 
 import "core:fmt"

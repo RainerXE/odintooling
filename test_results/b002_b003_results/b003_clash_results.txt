@@ -1,0 +1,3 @@
+Warning: scanning 'tests/B003_STR_SUBFOLDERPACKAGE/parent/' recursively. Use --non-recursive to scan top-level only.
+🔴 /Users/rainer/SynologyDrive/Development/MyODIN/odintooling/tests/B003_STR_SUBFOLDERPACKAGE/parent/child_clash/file.odin:1:1: B003 [structural] package "graphics" — subfolder "child_clash" is a separate Odin package from parent "parent"; did you mean a distinct package name?
+1 violation(s) in 0 file(s)

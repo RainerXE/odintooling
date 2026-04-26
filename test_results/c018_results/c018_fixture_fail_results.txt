@@ -1,0 +1,11 @@
+🔴 tests/C018_STY_PROCVISIBILITY/c018_fixture_fail.odin:6:1: C018 [style] Public proc 'set_shader_value' should be PascalCase (API surface symbol)
+Fix: Rename 'set_shader_value' to PascalCase equivalent (e.g. capitalise each word, remove underscores)
+🔴 tests/C018_STY_PROCVISIBILITY/c018_fixture_fail.odin:7:1: C018 [style] Public proc 'init_renderer' should be PascalCase (API surface symbol)
+Fix: Rename 'init_renderer' to PascalCase equivalent (e.g. capitalise each word, remove underscores)
+🔴 tests/C018_STY_PROCVISIBILITY/c018_fixture_fail.odin:8:1: C018 [style] Public proc 'parse_file' should be PascalCase (API surface symbol)
+Fix: Rename 'parse_file' to PascalCase equivalent (e.g. capitalise each word, remove underscores)
+🔴 tests/C018_STY_PROCVISIBILITY/c018_fixture_fail.odin:12:1: C018 [style] @(private) proc 'InitInternal' should be snake_case (internal symbol)
+Fix: Rename 'InitInternal' to snake_case equivalent
+🔴 tests/C018_STY_PROCVISIBILITY/c018_fixture_fail.odin:15:1: C018 [style] @(private) proc 'ComputeHash' should be snake_case (internal symbol)
+Fix: Rename 'ComputeHash' to snake_case equivalent
+5 violation(s) in 1 file(s)

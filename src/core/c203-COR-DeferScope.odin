@@ -1,3 +1,7 @@
+// c203-COR-DeferScope.odin — C203: defer-in-inner-block scope trap.
+// Detects the pattern where a resource handle is opened and deferred-closed inside
+// an inner block while the handle is stored in an outer-scope variable — the handle
+// becomes dangling when the inner block exits before the outer scope uses it.
 package core
 
 import "core:fmt"

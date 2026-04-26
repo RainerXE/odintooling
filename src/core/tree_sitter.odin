@@ -1,3 +1,6 @@
+// tree_sitter.odin — high-level AST parsing wrappers around libtree-sitter.
+// initTreeSitterParser / parseToAST turn Odin source text into an ASTNode tree;
+// parseSource returns the raw TSTree for SCM-query rules.
 package core
 
 import "core:fmt"

@@ -1,0 +1,59 @@
+=== Focused OLS Codebase Analysis Report ===
+Generated: Sat Apr 25 09:33:37 CEST 2026
+Linter: odin-lint
+Rule: C001 (Allocation without defer free)
+Directory: vendor/ols/src/
+
+vendor/ols/src/main.odin
+🔴 vendor/ols/src/main.odin:39:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/main.odin:50:5: C101 [correctness] context.allocator assigned without 'defer context.allocator = ...' restore
+Fix: Save the old value before the assignment and add 'defer context.allocator = <saved>'
+2 violation(s) in 1 file(s)
+
+vendor/ols/src/server/document_symbols.odin
+🔴 vendor/ols/src/server/document_symbols.odin:79:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/document_symbols.odin:75:5: C007 [style] Type 'ranges' starts with lowercase — use PascalCase for type names
+Fix: Rename 'ranges' to 'Ranges'
+2 violation(s) in 1 file(s)
+
+vendor/ols/src/server/build.odin
+🔴 vendor/ols/src/server/build.odin:314:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/build.odin:198:3: C101 [correctness] context.allocator assigned without 'defer context.allocator = ...' restore
+Fix: Save the old value before the assignment and add 'defer context.allocator = <saved>'
+2 violation(s) in 1 file(s)
+
+vendor/ols/src/server/check.odin
+🔴 vendor/ols/src/server/check.odin:208:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/check.odin:65:7: C201 [correctness] error return of 'close' is discarded
+Fix: Assign the result and handle the error, or use 'or_return'
+🔴 vendor/ols/src/server/check.odin:272:7: C201 [correctness] error return of 'close' is discarded
+Fix: Assign the result and handle the error, or use 'or_return'
+🔴 vendor/ols/src/server/check.odin:296:6: C201 [correctness] error return of 'close' is discarded
+Fix: Assign the result and handle the error, or use 'or_return'
+🔴 vendor/ols/src/server/check.odin:412:6: C201 [correctness] error return of 'close' is discarded
+Fix: Assign the result and handle the error, or use 'or_return'
+5 violation(s) in 1 file(s)
+
+vendor/ols/src/server/documents.odin
+🔴 vendor/ols/src/server/documents.odin:244:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/documents.odin:264:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/documents.odin:416:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 vendor/ols/src/server/documents.odin:387:2: C101 [correctness] context.allocator assigned without 'defer context.allocator = ...' restore
+Fix: Save the old value before the assignment and add 'defer context.allocator = <saved>'
+4 violation(s) in 1 file(s)
+
+=== SUMMARY ===
+Total files analyzed: 65
+Files with C001 violations: 5
+Files without violations: 60
+Internal errors: 0
+Total C001 violations found: 7
+
+⚠️  Found 5 files with potential memory issues

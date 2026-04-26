@@ -1,3 +1,6 @@
+// analyze_content.odin — in-memory lint entry point shared by the OLS plugin and MCP server.
+// Runs all enabled rule passes against source text already in memory, without disk I/O.
+// Both the CLI analyze_file and live-edit surfaces call this as the canonical lint pipeline.
 package core
 
 import "core:strings"

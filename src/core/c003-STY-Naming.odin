@@ -1,3 +1,6 @@
+// c003-STY-Naming.odin — C003/C007/C016–C020: naming convention rules.
+// All naming checks share one SCM pass (naming_scm_run) that captures proc,
+// type, and variable identifiers and checks them against Odin naming conventions.
 package core
 
 import "core:fmt"

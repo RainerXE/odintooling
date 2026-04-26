@@ -1,3 +1,6 @@
+// rule_docs.odin — detailed rule documentation for `olt --explain <RULE>`.
+// explain_rule returns a multi-line string with description, examples, and fix
+// guidance for the requested rule ID; returns ("", false) for unknown IDs.
 package core
 
 import "core:fmt"

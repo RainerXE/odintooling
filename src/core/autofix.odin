@@ -1,3 +1,6 @@
+// autofix.odin — fix generation, proposal (--propose), and in-place application (--fix).
+// generate_fixes converts Diagnostic.fix strings into FileEdit structs; apply_fixes
+// writes the edits back to disk; propose_fixes prints a human-readable diff.
 package core
 
 import "core:fmt"

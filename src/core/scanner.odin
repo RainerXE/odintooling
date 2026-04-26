@@ -1,3 +1,6 @@
+// scanner.odin — .odin file discovery and directory traversal.
+// collect_odin_files recurses into target directories (respecting --non-recursive
+// and --include-vendor flags) and returns all .odin files to lint.
 package core
 
 import "core:fmt"

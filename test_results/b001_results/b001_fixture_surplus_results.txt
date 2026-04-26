@@ -1,0 +1,3 @@
+🔴 tests/B001_STR_BRACEBALANCE/b001_fixture_surplus.odin:10:1: B001 [structural] unexpected closing brace at line 10, col 1 — no matching opening brace
+🔵 tests/B001_STR_BRACEBALANCE/b001_fixture_surplus.odin:0:0: B001 [structural] INFO: other diagnostics suppressed — fix brace imbalance first
+2 violation(s) in 1 file(s)

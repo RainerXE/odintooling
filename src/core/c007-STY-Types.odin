@@ -1,3 +1,6 @@
+// c007-STY-Types.odin — C007: type and struct names must be PascalCase.
+// Shares the naming SCM pass with C003; checks struct, enum, and union
+// declarations for the Odin PascalCase naming convention.
 package core
 
 // =============================================================================

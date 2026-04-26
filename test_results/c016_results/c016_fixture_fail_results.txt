@@ -1,0 +1,13 @@
+🔴 tests/C016_STY_LOCALNAME/c016_fixture_fail.odin:6:5: C016 [style] Local variable 'playerCount' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'playerCount' to snake_case equivalent
+🔴 tests/C016_STY_LOCALNAME/c016_fixture_fail.odin:7:5: C016 [style] Local variable 'PlayerPtr' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'PlayerPtr' to snake_case equivalent
+🔴 tests/C016_STY_LOCALNAME/c016_fixture_fail.odin:8:5: C016 [style] Local variable 'TotalScore' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'TotalScore' to snake_case equivalent
+🔴 tests/C016_STY_LOCALNAME/c016_fixture_fail.odin:9:5: C016 [style] Local variable 'isValid' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'isValid' to snake_case equivalent
+🔴 tests/C016_STY_LOCALNAME/c016_fixture_fail.odin:10:5: C016 [style] Local variable 'filePath' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'filePath' to snake_case equivalent
+🔴 tests/C016_STY_LOCALNAME/c016_fixture_fail.odin:11:5: C016 [style] Local variable 'MaxItems' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'MaxItems' to snake_case equivalent
+6 violation(s) in 1 file(s)

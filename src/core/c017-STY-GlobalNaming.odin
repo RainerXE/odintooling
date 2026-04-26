@@ -1,3 +1,6 @@
+// c017-STY-GlobalNaming.odin — C017: package-level variable naming convention.
+// Package-scope variables should follow camelCase or _camelCase (opt-in);
+// also shares the naming SCM pass to avoid redundant tree-sitter queries.
 package core
 
 import "core:fmt"

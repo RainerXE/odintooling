@@ -1,3 +1,6 @@
+// type_resolver.odin — return-type heuristics for proc calls used by C201 and C019 Phase 2.
+// TypeResolveContext wraps the graph DB for project-local proc lookups; the fallback
+// list covers common stdlib procs that return (T, bool) or (T, Error) patterns.
 package core
 
 import "core:strings"

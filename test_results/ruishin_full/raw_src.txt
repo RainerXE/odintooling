@@ -1,0 +1,293 @@
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/colors.odin:84:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/colors.odin:47:6: C016 [style] Local variable 'okR' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'okR' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/colors.odin:51:6: C016 [style] Local variable 'okG' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'okG' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/colors.odin:55:6: C016 [style] Local variable 'okB' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'okB' to snake_case equivalent
+4 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/manager.odin:89:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/engine/scene.odin:1446:1: C003 [style] Procedure 'Scene_Event_Listener' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'Scene_Event_Listener' to 'scene_Event_Listener'
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:102:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:103:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:112:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:170:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+4 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:1384:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:1447:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:4360:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:5968:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:5979:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:6015:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:6163:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+7 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:870:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1050:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1306:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1310:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1324:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1325:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1408:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+7 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_record.odin:144:11: C016 [style] Local variable 'RECORD_MAGIC' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'RECORD_MAGIC' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_record.odin:188:11: C016 [style] Local variable 'RECORD_MAGIC' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'RECORD_MAGIC' to snake_case equivalent
+2 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin:102:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin:319:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin:556:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/gpu_asset_manager.odin:98:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin:124:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin:327:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin:382:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin:220:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin:221:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin:260:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin:261:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+4 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:309:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:373:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:503:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:1375:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+4 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_render.odin:120:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:100:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:101:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:120:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:121:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:122:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:331:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:343:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:344:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:345:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+9 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/itemize.odin:20:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:106:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:112:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:198:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:324:8: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:330:8: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:395:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:396:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+7 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:43:11: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:45:11: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:299:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:87:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:90:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:91:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:157:1: C003 [style] Procedure 'SizingFixed' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingFixed' to 'sizingFixed'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:161:1: C003 [style] Procedure 'SizingGrow' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingGrow' to 'sizingGrow'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:165:1: C003 [style] Procedure 'SizingFit' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingFit' to 'sizingFit'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:169:1: C003 [style] Procedure 'SizingPercent' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingPercent' to 'sizingPercent'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:173:1: C003 [style] Procedure 'CornerRadiusAll' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'CornerRadiusAll' to 'cornerRadiusAll'
+8 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:138:18: C016 [style] Local variable 'CLAY_ORDERED_FLUSH' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_ORDERED_FLUSH' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:188:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_L' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_SCISSOR_EXPAND_L' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:189:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_T' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_SCISSOR_EXPAND_T' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:190:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_R' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_SCISSOR_EXPAND_R' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:191:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_B' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_SCISSOR_EXPAND_B' to snake_case equivalent
+5 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/main.odin:844:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/main.odin:189:8: C016 [style] Local variable 'COLOR_BAR' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'COLOR_BAR' to snake_case equivalent
+2 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/platform/detect.odin:22:2: C007 [style] Type 'iOS' starts with lowercase — use PascalCase for type names
+Fix: Rename 'iOS' to 'IOS'
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/animations.odin:182:1: C003 [style] Procedure 'Ease_Fn' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'Ease_Fn' to 'ease_Fn'
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/draw_list.odin:706:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/error_handling.odin:37:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/error_handling.odin:38:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/error_handling.odin:44:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/renderer.odin:800:1: C003 [style] Procedure 'SetAtlasSizeOverride' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetAtlasSizeOverride' to 'setAtlasSizeOverride'
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:120:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:141:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:145:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:223:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:248:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:329:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:348:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:351:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+8 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found

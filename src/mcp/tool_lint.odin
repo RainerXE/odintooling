@@ -1,3 +1,6 @@
+// mcp/tool_lint.odin — lint_file, lint_snippet, and lint_fix MCP tools.
+// lint_file lints a file on disk; lint_snippet lints in-memory source text;
+// lint_fix applies --fix to a file and returns a before/after diff.
 package mcp_server
 
 import "core:encoding/json"

@@ -1,3 +1,6 @@
+// call_graph.odin — SQLite-backed code-knowledge graph: schema, CRUD, and queries.
+// Stores declarations, call edges, enum members, and lint violations in
+// .codegraph/olt_graph.db for use by C201, C202, C012-T3, and DNA export.
 package core
 
 import "core:fmt"

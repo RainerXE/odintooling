@@ -1,0 +1,7 @@
+🔴 tests/C019_STY_TYPEMARKER/c019_fail.odin:41:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 tests/C019_STY_TYPEMARKER/c019_fail.odin:43:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 tests/C019_STY_TYPEMARKER/c019_fail.odin:45:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)

@@ -1,0 +1,7 @@
+tests/C015_DEA_UNUSEDCONST/c015_fixture_fail.odin:6:1: C015 [dead_code] @(private) constant 'DEAD_CONSTANT' is never referenced — consider removing it
+tests/C015_DEA_UNUSEDCONST/c015_fixture_fail.odin:9:1: C015 [dead_code] @(private) constant 'ANOTHER_DEAD' is never referenced — consider removing it
+tests/C015_DEA_UNUSEDCONST/c015_fixture_fail.odin:12:1: C015 [dead_code] @(private) variable 'dead_variable' is never referenced — consider removing it
+export-symbols: 1 files, 5 nodes, 0 edges, 0 unresolved
+  dead code:    3 violation(s)
+  graph db:    /tmp/c015_fail_test.db
+  symbols.json: .codegraph/symbols.json
