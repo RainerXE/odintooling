@@ -1,3 +1,6 @@
+// error_class.odin — stable error-class strings for each rule ID.
+// Maps rule IDs to dotted tier_category_detail strings (e.g. correctness_memory_leak)
+// used by the MCP API and SARIF output for machine-readable diagnostic classification.
 package core
 
 // rule_id_to_error_class maps a rule ID to its stable error-class string.

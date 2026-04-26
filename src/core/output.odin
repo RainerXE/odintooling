@@ -1,3 +1,6 @@
+// output.odin — diagnostic output formatters: text, JSON, and SARIF.
+// emit_json / emit_sarif serialise collected diagnostics for machine-readable output;
+// emit_or_collect routes individual diagnostics to stdout or a collector slice.
 package core
 
 import "core:fmt"

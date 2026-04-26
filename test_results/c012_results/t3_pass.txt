@@ -1,0 +1,3 @@
+🔴 tests/C012_SEM_NAMING/c012_t3_pass.odin:10:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)

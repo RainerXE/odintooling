@@ -1,3 +1,5 @@
+// c004-STY-Private.odin — C004: unexported identifiers starting with underscore (disabled).
+// Placeholder rule; naming conventions for private symbols are now handled by C018.
 package core
 
 // =============================================================================

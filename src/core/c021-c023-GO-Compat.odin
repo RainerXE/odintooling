@@ -1,3 +1,6 @@
+// c021-c023-GO-Compat.odin — C021/C022/C023: Go-style syntax traps (go_migration domain).
+// Text-line scanners that flag Go fmt.Println/Printf/Sprintf calls, for-range loops,
+// and C-style *ptr dereferences that do not compile or behave differently in Odin.
 package core
 
 import "core:fmt"

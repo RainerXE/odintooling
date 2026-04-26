@@ -1,3 +1,6 @@
+// c011-FFI-Safety.odin — C011: FFI resource leak detection.
+// Detects tree-sitter ts_*_new() allocations without a matching defer ts_*_delete().
+// Enabled only when the ffi domain is active (projects with a ffi/ directory).
 package core
 
 import "core:fmt"

@@ -1,3 +1,6 @@
+// c009-MIG-OsOld.odin — C009: deprecated core:os/old import detection.
+// SCM query flags any import of the old os package and suggests the current
+// core:os equivalent, enabling automated migration with --unsafe-fix.
 package core
 
 import "core:fmt"

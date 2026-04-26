@@ -1,3 +1,6 @@
+// c019-STY-TypeMarker.odin — C019: type marker suffix conventions (opt-in).
+// Phase 1 checks explicit type annotations (_ptr/_slice/_map suffixes); Phase 2
+// consults the graph DB to check inferred := assignments against proc return types.
 package core
 
 import "core:fmt"

@@ -1,3 +1,6 @@
+// main.odin — CLI entry point and per-file analysis pipeline.
+// Defines the Diagnostic type, analyze_file (runs all enabled rules on one file),
+// and _main (CLI dispatch: parse args, collect files, run analysis, emit output).
 package core
 
 import "core:fmt"

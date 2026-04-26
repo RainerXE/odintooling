@@ -1,0 +1,11 @@
+🔴 tests/C017_STY_GLOBALNAME/c017_fixture_fail.odin:6:1: C017 [style] Package-level variable 'severity_strings' uses underscores — use camelCase instead of snake_case
+Fix: Rename 'severity_strings' to camelCase equivalent
+🔴 tests/C017_STY_GLOBALNAME/c017_fixture_fail.odin:7:1: C017 [style] Package-level variable 'global_counter' uses underscores — use camelCase instead of snake_case
+Fix: Rename 'global_counter' to camelCase equivalent
+🔴 tests/C017_STY_GLOBALNAME/c017_fixture_fail.odin:8:1: C017 [style] Package-level variable 'default_config' uses underscores — use camelCase instead of snake_case
+Fix: Rename 'default_config' to camelCase equivalent
+🔴 tests/C017_STY_GLOBALNAME/c017_fixture_fail.odin:11:1: C017 [style] Package-level variable 'GlobalCounter' starts with uppercase — use camelCase (e.g. 'globalCounter')
+Fix: Rename 'GlobalCounter' to camelCase equivalent
+🔴 tests/C017_STY_GLOBALNAME/c017_fixture_fail.odin:12:1: C017 [style] Package-level variable 'SeverityLevel' starts with uppercase — use camelCase (e.g. 'severityLevel')
+Fix: Rename 'SeverityLevel' to camelCase equivalent
+5 violation(s) in 1 file(s)

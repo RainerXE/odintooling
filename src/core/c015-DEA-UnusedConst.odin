@@ -1,3 +1,6 @@
+// c015-DEA-UnusedConst.odin — C015: unexported constant never referenced.
+// Companion to C014; flags unexported constants that appear in no other
+// expression in the package, indicating dead declarations.
 package core
 
 import "core:fmt"

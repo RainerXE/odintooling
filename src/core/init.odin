@@ -1,3 +1,6 @@
+// init.odin — olt --init first-run wizard and --install system symlink creator.
+// The wizard guides users through OLS detection, olt.toml profile selection, and
+// binary installation to ~/.local/bin/ with PATH verification.
 package core
 
 import "core:fmt"

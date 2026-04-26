@@ -1,3 +1,6 @@
+// c001-COR-Memory.odin — C001: heap allocation without matching defer free.
+// Uses the ASTNode walker to find make()/new() assignments that lack a defer delete()
+// or defer free() in the same block scope, with owner-transfer and arena escape hatches.
 package core
 
 import "core:fmt"

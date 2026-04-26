@@ -1,3 +1,6 @@
+// c101-CTX-Integrity.odin — C101: context.allocator assigned without defer restore.
+// Detects context.allocator = ... assignments without a paired defer context.allocator = ...,
+// which silently changes the allocator for all downstream calls in the same scope.
 package core
 
 import "core:fmt"

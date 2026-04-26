@@ -1,3 +1,6 @@
+// c018-STY-ProcVisibility.odin — C018: procedure visibility marker convention.
+// Checks that unexported procs start with _ and exported procs don't, mirroring
+// the Odin standard library's visibility marker style (opt-in, conflicts with C003).
 package core
 
 import "core:fmt"

@@ -1,3 +1,5 @@
+// c006-STY-Public.odin — C006: exported symbol naming (disabled).
+// Placeholder; exported naming checks are handled by C003/C007.
 package core
 
 // =============================================================================

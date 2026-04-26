@@ -1,3 +1,6 @@
+// c012-SEM-Naming.odin — C012: semantic ownership naming hints (opt-in).
+// Three tiers: S1-S3 check naming conventions for pointers/slices/maps;
+// T1-T3 use the graph DB to flag proc-return types that violate ownership markers.
 package core
 
 import "core:fmt"

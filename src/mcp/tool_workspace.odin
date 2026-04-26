@@ -1,3 +1,6 @@
+// mcp/tool_workspace.odin — lint_workspace, list_rules, and run_odin_check MCP tools.
+// lint_workspace batch-lints a directory; list_rules returns the full rule catalog;
+// run_odin_check shells out to `odin check` and returns structured compiler diagnostics.
 package mcp_server
 
 import "core:encoding/json"

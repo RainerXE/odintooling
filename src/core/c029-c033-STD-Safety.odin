@@ -1,3 +1,6 @@
+// c029-c033-STD-Safety.odin — C029/C033: stdlib allocation safety (stdlib_safety domain).
+// C029 detects strings.split/clone/join/fmt.aprintf/os.read_entire_file without defer delete;
+// C033 detects strings.builder_make() without defer strings.builder_destroy.
 package core
 
 import "core:fmt"

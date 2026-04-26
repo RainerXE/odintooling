@@ -1,0 +1,841 @@
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/colors.odin:84:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/colors.odin:47:6: C016 [style] Local variable 'okR' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'okR' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/colors.odin:51:6: C016 [style] Local variable 'okG' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'okG' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/colors.odin:55:6: C016 [style] Local variable 'okB' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'okB' to snake_case equivalent
+4 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/assets/manager.odin:89:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/engine/scene.odin:1446:1: C003 [style] Procedure 'Scene_Event_Listener' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'Scene_Event_Listener' to 'scene_Event_Listener'
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:102:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:103:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:112:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/font_manager.odin:170:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+4 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:1384:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:1447:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:4360:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:5968:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:5979:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:6015:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_core.odin:6163:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+7 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:870:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1050:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1306:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1310:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1324:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1325:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_draw.odin:1408:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+7 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_record.odin:144:11: C016 [style] Local variable 'RECORD_MAGIC' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'RECORD_MAGIC' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_record.odin:188:11: C016 [style] Local variable 'RECORD_MAGIC' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'RECORD_MAGIC' to snake_case equivalent
+2 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin:102:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin:319:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/g2d_text.odin:556:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/gpu_asset_manager.odin:98:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin:124:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin:327:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_decoder.odin:382:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin:220:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin:221:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin:260:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/rsd_render.odin:261:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+4 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:309:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:373:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:503:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_parser.odin:1375:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+4 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/svg_render.odin:120:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:100:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:101:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:120:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:121:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:122:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:331:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:343:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:344:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/bidi.odin:345:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+9 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/itemize.odin:20:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:106:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:112:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:198:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:324:8: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:330:8: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:395:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/layout.odin:396:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+7 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:43:11: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:45:11: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/graphics/text/shaper.odin:299:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:87:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:90:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:91:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:157:1: C003 [style] Procedure 'SizingFixed' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingFixed' to 'sizingFixed'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:161:1: C003 [style] Procedure 'SizingGrow' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingGrow' to 'sizingGrow'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:165:1: C003 [style] Procedure 'SizingFit' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingFit' to 'sizingFit'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:169:1: C003 [style] Procedure 'SizingPercent' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingPercent' to 'sizingPercent'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/layout.odin:173:1: C003 [style] Procedure 'CornerRadiusAll' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'CornerRadiusAll' to 'cornerRadiusAll'
+8 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:138:18: C016 [style] Local variable 'CLAY_ORDERED_FLUSH' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_ORDERED_FLUSH' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:188:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_L' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_SCISSOR_EXPAND_L' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:189:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_T' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_SCISSOR_EXPAND_T' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:190:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_R' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_SCISSOR_EXPAND_R' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/layout/render_bridge.odin:191:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_B' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'CLAY_SCISSOR_EXPAND_B' to snake_case equivalent
+5 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/main.odin:844:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/main.odin:189:8: C016 [style] Local variable 'COLOR_BAR' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'COLOR_BAR' to snake_case equivalent
+2 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/platform/detect.odin:22:2: C007 [style] Type 'iOS' starts with lowercase — use PascalCase for type names
+Fix: Rename 'iOS' to 'IOS'
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/animations.odin:182:1: C003 [style] Procedure 'Ease_Fn' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'Ease_Fn' to 'ease_Fn'
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/draw_list.odin:706:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/error_handling.odin:37:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/error_handling.odin:38:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/error_handling.odin:44:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/renderer/renderer.odin:800:1: C003 [style] Procedure 'SetAtlasSizeOverride' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetAtlasSizeOverride' to 'setAtlasSizeOverride'
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:120:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:141:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:145:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:223:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:248:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:329:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:348:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/src/ui/theme/accessibility.odin:351:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+8 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/2d/test_svg_gradient.odin:22:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/2d/test_svg_gradient.odin:75:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/2d/test_svg_gradient.odin:87:3: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/2d/test_svg_gradient.odin:131:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/2d/test_svg_gradient.odin:190:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+5 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/performance/test_critical_paths.odin:79:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/performance/test_critical_paths.odin:88:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/performance/test_critical_paths.odin:97:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/performance/test_critical_paths.odin:179:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+4 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/performance/test_phase10d_performance.odin:93:9: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/rsd/rsd_test.odin:183:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_hit_testing.odin:77:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_image_handling.odin:21:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_image_handling.odin:71:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_image_handling.odin:104:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_image_handling.odin:153:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_image_handling.odin:190:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_image_handling.odin:228:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+6 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_input_system.odin:184:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_input_system.odin:233:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+2 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_scene_graph_realistic.odin:190:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_scene_graph.odin:232:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/engine/test_simple_scene.odin:151:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_animation.odin:82:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_animation.odin:87:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_animation.odin:108:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_path_gradients.odin:16:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_path_gradients.odin:20:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_path_gradients.odin:52:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_path_gradients.odin:57:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_path_gradients.odin:90:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_path_gradients.odin:92:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_path_gradients.odin:105:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_path_gradients.odin:184:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_path_gradients.odin:188:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+9 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_perspective.odin:113:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_stencil_functionality.odin:25:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/graphics/test_stencil_functionality.odin:26:2: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+2 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/logging/test_logging_basic.odin:10:1: C007 [style] Type 'logging_basic_suite' starts with lowercase — use PascalCase for type names
+Fix: Rename 'logging_basic_suite' to 'Logging_basic_suite'
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/logging/test_logging_intelligent.odin:10:1: C007 [style] Type 'logging_intelligent_suite' starts with lowercase — use PascalCase for type names
+Fix: Rename 'logging_intelligent_suite' to 'Logging_intelligent_suite'
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/logging/test_logging_setup.odin:9:1: C007 [style] Type 'logging_setup_suite' starts with lowercase — use PascalCase for type names
+Fix: Rename 'logging_setup_suite' to 'Logging_setup_suite'
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/renderer/test_advanced_features.odin:34:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/renderer/test_advanced_features.odin:49:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tests/unit/renderer/test_advanced_features.odin:193:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tools/odin/diagnose_svg_rsd.odin:46:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tools/odin/final_debug.odin:107:2: B001 [structural] unexpected closing brace at line 107, col 2 — no matching opening brace
+🔴 /Users/rainer/Development/MyODIN/RuiShin/tools/odin/final_debug.odin:108:1: B001 [structural] unexpected closing brace at line 108, col 1 — no matching opening brace
+🔵 /Users/rainer/Development/MyODIN/RuiShin/tools/odin/final_debug.odin:0:0: INFO - other diagnostics suppressed — fix brace imbalance first
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:382:2: C003 [style] Procedure 'MinMemorySize' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'MinMemorySize' to 'minMemorySize'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:383:2: C003 [style] Procedure 'CreateArenaWithCapacityAndMemory' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'CreateArenaWithCapacityAndMemory' to 'createArenaWithCapacityAndMemory'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:384:2: C003 [style] Procedure 'SetPointerState' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetPointerState' to 'setPointerState'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:385:2: C003 [style] Procedure 'Initialize' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'Initialize' to 'initialize'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:386:2: C003 [style] Procedure 'GetCurrentContext' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'GetCurrentContext' to 'getCurrentContext'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:387:2: C003 [style] Procedure 'SetCurrentContext' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetCurrentContext' to 'setCurrentContext'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:388:2: C003 [style] Procedure 'UpdateScrollContainers' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'UpdateScrollContainers' to 'updateScrollContainers'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:389:2: C003 [style] Procedure 'SetLayoutDimensions' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetLayoutDimensions' to 'setLayoutDimensions'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:390:2: C003 [style] Procedure 'BeginLayout' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'BeginLayout' to 'beginLayout'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:391:2: C003 [style] Procedure 'EndLayout' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'EndLayout' to 'endLayout'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:392:2: C003 [style] Procedure 'GetElementId' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'GetElementId' to 'getElementId'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:393:2: C003 [style] Procedure 'GetElementIdWithIndex' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'GetElementIdWithIndex' to 'getElementIdWithIndex'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:394:2: C003 [style] Procedure 'GetElementData' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'GetElementData' to 'getElementData'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:395:2: C003 [style] Procedure 'Hovered' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'Hovered' to 'hovered'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:396:2: C003 [style] Procedure 'OnHover' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'OnHover' to 'onHover'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:397:2: C003 [style] Procedure 'PointerOver' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'PointerOver' to 'pointerOver'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:398:2: C003 [style] Procedure 'GetScrollOffset' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'GetScrollOffset' to 'getScrollOffset'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:399:2: C003 [style] Procedure 'GetScrollContainerData' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'GetScrollContainerData' to 'getScrollContainerData'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:400:2: C003 [style] Procedure 'SetMeasureTextFunction' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetMeasureTextFunction' to 'setMeasureTextFunction'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:401:2: C003 [style] Procedure 'SetQueryScrollOffsetFunction' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetQueryScrollOffsetFunction' to 'setQueryScrollOffsetFunction'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:402:2: C003 [style] Procedure 'RenderCommandArray_Get' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'RenderCommandArray_Get' to 'renderCommandArray_Get'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:403:2: C003 [style] Procedure 'SetDebugModeEnabled' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetDebugModeEnabled' to 'setDebugModeEnabled'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:404:2: C003 [style] Procedure 'IsDebugModeEnabled' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'IsDebugModeEnabled' to 'isDebugModeEnabled'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:405:2: C003 [style] Procedure 'SetCullingEnabled' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetCullingEnabled' to 'setCullingEnabled'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:406:2: C003 [style] Procedure 'GetMaxElementCount' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'GetMaxElementCount' to 'getMaxElementCount'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:407:2: C003 [style] Procedure 'SetMaxElementCount' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetMaxElementCount' to 'setMaxElementCount'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:408:2: C003 [style] Procedure 'GetMaxMeasureTextCacheWordCount' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'GetMaxMeasureTextCacheWordCount' to 'getMaxMeasureTextCacheWordCount'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:409:2: C003 [style] Procedure 'SetMaxMeasureTextCacheWordCount' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SetMaxMeasureTextCacheWordCount' to 'setMaxMeasureTextCacheWordCount'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:410:2: C003 [style] Procedure 'ResetMeasureTextCache' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'ResetMeasureTextCache' to 'resetMeasureTextCache'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:423:1: C003 [style] Procedure 'ConfigureOpenElement' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'ConfigureOpenElement' to 'configureOpenElement'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:429:1: C003 [style] Procedure 'UI_WithId' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'UI_WithId' to 'uI_WithId'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:435:1: C003 [style] Procedure 'UI_AutoId' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'UI_AutoId' to 'uI_AutoId'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:440:1: C003 [style] Procedure 'UI' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'UI' to 'uI'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:440:12: C003 [style] Procedure 'UI_WithId' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'UI_WithId' to 'uI_WithId'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:440:23: C003 [style] Procedure 'UI_AutoId' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'UI_AutoId' to 'uI_AutoId'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:442:1: C003 [style] Procedure 'Text' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'Text' to 'text'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:448:1: C003 [style] Procedure 'TextDynamic' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'TextDynamic' to 'textDynamic'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:452:1: C003 [style] Procedure 'TextConfig' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'TextConfig' to 'textConfig'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:456:1: C003 [style] Procedure 'PaddingAll' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'PaddingAll' to 'paddingAll'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:460:1: C003 [style] Procedure 'BorderOutside' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'BorderOutside' to 'borderOutside'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:464:1: C003 [style] Procedure 'BorderAll' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'BorderAll' to 'borderAll'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:468:1: C003 [style] Procedure 'CornerRadiusAll' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'CornerRadiusAll' to 'cornerRadiusAll'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:472:1: C003 [style] Procedure 'SizingFit' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingFit' to 'sizingFit'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:476:1: C003 [style] Procedure 'SizingGrow' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingGrow' to 'sizingGrow'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:480:1: C003 [style] Procedure 'SizingFixed' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingFixed' to 'sizingFixed'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:484:1: C003 [style] Procedure 'SizingPercent' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'SizingPercent' to 'sizingPercent'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:488:1: C003 [style] Procedure 'MakeString' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'MakeString' to 'makeString'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:492:1: C003 [style] Procedure 'ID' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'ID' to 'iD'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/clay-odin/clay.odin:496:1: C003 [style] Procedure 'ID_LOCAL' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'ID_LOCAL' to 'iD_LOCAL'
+49 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay_renderer_raylib.odin:51:2: C016 [style] Local variable 'scaleFactor' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'scaleFactor' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay_renderer_raylib.odin:80:2: C016 [style] Local variable 'scaleFactor' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'scaleFactor' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay_renderer_raylib.odin:116:13: C016 [style] Local variable 'imageTexture' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'imageTexture' to snake_case equivalent
+3 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:466:5: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:65:1: C003 [style] Procedure 'LandingPageBlob' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'LandingPageBlob' to 'landingPageBlob'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:80:1: C003 [style] Procedure 'LandingPageDesktop' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'LandingPageDesktop' to 'landingPageDesktop'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:112:1: C003 [style] Procedure 'LandingPageMobile' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'LandingPageMobile' to 'landingPageMobile'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:145:1: C003 [style] Procedure 'FeatureBlocks' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'FeatureBlocks' to 'featureBlocks'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:146:5: C016 [style] Local variable 'textConfig' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'textConfig' to snake_case equivalent
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:165:1: C003 [style] Procedure 'FeatureBlocksDesktop' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'FeatureBlocksDesktop' to 'featureBlocksDesktop'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:176:1: C003 [style] Procedure 'FeatureBlocksMobile' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'FeatureBlocksMobile' to 'featureBlocksMobile'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:185:1: C003 [style] Procedure 'DeclarativeSyntaxPage' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'DeclarativeSyntaxPage' to 'declarativeSyntaxPage'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:211:1: C003 [style] Procedure 'DeclarativeSyntaxPageDesktop' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'DeclarativeSyntaxPageDesktop' to 'declarativeSyntaxPageDesktop'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:224:1: C003 [style] Procedure 'DeclarativeSyntaxPageMobile' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'DeclarativeSyntaxPageMobile' to 'declarativeSyntaxPageMobile'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:238:1: C003 [style] Procedure 'ColorLerp' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'ColorLerp' to 'colorLerp'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:244:1: C003 [style] Procedure 'HighPerformancePage' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'HighPerformancePage' to 'highPerformancePage'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:282:1: C003 [style] Procedure 'HighPerformancePageDesktop' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'HighPerformancePageDesktop' to 'highPerformancePageDesktop'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:291:1: C003 [style] Procedure 'HighPerformancePageMobile' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'HighPerformancePageMobile' to 'highPerformancePageMobile'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:306:1: C003 [style] Procedure 'RendererButtonActive' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'RendererButtonActive' to 'rendererButtonActive'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:316:1: C003 [style] Procedure 'RendererButtonInactive' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'RendererButtonInactive' to 'rendererButtonInactive'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:328:1: C003 [style] Procedure 'RendererPage' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'RendererPage' to 'rendererPage'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:354:1: C003 [style] Procedure 'RendererPageDesktop' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'RendererPageDesktop' to 'rendererPageDesktop'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:367:1: C003 [style] Procedure 'RendererPageMobile' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'RendererPageMobile' to 'rendererPageMobile'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:392:5: C016 [style] Local variable 'mobileScreen' is not snake_case — use lowercase_with_underscores
+Fix: Rename 'mobileScreen' to snake_case equivalent
+21 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-freetype/demo/demo.odin:79:4: C001 [correctness] Allocation without matching defer free in same scope
+Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
+1 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/aat/aat_layout.odin:99:1: C007 [style] Type 'layout_feature_type_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'layout_feature_type_t' to 'Layout_feature_type_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/aat/aat_layout.odin:151:1: C007 [style] Type 'layout_feature_selector_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'layout_feature_selector_t' to 'Layout_feature_selector_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/aat/aat_layout.odin:490:1: C007 [style] Type 'layout_feature_selector_info_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'layout_feature_selector_info_t' to 'Layout_feature_selector_info_t'
+3 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/blob.odin:82:1: C007 [style] Type 'blob_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'blob_t' to 'Blob_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/blob.odin:92:1: C007 [style] Type 'memory_mode_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'memory_mode_t' to 'Memory_mode_t'
+2 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:101:1: C007 [style] Type 'glyph_info_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'glyph_info_t' to 'Glyph_info_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:122:1: C007 [style] Type 'glyph_flags_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'glyph_flags_t' to 'Glyph_flags_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:167:1: C007 [style] Type 'glyph_position_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'glyph_position_t' to 'Glyph_position_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:187:1: C007 [style] Type 'buffer_content_type_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'buffer_content_type_t' to 'Buffer_content_type_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:207:1: C007 [style] Type 'segment_properties_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'segment_properties_t' to 'Segment_properties_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:229:1: C007 [style] Type 'buffer_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'buffer_t' to 'Buffer_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:247:1: C007 [style] Type 'buffer_flags_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'buffer_flags_t' to 'Buffer_flags_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:282:1: C007 [style] Type 'buffer_cluster_level_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'buffer_cluster_level_t' to 'Buffer_cluster_level_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:299:1: C007 [style] Type 'buffer_serialize_format_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'buffer_serialize_format_t' to 'Buffer_serialize_format_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:309:1: C007 [style] Type 'buffer_serialize_flags_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'buffer_serialize_flags_t' to 'Buffer_serialize_flags_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/buffer.odin:330:1: C007 [style] Type 'buffer_diff_flags_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'buffer_diff_flags_t' to 'Buffer_diff_flags_t'
+11 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:121:1: C007 [style] Type 'var_int_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'var_int_t' to 'Var_int_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:143:1: C007 [style] Type 'var_num_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'var_num_t' to 'Var_num_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:172:1: C003 [style] Procedure 'TAG' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'TAG' to 'tAG'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:184:1: C003 [style] Procedure 'UNTAG' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'UNTAG' to 'uNTAG'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:225:1: C007 [style] Type 'direction_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'direction_t' to 'Direction_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:238:1: C003 [style] Procedure 'DIRECTION_IS_VALID' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'DIRECTION_IS_VALID' to 'dIRECTION_IS_VALID'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:244:1: C003 [style] Procedure 'DIRECTION_IS_HORIZONTAL' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'DIRECTION_IS_HORIZONTAL' to 'dIRECTION_IS_HORIZONTAL'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:250:1: C003 [style] Procedure 'DIRECTION_IS_VERTICAL' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'DIRECTION_IS_VERTICAL' to 'dIRECTION_IS_VERTICAL'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:256:1: C003 [style] Procedure 'DIRECTION_IS_FORWARD' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'DIRECTION_IS_FORWARD' to 'dIRECTION_IS_FORWARD'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:262:1: C003 [style] Procedure 'DIRECTION_IS_BACKWARD' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'DIRECTION_IS_BACKWARD' to 'dIRECTION_IS_BACKWARD'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:268:1: C003 [style] Procedure 'DIRECTION_REVERSE' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'DIRECTION_REVERSE' to 'dIRECTION_REVERSE'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:292:1: C007 [style] Type 'script_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'script_t' to 'Script_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:521:1: C007 [style] Type 'user_data_key_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'user_data_key_t' to 'User_data_key_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:569:1: C007 [style] Type 'feature_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'feature_t' to 'Feature_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:588:1: C007 [style] Type 'variation_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'variation_t' to 'Variation_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:610:1: C003 [style] Procedure 'COLOR' starts with uppercase — use camelCase or snake_case
+Fix: Rename 'COLOR' to 'cOLOR'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/common.odin:649:1: C007 [style] Type 'style_tag_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'style_tag_t' to 'Style_tag_t'
+17 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/draw.odin:93:1: C007 [style] Type 'draw_funcs_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'draw_funcs_t' to 'Draw_funcs_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/draw.odin:108:1: C007 [style] Type 'draw_state_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'draw_state_t' to 'Draw_state_t'
+2 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/face.odin:94:1: C007 [style] Type 'face_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'face_t' to 'Face_t'
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/font.odin:106:1: C007 [style] Type 'font_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'font_t' to 'Font_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/font.odin:117:1: C007 [style] Type 'font_funcs_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'font_funcs_t' to 'Font_funcs_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/font.odin:558:1: C007 [style] Type 'font_extents_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'font_extents_t' to 'Font_extents_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/font.odin:581:1: C007 [style] Type 'glyph_extents_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'glyph_extents_t' to 'Glyph_extents_t'
+4 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/map.odin:94:1: C007 [style] Type 'map_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'map_t' to 'Map_t'
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot_layout.odin:129:1: C007 [style] Type 'layout_baseline_tag_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'layout_baseline_tag_t' to 'Layout_baseline_tag_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot_layout.odin:149:1: C007 [style] Type 'layout_glyph_class_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'layout_glyph_class_t' to 'Layout_glyph_class_t'
+2 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot_math.odin:110:1: C007 [style] Type 'math_constant_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'math_constant_t' to 'Math_constant_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot_math.odin:177:1: C007 [style] Type 'math_kern_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'math_kern_t' to 'Math_kern_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot_math.odin:192:1: C007 [style] Type 'math_kern_entry_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'math_kern_entry_t' to 'Math_kern_entry_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot_math.odin:208:1: C007 [style] Type 'math_glyph_variant_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'math_glyph_variant_t' to 'Math_glyph_variant_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot_math.odin:221:1: C007 [style] Type 'math_glyph_part_flags_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'math_glyph_part_flags_t' to 'Math_glyph_part_flags_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot_math.odin:233:1: C007 [style] Type 'math_glyph_part_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'math_glyph_part_t' to 'Math_glyph_part_t'
+6 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot.odin:141:1: C007 [style] Type 'color_layer_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'color_layer_t' to 'Color_layer_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot.odin:160:1: C007 [style] Type 'color_palette_flags_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'color_palette_flags_t' to 'Color_palette_flags_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot.odin:183:1: C007 [style] Type 'meta_tag_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'meta_tag_t' to 'Meta_tag_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot.odin:208:1: C007 [style] Type 'metrics_tag_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'metrics_tag_t' to 'Metrics_tag_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot.odin:271:1: C007 [style] Type 'name_id_predefined_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'name_id_predefined_t' to 'Name_id_predefined_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot.odin:312:1: C007 [style] Type 'name_entry_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'name_entry_t' to 'Name_entry_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot.odin:355:1: C007 [style] Type 'var_axis_flags_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'var_axis_flags_t' to 'Var_axis_flags_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/ot/ot.odin:371:1: C007 [style] Type 'var_axis_info_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'var_axis_info_t' to 'Var_axis_info_t'
+8 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/paint.odin:108:1: C007 [style] Type 'paint_funcs_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'paint_funcs_t' to 'Paint_funcs_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/paint.odin:162:1: C007 [style] Type 'color_line_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'color_line_t' to 'Color_line_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/paint.odin:180:1: C007 [style] Type 'color_stop_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'color_stop_t' to 'Color_stop_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/paint.odin:201:1: C007 [style] Type 'paint_extend_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'paint_extend_t' to 'Paint_extend_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/paint.odin:216:1: C007 [style] Type 'paint_composite_mode_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'paint_composite_mode_t' to 'Paint_composite_mode_t'
+5 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/set.odin:95:1: C007 [style] Type 'set_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'set_t' to 'Set_t'
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/shape-plan.odin:97:1: C007 [style] Type 'shape_plan_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'shape_plan_t' to 'Shape_plan_t'
+1 violation(s) in 1 file(s)
+No diagnostics found
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/style/style.odin:89:1: C007 [style] Type 'style_tag_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'style_tag_t' to 'Style_tag_t'
+1 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/subset/subset.odin:101:1: C007 [style] Type 'subset_flags_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'subset_flags_t' to 'Subset_flags_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/subset/subset.odin:125:1: C007 [style] Type 'subset_input_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'subset_input_t' to 'Subset_input_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/subset/subset.odin:134:1: C007 [style] Type 'subset_sets_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'subset_sets_t' to 'Subset_sets_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/subset/subset.odin:152:1: C007 [style] Type 'subset_plan_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'subset_plan_t' to 'Subset_plan_t'
+4 violation(s) in 1 file(s)
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/unicode.odin:102:1: C007 [style] Type 'unicode_combining_class_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'unicode_combining_class_t' to 'Unicode_combining_class_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/unicode.odin:168:1: C007 [style] Type 'unicode_general_category_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'unicode_general_category_t' to 'Unicode_general_category_t'
+🔴 /Users/rainer/Development/MyODIN/RuiShin/vendor-local/odin-harfbuzz/harfbuzz/unicode.odin:210:1: C007 [style] Type 'unicode_funcs_t' starts with lowercase — use PascalCase for type names
+Fix: Rename 'unicode_funcs_t' to 'Unicode_funcs_t'
+3 violation(s) in 1 file(s)
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found
+No diagnostics found

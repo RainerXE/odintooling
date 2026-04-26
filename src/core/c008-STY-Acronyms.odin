@@ -1,3 +1,5 @@
+// c008-STY-Acronyms.odin — C008: acronym capitalisation hints (disabled).
+// Placeholder for a future rule; acronym casing is intentionally flexible in Odin.
 package core
 
 // =============================================================================

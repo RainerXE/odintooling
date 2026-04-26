@@ -1,0 +1,6 @@
+tests/C014_DEA_UNUSEDPROC/c014_fixture_fail.odin:6:1: C014 [dead_code] @(private) proc 'dead_helper' is never called — consider removing it
+tests/C014_DEA_UNUSEDPROC/c014_fixture_fail.odin:11:1: C014 [dead_code] @(private) proc 'another_dead_helper' is never called — consider removing it
+export-symbols: 1 files, 3 nodes, 0 edges, 0 unresolved
+  dead code:    2 violation(s)
+  graph db:    /tmp/c014_fail_test.db
+  symbols.json: .codegraph/symbols.json

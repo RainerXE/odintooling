@@ -1,3 +1,6 @@
+// ast.odin — ASTNode type, tree conversion, and walker utilities.
+// convertToASTNode wraps tree-sitter TSNode into the ASTNode struct used by C001,
+// C101, C029, C033, and other rules that need the custom ASTNode-based walker.
 package core
 
 import "core:fmt"

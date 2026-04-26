@@ -1,3 +1,6 @@
+// query_engine.odin — tree-sitter SCM query compilation, execution, and result management.
+// load_query_src compiles an S-expression pattern against the Odin grammar; run_query
+// executes it against a parsed AST and returns named capture results.
 package core
 
 import "core:fmt"

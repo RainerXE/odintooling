@@ -1,0 +1,3 @@
+🔴 tests/B001_STR_BRACEBALANCE/b001_fixture_unclosed.odin:6:15: B001 [structural] unclosed block opened at line 6, col 15 — expected matching '}'
+🔵 tests/B001_STR_BRACEBALANCE/b001_fixture_unclosed.odin:0:0: B001 [structural] INFO: other diagnostics suppressed — fix brace imbalance first
+2 violation(s) in 1 file(s)

@@ -1,3 +1,6 @@
+// lsp/diagnostic_inject.odin — publishDiagnostics JSON merging for the LSP proxy.
+// Parses the OLS publishDiagnostics payload, appends olt-generated diagnostics with
+// source=olt-lint, and re-serialises the merged array back to the editor.
 package lsp_proxy
 
 import "core:encoding/json"
