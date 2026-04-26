@@ -1,0 +1,17 @@
+# olt.toml — project configuration for olt itself
+# Run 'olt --help' for all options, or 'olt --explain C001' for rule details.
+
+[domains]
+ffi           = true  # C011: FFI resource safety (we use tree-sitter C bindings)
+odin_2026     = true  # C009/C010: deprecated API detection
+stdlib_safety = true  # C029/C033: stdlib allocation safety
+
+[naming]
+c016 = true   # local variables must be snake_case
+c017 = false  # package-level variable camelCase (opt-in)
+c018 = false  # visibility marker conventions (opt-in)
+c019 = false  # type marker suffixes (opt-in)
+c020 = false  # minimum name length (opt-in)
+
+[tools]
+# ols_path = "/path/to/ols"   # uncomment if ols is not in PATH
