@@ -1,3 +1,6 @@
+// c202-COR-SwitchExhaust.odin — C202: non-exhaustive switch on enum (requires --export-symbols).
+// Consults the graph DB enum_members table to check that every enum case is handled;
+// skips #partial switch and switches where the enum type cannot be resolved.
 package core
 
 import "core:fmt"

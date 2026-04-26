@@ -1,3 +1,6 @@
+// suppression.odin — inline diagnostic suppression via source comments.
+// Parses `// olt:ignore C001` (and legacy `// odin-lint:ignore`) comments and
+// builds a per-line map so rules can skip flagging suppressed locations.
 package core
 
 import "core:fmt"

@@ -1,3 +1,6 @@
+// c020-STY-ShortName.odin — C020: minimum variable name length (opt-in).
+// Flags variable names shorter than the configured threshold (default 3) unless
+// they appear in the allow-list (i, j, k, x, y, z, n, ok, err, db, id).
 package core
 
 import "core:fmt"

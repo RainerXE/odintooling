@@ -1,0 +1,132 @@
+========================================================
+ odin-lint Full Rule Report — RuiShin
+ Date: Tue Apr 21 08:39:44 CEST 2026
+ Linter: odin-lint 0.4.0
+supports Odin dev-2026-04 (grammar: dev-2026-04)
+========================================================
+
+Files scanned:       272
+Files with issues:   0
+Total violations:    285
+Total warnings:      0
+Internal errors:     0
+B001 suppressions:   1
+
+--------------------------------------------------------
+ VIOLATIONS BY RULE
+--------------------------------------------------------
+
+--------------------------------------------------------
+ B001 — FILES WITH BRACE IMBALANCE
+--------------------------------------------------------
+
+--------------------------------------------------------
+ TOP 20 FILES BY VIOLATION COUNT
+--------------------------------------------------------
+
+--------------------------------------------------------
+ C001 — MEMORY ALLOCATION WITHOUT DEFER FREE
+--------------------------------------------------------
+  Total: 116
+  🔴 src/assets/colors.odin:84:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/assets/manager.odin:89:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/font_manager.odin:102:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/font_manager.odin:103:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/font_manager.odin:112:3: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/font_manager.odin:170:3: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_core.odin:1384:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_core.odin:1447:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_core.odin:4360:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_core.odin:5968:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_core.odin:5979:5: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_core.odin:6015:5: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_core.odin:6163:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_draw.odin:870:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_draw.odin:1050:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_draw.odin:1306:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_draw.odin:1310:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_draw.odin:1324:3: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_draw.odin:1325:3: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_draw.odin:1408:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_text.odin:102:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_text.odin:319:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/g2d_text.odin:556:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/gpu_asset_manager.odin:98:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/rsd_decoder.odin:124:3: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/rsd_decoder.odin:327:2: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/rsd_decoder.odin:382:4: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/rsd_render.odin:220:4: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/rsd_render.odin:221:4: C001 [correctness] Allocation without matching defer free in same scope
+  🔴 src/graphics/rsd_render.odin:260:4: C001 [correctness] Allocation without matching defer free in same scope
+  ... (86 more)
+
+--------------------------------------------------------
+ C002 — DOUBLE-FREE / USE-AFTER-FREE
+--------------------------------------------------------
+  Total: 0
+
+--------------------------------------------------------
+ C003/C007 — NAMING CONVENTIONS (proc/type)
+--------------------------------------------------------
+  Total: 151
+  🔴 src/engine/scene.odin:1446:1: C003 [style] Procedure 'Scene_Event_Listener' starts with uppercase — use camelCase or snake_case
+  🔴 src/layout/layout.odin:157:1: C003 [style] Procedure 'SizingFixed' starts with uppercase — use camelCase or snake_case
+  🔴 src/layout/layout.odin:161:1: C003 [style] Procedure 'SizingGrow' starts with uppercase — use camelCase or snake_case
+  🔴 src/layout/layout.odin:165:1: C003 [style] Procedure 'SizingFit' starts with uppercase — use camelCase or snake_case
+  🔴 src/layout/layout.odin:169:1: C003 [style] Procedure 'SizingPercent' starts with uppercase — use camelCase or snake_case
+  🔴 src/layout/layout.odin:173:1: C003 [style] Procedure 'CornerRadiusAll' starts with uppercase — use camelCase or snake_case
+  🔴 src/platform/detect.odin:22:2: C007 [style] Type 'iOS' starts with lowercase — use PascalCase for type names
+  🔴 src/renderer/animations.odin:182:1: C003 [style] Procedure 'Ease_Fn' starts with uppercase — use camelCase or snake_case
+  🔴 src/renderer/renderer.odin:800:1: C003 [style] Procedure 'SetAtlasSizeOverride' starts with uppercase — use camelCase or snake_case
+  🔴 tests/unit/logging/test_logging_basic.odin:10:1: C007 [style] Type 'logging_basic_suite' starts with lowercase — use PascalCase for type names
+  🔴 tests/unit/logging/test_logging_intelligent.odin:10:1: C007 [style] Type 'logging_intelligent_suite' starts with lowercase — use PascalCase for type names
+  🔴 tests/unit/logging/test_logging_setup.odin:9:1: C007 [style] Type 'logging_setup_suite' starts with lowercase — use PascalCase for type names
+  🔴 vendor-local/clay/bindings/odin/clay-odin/clay.odin:382:2: C003 [style] Procedure 'MinMemorySize' starts with uppercase — use camelCase or snake_case
+  🔴 vendor-local/clay/bindings/odin/clay-odin/clay.odin:383:2: C003 [style] Procedure 'CreateArenaWithCapacityAndMemory' starts with uppercase — use camelCase or snake_case
+  🔴 vendor-local/clay/bindings/odin/clay-odin/clay.odin:384:2: C003 [style] Procedure 'SetPointerState' starts with uppercase — use camelCase or snake_case
+  🔴 vendor-local/clay/bindings/odin/clay-odin/clay.odin:385:2: C003 [style] Procedure 'Initialize' starts with uppercase — use camelCase or snake_case
+  🔴 vendor-local/clay/bindings/odin/clay-odin/clay.odin:386:2: C003 [style] Procedure 'GetCurrentContext' starts with uppercase — use camelCase or snake_case
+  🔴 vendor-local/clay/bindings/odin/clay-odin/clay.odin:387:2: C003 [style] Procedure 'SetCurrentContext' starts with uppercase — use camelCase or snake_case
+  🔴 vendor-local/clay/bindings/odin/clay-odin/clay.odin:388:2: C003 [style] Procedure 'UpdateScrollContainers' starts with uppercase — use camelCase or snake_case
+  🔴 vendor-local/clay/bindings/odin/clay-odin/clay.odin:389:2: C003 [style] Procedure 'SetLayoutDimensions' starts with uppercase — use camelCase or snake_case
+  ... (131 more)
+
+--------------------------------------------------------
+ C009 — DEPRECATED core:os/old IMPORTS
+--------------------------------------------------------
+  Total: 0
+
+--------------------------------------------------------
+ C010 — DEPRECATED fmt PROCS
+--------------------------------------------------------
+  Total: 0
+
+--------------------------------------------------------
+ C011 — FFI RESOURCE SAFETY
+--------------------------------------------------------
+  Total: 0
+
+--------------------------------------------------------
+ C016/C017/C018 — VISIBILITY MARKERS
+--------------------------------------------------------
+  Total: 16
+  🔴 src/assets/colors.odin:47:6: C016 [style] Local variable 'okR' is not snake_case — use lowercase_with_underscores
+  🔴 src/assets/colors.odin:51:6: C016 [style] Local variable 'okG' is not snake_case — use lowercase_with_underscores
+  🔴 src/assets/colors.odin:55:6: C016 [style] Local variable 'okB' is not snake_case — use lowercase_with_underscores
+  🔴 src/graphics/g2d_record.odin:144:11: C016 [style] Local variable 'RECORD_MAGIC' is not snake_case — use lowercase_with_underscores
+  🔴 src/graphics/g2d_record.odin:188:11: C016 [style] Local variable 'RECORD_MAGIC' is not snake_case — use lowercase_with_underscores
+  🔴 src/layout/render_bridge.odin:138:18: C016 [style] Local variable 'CLAY_ORDERED_FLUSH' is not snake_case — use lowercase_with_underscores
+  🔴 src/layout/render_bridge.odin:188:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_L' is not snake_case — use lowercase_with_underscores
+  🔴 src/layout/render_bridge.odin:189:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_T' is not snake_case — use lowercase_with_underscores
+  🔴 src/layout/render_bridge.odin:190:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_R' is not snake_case — use lowercase_with_underscores
+  🔴 src/layout/render_bridge.odin:191:16: C016 [style] Local variable 'CLAY_SCISSOR_EXPAND_B' is not snake_case — use lowercase_with_underscores
+  🔴 src/main.odin:189:8: C016 [style] Local variable 'COLOR_BAR' is not snake_case — use lowercase_with_underscores
+  🔴 vendor-local/clay/bindings/odin/examples/clay-official-website/clay_renderer_raylib.odin:51:2: C016 [style] Local variable 'scaleFactor' is not snake_case — use lowercase_with_underscores
+  🔴 vendor-local/clay/bindings/odin/examples/clay-official-website/clay_renderer_raylib.odin:80:2: C016 [style] Local variable 'scaleFactor' is not snake_case — use lowercase_with_underscores
+  🔴 vendor-local/clay/bindings/odin/examples/clay-official-website/clay_renderer_raylib.odin:116:13: C016 [style] Local variable 'imageTexture' is not snake_case — use lowercase_with_underscores
+  🔴 vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:146:5: C016 [style] Local variable 'textConfig' is not snake_case — use lowercase_with_underscores
+  🔴 vendor-local/clay/bindings/odin/examples/clay-official-website/clay-official-website.odin:392:5: C016 [style] Local variable 'mobileScreen' is not snake_case — use lowercase_with_underscores
+
+========================================================
+ END OF REPORT
+========================================================

@@ -1,0 +1,7 @@
+🔴 tests/C020_STY_SHORTNAME/c020_fixture_fail.odin:6:5: C020 [style] Short local variable name 'a' (length 1 < 3) — use a descriptive name
+🔴 tests/C020_STY_SHORTNAME/c020_fixture_fail.odin:7:5: C020 [style] Short local variable name 'b' (length 1 < 3) — use a descriptive name
+🔴 tests/C020_STY_SHORTNAME/c020_fixture_fail.odin:11:20: C020 [style] Short parameter name 'p' (length 1 < 3) — use a descriptive name
+🔴 tests/C020_STY_SHORTNAME/c020_fixture_fail.odin:11:28: C020 [style] Short parameter name 'q' (length 1 < 3) — use a descriptive name
+🔴 tests/C020_STY_SHORTNAME/c020_fixture_fail.odin:16:32: C020 [style] Short parameter name 'v' (length 1 < 3) — use a descriptive name
+🔴 tests/C020_STY_SHORTNAME/c020_fixture_fail.odin:18:5: C020 [style] Short local variable name 's' (length 1 < 3) — use a descriptive name
+6 violation(s) in 1 file(s)

@@ -1,3 +1,6 @@
+// c201-COR-UncheckedResult.odin — C201: unchecked error return value.
+// SCM query finds bare call statements (not assigned) to procs that return an error
+// or bool; uses the graph DB for project-local proc resolution beyond the stdlib list.
 package core
 
 import "core:fmt"

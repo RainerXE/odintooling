@@ -1,3 +1,6 @@
+// c014-DEA-UnusedProc.odin — C014: unexported procedure never called.
+// Uses graph DB call-edge data (built by --export-symbols) to identify
+// procedures that are declared but never referenced within the package.
 package core
 
 import "core:fmt"

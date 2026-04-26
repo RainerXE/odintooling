@@ -1,0 +1,5 @@
+🔴 tests/C101_CTX_INTEGRITY/c101_fail.odin:7:5: C101 [correctness] context.allocator assigned without 'defer context.allocator = ...' restore
+Fix: Save the old value before the assignment and add 'defer context.allocator = <saved>'
+🔴 tests/C101_CTX_INTEGRITY/c101_fail.odin:13:5: C101 [correctness] context.temp_allocator assigned without 'defer context.temp_allocator = ...' restore
+Fix: Save the old value before the assignment and add 'defer context.temp_allocator = <saved>'
+2 violation(s) in 1 file(s)

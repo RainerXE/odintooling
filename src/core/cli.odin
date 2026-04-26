@@ -1,3 +1,6 @@
+// cli.odin — command-line argument parsing, version info, help text, and rule listing.
+// parse_args turns os.args[1:] into LintOptions; rule_enabled decides whether a rule
+// should run given the active filters, tier, and domain config from olt.toml.
 package core
 
 import "core:fmt"

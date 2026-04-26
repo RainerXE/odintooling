@@ -1,3 +1,6 @@
+// b001-STR-BraceBalance.odin — B001: unmatched brace detection.
+// Runs before tree-sitter; if braces are unbalanced the AST is unreliable
+// so all other rules are suppressed for that file.
 package core
 
 import "core:fmt"

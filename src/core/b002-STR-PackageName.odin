@@ -1,3 +1,6 @@
+// b002-STR-PackageName.odin — B002/B003: package-name consistency rules.
+// B002 flags files whose package declaration doesn't match the directory majority;
+// B003 flags a subdirectory that reuses its parent's package name.
 package core
 
 import "core:os"

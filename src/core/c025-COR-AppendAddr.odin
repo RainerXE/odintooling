@@ -1,3 +1,6 @@
+// c025-COR-AppendAddr.odin — C025: append(slice, v) missing address-of (go_migration domain).
+// In Odin, append takes a pointer to the dynamic array: append(&slice, v).
+// The SCM and text-based scanners flag bare append(slice, v) calls.
 package core
 
 import "core:fmt"

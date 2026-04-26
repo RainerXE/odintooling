@@ -1,3 +1,6 @@
+// c016-STY-LocalNaming.odin — C016: local variable snake_case convention.
+// Local variables should use snake_case; this rule is enabled by default and
+// shares the naming SCM pass with C003/C007/C017/C018/C020.
 package core
 
 import "core:fmt"

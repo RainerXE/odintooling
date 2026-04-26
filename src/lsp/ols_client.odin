@@ -1,3 +1,6 @@
+// lsp/ols_client.odin — OLS subprocess lifecycle: spawn, pipe management, and shutdown.
+// Starts vanilla OLS as a child process, routes Content-Length-framed LSP messages
+// between the proxy and OLS, and handles OLS crash recovery.
 package lsp_proxy
 
 import "core:bufio"

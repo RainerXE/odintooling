@@ -1,0 +1,2 @@
+Warning: scanning 'tests/B002_STR_PACKAGENAME/correct_pkg/' recursively. Use --non-recursive to scan top-level only.
+No violations found in 3 file(s)

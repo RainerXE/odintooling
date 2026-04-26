@@ -1,0 +1,4 @@
+Warning: scanning 'tests/B002_STR_PACKAGENAME/wrong_pkg/' recursively. Use --non-recursive to scan top-level only.
+🔴 /Users/rainer/SynologyDrive/Development/MyODIN/odintooling/tests/B002_STR_PACKAGENAME/wrong_pkg/file_c_wrong.odin:1:1: B002 [structural] package "renderer" — expected "graphics" (majority in this directory)
+Fix: Change to: package graphics
+1 violation(s) in 0 file(s)

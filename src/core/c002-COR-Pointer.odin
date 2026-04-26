@@ -1,3 +1,6 @@
+// c002-COR-Pointer.odin — C002: double-free and use-after-free detection.
+// Uses a tree-sitter SCM query to find variables that are freed twice in the same
+// block scope, accounting for if/switch branching to minimise false positives.
 package core
 
 import "core:fmt"

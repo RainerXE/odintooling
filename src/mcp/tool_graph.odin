@@ -1,3 +1,6 @@
+// mcp/tool_graph.odin — codegraph_* MCP tools for code-knowledge graph queries.
+// Exposes codegraph_search, codegraph_context, codegraph_callers, codegraph_callees,
+// codegraph_impact, codegraph_node, codegraph_files, and codegraph_status to AI agents.
 package mcp_server
 
 import "core:encoding/json"

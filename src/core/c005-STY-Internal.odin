@@ -1,3 +1,5 @@
+// c005-STY-Internal.odin — C005: internal symbol naming (disabled).
+// Placeholder; internal convention checks superseded by C016/C018.
 package core
 
 // =============================================================================

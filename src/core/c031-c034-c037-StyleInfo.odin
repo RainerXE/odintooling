@@ -1,3 +1,6 @@
+// c031-c034-c037-StyleInfo.odin — C031/C034/C037: INFO-tier style suggestions.
+// C031 flags panic() on expected runtime failures; C034 flags for v,_ in (redundant blank
+// index); C037 flags a trailing bare return at the end of a void procedure.
 package core
 
 import "core:fmt"

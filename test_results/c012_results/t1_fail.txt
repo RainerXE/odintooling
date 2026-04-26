@@ -1,0 +1,7 @@
+🔵 tests/C012_SEM_NAMING/c012_t1_fail.odin:9:1: C012 [style] INFO: Variable 'scratch' is typed mem.Allocator — include 'alloc' or 'allocator' in the name to signal its role
+Fix: Rename 'scratch' to 'scratch_alloc'
+🔵 tests/C012_SEM_NAMING/c012_t1_fail.odin:12:1: C012 [style] INFO: Variable 'pool' is typed mem.Allocator — include 'alloc' or 'allocator' in the name to signal its role
+Fix: Rename 'pool' to 'pool_alloc'
+🔵 tests/C012_SEM_NAMING/c012_t1_fail.odin:15:1: C012 [style] INFO: Variable 'backing' is typed mem.Allocator — include 'alloc' or 'allocator' in the name to signal its role
+Fix: Rename 'backing' to 'backing_alloc'
+3 violation(s) in 1 file(s)
