@@ -161,6 +161,12 @@ _RULES :: []RuleCatalogEntry{
     {"C025", "correctness", "correctness_append_missing_addr",
      "append(slice, v) missing address-of — Odin's append takes a pointer to the slice (go_migration domain)",
      "Add & before first argument: change append(slice, ...) to append(&slice, ...)", false},
+    {"C029", "correctness", "correctness_stdlib_alloc_leak",
+     "stdlib allocating proc (strings.split/clone/join, fmt.aprintf, os.read_entire_file…) result not freed (stdlib_safety domain)",
+     "Add 'defer delete(var)' immediately after the allocation", false},
+    {"C033", "correctness", "correctness_builder_not_destroyed",
+     "strings.builder_make() without matching defer strings.builder_destroy — internal buffer leaks (stdlib_safety domain)",
+     "Add 'defer strings.builder_destroy(&sb)' immediately after strings.builder_make()", false},
     {"B001", "structural", "structure_unmatched_brace",
      "Unmatched brace — file has mismatched {{ or }}",
      "Fix brace balance", true},
@@ -271,7 +277,7 @@ _run_odin_check_handler :: proc(params: json.Value, allocator: runtime.Allocator
     defer delete(stderr_bytes)
 
     if exec_err != nil {
-        msg := fmt.aprintf("odin check failed to launch: %v", exec_err)
+        msg := fmt.aprintf("odin check failed to launch: %v", exec_err, allocator)
         b_err := strings.builder_make(allocator)
         strings.write_string(&b_err, `{"ok":false,"error":`)
         _json_str(&b_err, msg)

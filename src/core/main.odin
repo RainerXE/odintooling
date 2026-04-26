@@ -180,6 +180,30 @@ analyze_file :: proc(
         }
     }
 
+    // C029: stdlib alloc without defer delete (stdlib_safety domain)
+    // C033: strings.Builder without defer strings.builder_destroy (stdlib_safety domain)
+    if rule_enabled("C029", "correctness", opts) || rule_enabled("C033", "correctness", opts) {
+        ast_root, parse_ok := parseFile(ts_parser^, file_path)
+        if parse_ok {
+            std_content, std_err := os.read_entire_file_from_path(file_path, context.allocator)
+            if std_err == nil {
+                defer delete(std_content)
+                std_lines := strings.split(string(std_content), "\n")
+                defer delete(std_lines)
+                if rule_enabled("C029", "correctness", opts) {
+                    for d in dedupDiagnostics(c029_run(file_path, &ast_root, std_lines)) {
+                        violations += emit_or_collect(d, collector)
+                    }
+                }
+                if rule_enabled("C033", "correctness", opts) {
+                    for d in dedupDiagnostics(c033_run(file_path, &ast_root, std_lines)) {
+                        violations += emit_or_collect(d, collector)
+                    }
+                }
+            }
+        }
+    }
+
     // C002: Double-free detection (tree-sitter SCM)
     if rule_enabled("C002", "correctness", opts) {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)

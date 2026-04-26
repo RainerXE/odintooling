@@ -19,6 +19,8 @@ rule_id_to_error_class :: proc(rule_id: string) -> string {
     case "C022": return "correctness_go_range_loop"
     case "C023": return "correctness_go_deref_syntax"
     case "C025": return "correctness_append_missing_addr"
+    case "C029": return "correctness_stdlib_alloc_leak"
+    case "C033": return "correctness_builder_not_destroyed"
     // ── Style ─────────────────────────────────────────────────────────────────
     case "C003": return "style_naming_proc"
     case "C007": return "style_naming_type"
