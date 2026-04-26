@@ -172,7 +172,7 @@ suppression_summary :: proc(suppressions: map[int][]string) -> string {
 
     sorted_lines: [dynamic]int
     defer delete(sorted_lines)
-    for line_num, _ in suppressions {
+    for line_num in suppressions {
         append_elem(&sorted_lines, line_num)
     }
 

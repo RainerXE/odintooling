@@ -154,4 +154,19 @@ analyze_content :: proc(
 		}
 	}
 
+	// C031: panic() for expected runtime failures (INFO)
+	for d in dedupDiagnostics(c031_run(file_path, lines)) {
+		append(diags, d)
+	}
+
+	// C034: unused blank index in for loop (INFO)
+	for d in dedupDiagnostics(c034_run(file_path, lines)) {
+		append(diags, d)
+	}
+
+	// C037: trailing return in void proc (INFO)
+	for d in dedupDiagnostics(c037_run(file_path, lines)) {
+		append(diags, d)
+	}
+
 }
