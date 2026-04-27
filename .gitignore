@@ -3,23 +3,24 @@
 # =============================================================================
 
 # ── Binaries (committed per-platform in artifacts/<platform>/) ────────────────
-# Root-level strays
-odin-lint
-olt
+# Root-level strays (leading / anchors to repo root only)
+/odin-lint
+/olt
 
-# Old flat artifact names (replaced by platform subfolders)
-artifacts/odin-lint
-artifacts/odin-lint-mcp
-artifacts/odin-lint-lsp
-artifacts/odin-lint-plugin.dylib
-artifacts/odin-lint-plugin.so
-artifacts/odin-lint-debug
-artifacts/odin-lint-debug2
-artifacts/odin-lint-debug.dSYM/
-artifacts/odin-lint-debug2.dSYM/
-artifacts/olt
-artifacts/olt-mcp
-artifacts/olt-lsp
+# Old flat artifact names (replaced by platform subfolders).
+# Use exact paths so platform subfolders like artifacts/macos-arm64/olt are NOT ignored.
+/artifacts/odin-lint
+/artifacts/odin-lint-mcp
+/artifacts/odin-lint-lsp
+/artifacts/odin-lint-plugin.dylib
+/artifacts/odin-lint-plugin.so
+/artifacts/odin-lint-debug
+/artifacts/odin-lint-debug2
+/artifacts/odin-lint-debug.dSYM/
+/artifacts/odin-lint-debug2.dSYM/
+/artifacts/olt
+/artifacts/olt-mcp
+/artifacts/olt-lsp
 
 # ── Generated code graph ──────────────────────────────────────────────────────
 .codegraph/
