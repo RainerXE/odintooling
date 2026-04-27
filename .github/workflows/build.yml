@@ -1,0 +1,137 @@
+name: Build
+
+# ─── Triggers ────────────────────────────────────────────────────────────────
+# • Every push to master          → build all platforms, keep artifacts 7 days
+# • Every version tag (v*)        → build all platforms, attach to GitHub Release
+# • Manual trigger (Actions tab)  → build on demand, choose which platforms
+on:
+  push:
+    branches: [master]
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Platforms to build (all / macos / linux / windows)'
+        default: 'all'
+        required: false
+
+# ─── Jobs ────────────────────────────────────────────────────────────────────
+# Each job runs on a DIFFERENT machine identified by its labels.
+# You register a runner on a machine once; GitHub routes matching jobs to it.
+
+jobs:
+
+  # ── macOS ARM64 ─────────────────────────────────────────────────────────────
+  # Runs on: your Apple Silicon Mac (the one you develop on)
+  # Labels set when you registered the runner: self-hosted, macos, arm64
+  build-macos:
+    name: macOS ARM64
+    if: ${{ github.event.inputs.platforms == '' || contains(fromJSON('["all","macos"]'), github.event.inputs.platforms) }}
+    runs-on: [self-hosted, macos, arm64]
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build olt, olt-mcp, olt-lsp
+        run: |
+          ./scripts/build.sh
+          ./scripts/build_mcp.sh
+          ./scripts/build_lsp.sh
+
+      - name: Smoke test
+        run: |
+          BIN=./artifacts/macos-arm64/olt
+          $BIN --version | grep -q 'olt' || (echo "version check failed" && exit 1)
+          $BIN --list-rules | grep -q 'C001' || (echo "list-rules check failed" && exit 1)
+          echo 'package s; p::proc(){_=1+1}' > /tmp/s.odin
+          $BIN /tmp/s.odin && echo "clean lint OK"
+          echo 'package l; l::proc(){_=make([]u8,10)}' > /tmp/l.odin
+          $BIN /tmp/l.odin; [ $? -eq 1 ] && echo "leak detection OK"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: artifacts/macos-arm64/
+          retention-days: 7
+
+  # ── Linux x86_64 ────────────────────────────────────────────────────────────
+  # Runs on: your Debian 13 x86_64 machine
+  # Labels set when you registered the runner: self-hosted, linux, x86_64
+  build-linux-x86:
+    name: Linux x86_64
+    if: ${{ github.event.inputs.platforms == '' || contains(fromJSON('["all","linux"]'), github.event.inputs.platforms) }}
+    runs-on: [self-hosted, linux, x86_64]
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build + smoke test
+        # build_linux_x86.sh calls _build_linux_inner.sh which includes 8 smoke tests
+        run: ./scripts/build_linux_x86.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: artifacts/linux-x86_64/
+          retention-days: 7
+
+  # ── Windows x86_64 ──────────────────────────────────────────────────────────
+  # Runs on: your Windows 11 VM or machine
+  # Labels set when you registered the runner: self-hosted, windows, x86_64
+  build-windows:
+    name: Windows x86_64
+    if: ${{ github.event.inputs.platforms == '' || contains(fromJSON('["all","windows"]'), github.event.inputs.platforms) }}
+    runs-on: [self-hosted, windows, x86_64]
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build + smoke test
+        shell: pwsh
+        run: .\scripts\build_windows.ps1
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: artifacts/windows-x86_64/
+          retention-days: 7
+
+  # ── Attach to GitHub Release (only on version tags) ──────────────────────
+  # Waits for all three platform builds to finish, then uploads binaries
+  # to the GitHub Release page that was created when you pushed the tag.
+  release:
+    name: Publish release assets
+    needs: [build-macos, build-linux-x86, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Attach binaries to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/macos-arm64/olt
+            dist/macos-arm64/olt-mcp
+            dist/macos-arm64/olt-lsp
+            dist/linux-x86_64/olt
+            dist/linux-x86_64/olt-mcp
+            dist/linux-x86_64/olt-lsp
+            dist/windows-x86_64/olt.exe
+            dist/windows-x86_64/olt-mcp.exe
+            dist/windows-x86_64/olt-lsp.exe
