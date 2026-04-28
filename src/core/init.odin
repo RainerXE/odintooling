@@ -1,6 +1,10 @@
-// init.odin — olt --init first-run wizard and --install system symlink creator.
-// The wizard guides users through OLS detection, olt.toml profile selection, and
-// binary installation to ~/.local/bin/ with PATH verification.
+// init.odin — olt setup (system wizard) and olt init (local project config).
+//
+// olt setup  — full first-run wizard: OLS detection, install + symlinks.
+//              Writes ~/.config/olt/setup_done on completion.
+// olt init   — creates olt.toml in the current directory.
+//              Checks for setup_done marker first; if missing, runs setup.
+// --install  — re-run only the install step (useful after a rebuild).
 package core
 
 import "core:fmt"
@@ -8,48 +12,107 @@ import "core:os"
 import "core:strings"
 
 // =============================================================================
-// olt --init    — interactive first-run setup wizard
-// olt --install — create symlinks in ~/.local/bin/
-// =============================================================================
-//
-// --init  walks the user through:
-//   1. Locating / configuring OLS (Odin Language Server)
-//   2. Creating an olt.toml with a chosen rule profile
-//   3. Installing binaries to ~/.local/bin/
-//
-// --install runs only step 3 (useful after a rebuild).
+// Public entry points
 // =============================================================================
 
-// run_init_command runs the interactive first-run wizard. Returns exit code.
-run_init_command :: proc() -> int {
-	fmt.printfln("olt %s  —  First-run setup", OLT_VERSION)
+// run_setup_command is the full first-run wizard. Returns exit code.
+// Invoked by: `olt setup`  and  `olt --init` (backward compat alias).
+run_setup_command :: proc() -> int {
+	fmt.printfln("olt %s  —  Setup", OLT_VERSION)
 	fmt.println()
 
 	// ── Step 1: OLS ──────────────────────────────────────────────────────────
-	_init_header(1, 3, "OLS (Odin Language Server)")
-	ols_path := _init_ols_step()
+	_init_header(1, 2, "OLS (Odin Language Server)")
+	_init_ols_step()
 	fmt.println()
 
-	// ── Step 2: Config ───────────────────────────────────────────────────────
-	_init_header(2, 3, "Project configuration")
-	_init_config_step(ols_path)
-	fmt.println()
-
-	// ── Step 3: Install ──────────────────────────────────────────────────────
-	_init_header(3, 3, "Install")
+	// ── Step 2: Install ──────────────────────────────────────────────────────
+	_init_header(2, 2, "Install")
 	_install_step()
 	fmt.println()
 
-	fmt.println("Setup complete.  Run 'olt --help' to get started.")
+	_write_setup_marker()
+	fmt.println("Setup complete.")
+	fmt.println("Run 'olt init' in any Odin project to create a local olt.toml.")
 	return 0
 }
 
-// run_install_command runs only the install step. Returns exit code.
+// run_init_command is the backward-compat alias for run_setup_command.
+// Invoked by: `olt --init`
+run_init_command :: proc() -> int {
+	return run_setup_command()
+}
+
+// run_local_init creates olt.toml in the current directory.
+// Invoked by: `olt init`
+// If setup has not been run, informs the user and offers to run it first.
+run_local_init :: proc() -> int {
+	if !_setup_done() {
+		fmt.println("olt setup has not been run yet.")
+		fmt.println("It configures OLS and installs olt system-wide — needed for full functionality.")
+		fmt.println()
+		fmt.print("Run 'olt setup' now? [Y/n]: ")
+		if _yn_default_yes() {
+			fmt.println()
+			code := run_setup_command()
+			if code != 0 { return code }
+			fmt.println()
+		} else {
+			fmt.println("Skipped — you can run 'olt setup' at any time.")
+			fmt.println()
+		}
+	}
+
+	fmt.printfln("olt %s  —  Project init", OLT_VERSION)
+	fmt.println()
+	_init_config_step("")
+	return 0
+}
+
+// run_install_command re-runs only the install step. Returns exit code.
+// Invoked by: `olt --install`
 run_install_command :: proc() -> int {
 	fmt.printfln("olt %s  —  Install", OLT_VERSION)
 	fmt.println()
 	_install_step()
 	return 0
+}
+
+// =============================================================================
+// Setup marker
+// =============================================================================
+
+@(private = "file")
+_setup_marker_path :: proc() -> string {
+	home, ok := os.lookup_env_alloc("HOME", context.temp_allocator)
+	if !ok || home == "" { return "" }
+	return strings.join([]string{home, ".config", "olt", "setup_done"}, "/",
+		allocator = context.temp_allocator)
+}
+
+@(private = "file")
+_setup_done :: proc() -> bool {
+	path := _setup_marker_path()
+	return path != "" && os.is_file(path)
+}
+
+@(private = "file")
+_write_setup_marker :: proc() {
+	path := _setup_marker_path()
+	if path == "" { return }
+	// Ensure ~/.config/olt/ exists.
+	last_slash := strings.last_index(path, "/")
+	if last_slash > 0 {
+		dir := path[:last_slash]
+		if !os.is_dir(dir) {
+			state, _, _, err := os.process_exec(
+				os.Process_Desc{command = []string{"mkdir", "-p", dir}},
+				context.allocator,
+			)
+			if err != nil || !state.success { return }
+		}
+	}
+	_ = os.write_entire_file_from_string(path, OLT_VERSION)
 }
 
 // =============================================================================
@@ -128,16 +191,15 @@ _install_step :: proc() {
 		return
 	}
 
-	bin_dir := _own_bin_dir()
-	dst_dir := strings.join([]string{home, ".local", "bin"}, "/")
-	defer delete(dst_dir)
-
-	// Resolve bin_dir to an absolute path so symlinks work from any directory.
+	bin_dir     := _own_bin_dir()
 	abs_bin_dir := _resolve_path(bin_dir)
 	defer delete(abs_bin_dir)
 
 	olt_src := strings.join([]string{abs_bin_dir, "olt"}, "/")
 	defer delete(olt_src)
+
+	dst_dir := strings.join([]string{home, ".local", "bin"}, "/")
+	defer delete(dst_dir)
 
 	fmt.printfln("  Source:  %s", olt_src)
 	fmt.printfln("  Target:  %s/", dst_dir)
@@ -148,7 +210,6 @@ _install_step :: proc() {
 		return
 	}
 
-	// Create target directory if needed.
 	if !os.is_dir(dst_dir) {
 		state, _, _, err := os.process_exec(
 			os.Process_Desc{command = []string{"mkdir", "-p", dst_dir}},
@@ -177,7 +238,7 @@ _install_step :: proc() {
 		}
 	}
 
-	// Symlinks — each is optional and asked separately.
+	// Symlinks — asked separately.
 	fmt.println()
 	fmt.println("  Symlinks (all point to olt, enable argv[0] mode dispatch):")
 	fmt.println()
@@ -186,13 +247,13 @@ _install_step :: proc() {
 	defer delete(olt_dst)
 
 	_ask_symlink(dst_dir, olt_dst, "ols",
-		"IDE OLS language server integration — point your editor here instead of vanilla OLS")
+		"IDE OLS integration — point your editor here instead of vanilla OLS")
 	_ask_symlink(dst_dir, olt_dst, "olt-lsp",
 		"Backward-compatible LSP binary name")
 	_ask_symlink(dst_dir, olt_dst, "olt-mcp",
-		"Backward-compatible MCP binary name (for MCP clients that cannot set args)")
+		"Backward-compatible MCP binary name")
 
-	// Report PATH status.
+	// PATH status.
 	fmt.println()
 	path_val, path_ok := os.lookup_env_alloc("PATH", context.allocator)
 	defer if path_ok { delete(path_val) }
@@ -205,13 +266,12 @@ _install_step :: proc() {
 	}
 }
 
-// _ask_symlink prompts the user to create one named symlink pointing to target.
 @(private = "file")
-_ask_symlink :: proc(dst_dir: string, target: string, link_name: string, description: string) {
+_ask_symlink :: proc(dst_dir, target, link_name, description: string) {
 	link_path := strings.join([]string{dst_dir, link_name}, "/")
 	defer delete(link_path)
 	fmt.printfln("  %s — %s", link_name, description)
-	fmt.printf("    Install %s → olt symlink? [Y/n]: ", link_name)
+	fmt.printf("    Install %s → olt? [Y/n]: ", link_name)
 	if !_yn_default_yes() {
 		fmt.println("    Skipped.")
 		return
@@ -238,18 +298,14 @@ _init_header :: proc(step, total: int, name: string) {
 	fmt.println()
 }
 
-// _readline reads a trimmed line from stdin and returns a heap-allocated copy.
-// Caller owns the returned string (or it may be leaked safely on process exit).
 @(private = "file")
 _readline :: proc() -> string {
 	buf: [512]u8
 	n, _ := os.read(os.stdin, buf[:])
 	if n <= 0 { return "" }
-	trimmed := strings.trim(string(buf[:n]), " \t\r\n")
-	return strings.clone(trimmed)  // clone before buf goes out of scope
+	return strings.clone(strings.trim(string(buf[:n]), " \t\r\n"))
 }
 
-// _yn_default_yes reads Y/n — returns true unless user types "n" or "no".
 @(private = "file")
 _yn_default_yes :: proc() -> bool {
 	ans := _readline()
@@ -257,7 +313,6 @@ _yn_default_yes :: proc() -> bool {
 	return !strings.equal_fold(ans, "n") && !strings.equal_fold(ans, "no")
 }
 
-// _yn_default_no reads y/N — returns true only if user types "y" or "yes".
 @(private = "file")
 _yn_default_no :: proc() -> bool {
 	ans := _readline()
@@ -265,7 +320,6 @@ _yn_default_no :: proc() -> bool {
 	return strings.equal_fold(ans, "y") || strings.equal_fold(ans, "yes")
 }
 
-// _which runs `which <name>` and returns a heap-allocated path, or "" if not found.
 @(private = "file")
 _which :: proc(name: string) -> string {
 	state, stdout, _, err := os.process_exec(
@@ -274,28 +328,23 @@ _which :: proc(name: string) -> string {
 	)
 	defer delete(stdout)
 	if err != nil || !state.success { return "" }
-	// Clone before stdout is freed by defer.
 	return strings.clone(strings.trim(string(stdout), " \t\r\n"))
 }
 
-// _own_bin_dir returns the directory that contains the running olt binary.
 @(private = "file")
 _own_bin_dir :: proc() -> string {
 	if len(os.args) == 0 { return "." }
 	arg0 := os.args[0]
 	if !strings.contains(arg0, "/") {
-		// Invoked by name from PATH — look for ./artifacts/ first.
 		if os.is_dir("artifacts") { return "artifacts" }
 		return "."
 	}
 	return filepath_dir(arg0)
 }
 
-// _resolve_path turns a relative path into an absolute one by prepending CWD.
 @(private = "file")
 _resolve_path :: proc(p: string) -> string {
 	if strings.has_prefix(p, "/") { return strings.clone(p) }
-	// Shell out to pwd for CWD — Odin has no os.getcwd on all platforms.
 	state, stdout, _, err := os.process_exec(
 		os.Process_Desc{command = []string{"pwd"}},
 		context.allocator,
@@ -303,13 +352,11 @@ _resolve_path :: proc(p: string) -> string {
 	defer delete(stdout)
 	if err != nil || !state.success { return strings.clone(p) }
 	cwd := strings.trim(string(stdout), " \t\r\n")
-	// Strip leading "./" from p if present.
 	rel := p
 	if strings.has_prefix(rel, "./") { rel = rel[2:] }
 	return strings.join([]string{cwd, rel}, "/")
 }
 
-// _build_toml generates olt.toml content for the chosen profile.
 @(private = "file")
 _build_toml :: proc(profile, ols_path: string) -> string {
 	b := strings.builder_make()
