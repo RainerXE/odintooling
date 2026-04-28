@@ -121,9 +121,12 @@ _write_setup_marker :: proc() {
 
 @(private = "file")
 _init_ols_step :: proc() -> (ols_path: string) {
+	// Try both common names: 'ols' (build-from-source) and 'ols_lsp' (Homebrew).
 	found := _which("ols")
+	if found == "" { found = _which("ols_lsp") }
+
 	if found != "" {
-		fmt.printfln("  Found ols: %s", found)
+		fmt.printfln("  Found OLS: %s", found)
 		fmt.print("  Use a different path? [y/N]: ")
 		if _yn_default_no() {
 			fmt.print("  Path: ")
@@ -134,9 +137,14 @@ _init_ols_step :: proc() -> (ols_path: string) {
 
 	fmt.println("  OLS not found in PATH.")
 	fmt.println("  OLS provides type-checking and completions in your editor.")
-	fmt.println("  Get it from: https://github.com/DanielGavin/ols")
 	fmt.println()
-	fmt.print("  Enter path to ols binary, or leave blank to skip: ")
+	fmt.println("  Install options:")
+	fmt.println("    Homebrew:         brew install ols      (binary: ols_lsp)")
+	fmt.println("    Build from source: https://github.com/DanielGavin/ols  (binary: ols)")
+	fmt.println()
+	fmt.println("  Tip: run 'which ols_lsp' or 'which ols' to find the installed path.")
+	fmt.println()
+	fmt.print("  Enter path to OLS binary, or leave blank to skip: ")
 	entered := _readline()
 	if entered != "" && os.is_file(entered) {
 		fmt.printfln("  Will write ols_path = \"%s\" to olt.toml.", entered)
@@ -145,7 +153,7 @@ _init_ols_step :: proc() -> (ols_path: string) {
 	if entered != "" {
 		fmt.printfln("  Warning: %s does not exist — skipping ols_path.", entered)
 	} else {
-		fmt.println("  Skipped — configure ols_path in olt.toml later if needed.")
+		fmt.println("  Skipped — set ols_path in olt.toml later if needed.")
 	}
 	return ""
 }
