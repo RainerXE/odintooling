@@ -215,7 +215,22 @@ Build a semantic graph of your project for deeper analysis:
 olt src/ --export-symbols
 ```
 
-This writes a SQLite database to `.codegraph/olt_graph.db` and enables C202 switch exhaustiveness checking and all `get_*` / `search_symbols` MCP tools.
+By default this writes to `.codegraph/odin_lint_graph.db` and `.codegraph/symbols.json`. The `.codegraph/` directory is a shared convention — other code intelligence tools (e.g. CodeGraph) also use it, each with their own filename, so they coexist without conflict.
+
+Pass a custom path via the MCP `export_symbols` tool:
+```json
+{ "path": "src/", "db_path": "/tmp/my_project.db" }
+```
+`symbols_path` in the response is always derived from `db_path` — `/tmp/my_project.db` → `/tmp/symbols.json`.
+
+Add `.codegraph/` to your `.gitignore` to keep generated graph files out of version control:
+```
+.codegraph/
+```
+
+Once exported, this enables:
+- C202 switch exhaustiveness checking
+- All `get_*` / `search_symbols` MCP tools for AI-assisted refactoring
 
 ---
 
