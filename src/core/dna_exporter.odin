@@ -37,7 +37,8 @@ export_symbols :: proc(
     db_path:   string = GRAPH_DB_PATH,
     cfg:       OdinLintConfig = {},
 ) -> ExportResult {
-    result := ExportResult{db_path = db_path, symbols_path = SYMBOLS_JSON_PATH}
+    symbols_path := _symbols_path_for(db_path)
+    result := ExportResult{db_path = db_path, symbols_path = symbols_path}
 
     if !graph_ensure_dir(db_path) {
         fmt.eprintfln("export-symbols: cannot create directory for %s", db_path)
@@ -212,12 +213,23 @@ export_symbols :: proc(
     // -----------------------------------------------------------------------
     // Pass 7 — Write symbols.json.
     // -----------------------------------------------------------------------
-    _pass5_write_symbols_json(db, SYMBOLS_JSON_PATH)
+    _pass5_write_symbols_json(db, symbols_path)
     result.nodes_written = _count_table(db, "nodes")
     result.edges_written = _count_table(db, "edges")
     result.unresolved    = _count_table(db, "unresolved_refs")
     result.ok = true
     return result
+}
+
+// _symbols_path_for derives the symbols.json path from the db path.
+// "/tmp/my.db" → "/tmp/symbols.json"; ".codegraph/graph.db" → ".codegraph/symbols.json"
+@(private)
+_symbols_path_for :: proc(db_path: string) -> string {
+    dir := filepath_dir(db_path)
+    if dir == "" || dir == "." {
+        return "symbols.json"
+    }
+    return strings.join([]string{dir, "symbols.json"}, "/")
 }
 
 // =============================================================================
