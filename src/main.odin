@@ -35,6 +35,7 @@ main :: proc() {
         switch os.args[1] {
         case "mcp":   mcp.mcp_run();                   return
         case "lsp":   lsp.lsp_run();                   return
+        case "version": core.print_version(); return
         case "setup": os.exit(core.run_setup_command())
         case "init":  os.exit(core.run_local_init())
         }
