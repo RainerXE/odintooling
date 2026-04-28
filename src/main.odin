@@ -30,15 +30,13 @@ main :: proc() {
         return
     }
 
-    // Explicit subcommand: `olt mcp` or `olt lsp`
+    // Explicit subcommands.
     if len(os.args) > 1 {
         switch os.args[1] {
-        case "mcp":
-            mcp.mcp_run()
-            return
-        case "lsp":
-            lsp.lsp_run()
-            return
+        case "mcp":   mcp.mcp_run();                   return
+        case "lsp":   lsp.lsp_run();                   return
+        case "setup": os.exit(core.run_setup_command())
+        case "init":  os.exit(core.run_local_init())
         }
     }
 
