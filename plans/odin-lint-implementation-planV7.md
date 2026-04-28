@@ -2767,6 +2767,70 @@ handled by suppression comments, not by extending file-scope C001 analysis.
 
 ---
 
-*Version: 7.6*
-*Last status review: April 21 2026*
+---
+
+## Recent Milestones (April 2026)
+
+M12 Advanced Rules + C019 Phase 2                                      ✅ COMPLETE (April 25 2026)
+  C019 Phase 2 — inferred type marker suffixes (`:=` assignments)       ✅ DONE
+  C012-T2 — mem.Arena / virtual.Arena naming (needs 'arena' in name)    ✅ DONE
+  C021/C022/C023 Go-compat rules (fmt.Println, for range, *ptr deref)   ✅ DONE
+  C025 append address-of (go_migration domain)                          ✅ DONE
+
+M13 stdlib safety + quality control                                     ✅ COMPLETE (April 26 2026)
+  C029 stdlib allocating proc leak detection                            ✅ DONE
+  C033 strings.builder_make without destroy                             ✅ DONE
+  C031/C034/C037 INFO-tier style rules                                  ✅ DONE
+  Memory safety audit: free_suppressions, dedupDiagnostics, LSP URI    ✅ DONE
+  File headers on all 58 source files                                   ✅ DONE
+
+M14 Distribution + External Library                                     ✅ COMPLETE (April 27 2026)
+  Repo cleanup: vendor/ols removed, artifacts restructured by platform  ✅ DONE
+  odin-mcp published as standalone external library (RainerXE/odin-mcp) ✅ DONE
+  README.md created                                                      ✅ DONE
+  Linux ARM64 + x86 Podman builds with smoke tests (8/8)                ✅ DONE
+  GitHub Actions self-hosted runner workflow (macOS + Linux + Windows)  ✅ DONE
+  AI attribution removed from git history (filter-branch)               ✅ DONE
+
+M15 odin-mcp v2 + olt v0.95                                             ✅ COMPLETE (April 28 2026)
+  odin-mcp v2 library in vendor/odin-mcp/mcp/ (package mcp)            ✅ DONE
+    Context_Tool_Handler (rawptr ctx), Simple_Tool_Handler              ✅ DONE
+    Tool_Result struct replacing (string, bool) return                  ✅ DONE
+    Resources (resources/list, resources/read) with Resource_Def        ✅ DONE
+    Prompts (prompts/list, prompts/get) with Prompt_Def                 ✅ DONE
+    Middleware hooks (Before_Tool_Hook, After_Tool_Hook)                 ✅ DONE
+    MCP spec capabilities: tools, resources, prompts in initialize      ✅ DONE
+    Old root package kept for backward compat; mcp/ is the new API      ✅ DONE
+  olt migrated to odin-mcp v2 API                                       ✅ DONE
+    17 handlers updated: (string, bool) → mcp.Tool_Result               ✅ DONE
+    Import paths: vendor/odin-mcp → vendor/odin-mcp/mcp                 ✅ DONE
+    fmt.aprintf extra-arg bug fixed (named allocator= param)            ✅ DONE
+  All 72 MCP integration tests pass; 0 violations on own codebase       ✅ DONE
+  Version: 0.95.0
+
+M16 Unified Binary + argv[0] Dispatch — olt v0.96                       ⬜ IN PROGRESS
+  Single `olt` binary replacing olt, olt-mcp, olt-lsp                   ⬜
+    src/mcp/main.odin: main → mcp_run() exported proc                   ⬜
+    src/lsp/proxy.odin: main → lsp_run() exported proc                  ⬜
+    src/core/main.odin: unified dispatcher                              ⬜
+  argv[0] dispatch (busybox pattern)                                     ⬜
+    invoked as "ols" or "olt-lsp" → LSP proxy mode                      ⬜
+    invoked as "olt-mcp"          → MCP server mode                     ⬜
+    invoked as "olt" + subcommand "mcp"/"lsp" → explicit dispatch       ⬜
+    default                       → CLI mode                            ⬜
+  olt --install: interactive symlink setup                               ⬜
+    asks: install ols symlink? (IDE OLS integration)                    ⬜
+    asks: install olt-lsp symlink? (backward compat)                    ⬜
+    asks: install olt-mcp symlink? (MCP client backward compat)         ⬜
+    installs symlinks next to the olt binary                            ⬜
+  Build system: single build.sh produces one artifact                   ⬜
+    build_mcp.sh / build_lsp.sh deprecated (print deprecation notice)  ⬜
+  Version: 0.96.0
+  Gate: `olt --version` prints 0.96.0; `olt mcp` starts MCP server;
+        symlink `ols → olt` makes editor OLS integration work unchanged
+
+---
+
+*Version: 7.7*
+*Last status review: April 28 2026*
 *Previous version: odin-lint-implementation-planV6.md (V7.0 was the internal draft)*

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Build olt CLI → artifacts/<platform>/olt
+# Build olt → artifacts/<platform>/olt
+# Single binary: CLI + MCP server + LSP proxy (dispatched via argv[0] or subcommand)
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,7 +25,7 @@ echo "Building olt (Odin Language Tools)..."
 echo "  Platform: $PLATFORM"
 echo "  Output:   $OUT"
 
-odin build "$REPO_ROOT/src/core" -out:"$OUT" \
+odin build "$REPO_ROOT/src" -out:"$OUT" \
     -extra-linker-flags:"$REPO_ROOT/ffi/tree_sitter/tree-sitter-lib/libtree-sitter.a \
     $REPO_ROOT/ffi/tree_sitter/tree-sitter-odin/libtree-sitter-odin.a \
     $REPO_ROOT/ffi/sqlite/libsqlite3.a"
@@ -32,4 +33,6 @@ odin build "$REPO_ROOT/src/core" -out:"$OUT" \
 echo "✅ Build successful!"
 echo "Executable: $OUT"
 echo ""
-echo "To test: $OUT --help"
+echo "To test:       $OUT --help"
+echo "MCP mode:      $OUT mcp"
+echo "LSP mode:      $OUT lsp     (or symlink: ols → olt)"

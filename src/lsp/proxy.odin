@@ -159,7 +159,8 @@ _run_thread_a :: proc(state: ^ProxyState) {
 // Main entry point
 // =============================================================================
 
-main :: proc() {
+// lsp_run is the LSP proxy entry point, called from src/main.odin.
+lsp_run :: proc() {
 	// Locate OLS binary: read olt.toml if present, fall back to PATH.
 	cfg := core.load_project_config([]string{"."})
 	ols_path := core.effective_ols_path(cfg)
@@ -167,14 +168,14 @@ main :: proc() {
 	// Initialise tree-sitter for our analysis.
 	ts_parser, ts_ok := core.initTreeSitterParser()
 	if !ts_ok {
-		fmt.eprintln("olt-lsp: failed to initialise tree-sitter parser")
+		fmt.eprintln("olt: LSP mode: failed to initialise tree-sitter parser")
 		os.exit(1)
 	}
 
 	// Start OLS subprocess.
 	ols_proc, ols_ok := ols_start(ols_path)
 	if !ols_ok {
-		fmt.eprintfln("olt-lsp: could not start OLS at '%s'", ols_path)
+		fmt.eprintfln("olt: LSP mode: could not start OLS at '%s'", ols_path)
 		fmt.eprintln("  Set [tools] ols_path in olt.toml or ensure 'ols' is in PATH.")
 		fmt.eprintln("  Vanilla OLS: https://github.com/DanielGavin/ols")
 		os.exit(1)

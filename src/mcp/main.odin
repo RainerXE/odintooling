@@ -50,10 +50,11 @@ import core "../core"
 _ts_parser: core.TreeSitterASTParser
 _ts_ready:  bool
 
-main :: proc() {
+// mcp_run is the MCP server entry point, called from src/main.odin.
+mcp_run :: proc() {
     p, ok := core.initTreeSitterParser()
     if !ok {
-        fmt.eprintln("olt-mcp: failed to initialise tree-sitter parser")
+        fmt.eprintln("olt: MCP mode: failed to initialise tree-sitter parser")
         os.exit(1)
     }
     _ts_parser = p
