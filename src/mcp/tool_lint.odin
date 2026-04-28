@@ -9,14 +9,14 @@ import "core:os"
 import "core:strings"
 import "base:runtime"
 
-import mcp  "../../vendor/odin-mcp"
+import mcp  "../../vendor/odin-mcp/mcp"
 import core "../core"
 
 // ── Tier 1 tools: direct odin-lint analysis, no OLS subprocess ───────────────
 
 // make_lint_file_tool runs all rules on a file at the given path.
-make_lint_file_tool :: proc() -> mcp.RegisteredTool {
-    return mcp.RegisteredTool{
+make_lint_file_tool :: proc() -> mcp.Tool {
+    return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "lint_file",
             description = "Run odin-lint on an Odin source file. Returns all violations as JSON.",
@@ -31,17 +31,17 @@ make_lint_file_tool :: proc() -> mcp.RegisteredTool {
                 "required": ["path"]
             }`,
         },
-        handler = _lint_file_handler,
+        simple_handler = _lint_file_handler,
     }
 }
 
 @(private="file")
-_lint_file_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+_lint_file_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
     path, err := _extract_string_param(params, "path")
-    if err != "" { return err, true }
+    if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
 
     if !os.exists(path) {
-        return fmt.tprintf("file not found: %s", path), true
+        return mcp.tool_error(.Not_Found, fmt.tprintf("file not found: %s", path), allocator)
     }
 
     opts := core.LintOptions{recursive = false}
@@ -49,12 +49,12 @@ _lint_file_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> 
     collector := make([dynamic]core.Diagnostic, allocator)
     core.analyze_file(path, &_ts_parser, opts, &collector)
 
-    return _diags_to_json(collector[:], allocator), false
+    return mcp.tool_ok(_diags_to_json(collector[:], allocator), allocator)
 }
 
 // make_lint_snippet_tool runs all rules on in-memory Odin source text.
-make_lint_snippet_tool :: proc() -> mcp.RegisteredTool {
-    return mcp.RegisteredTool{
+make_lint_snippet_tool :: proc() -> mcp.Tool {
+    return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "lint_snippet",
             description = "Run odin-lint on an in-memory Odin source snippet. No file I/O performed.",
@@ -73,14 +73,14 @@ make_lint_snippet_tool :: proc() -> mcp.RegisteredTool {
                 "required": ["source"]
             }`,
         },
-        handler = _lint_snippet_handler,
+        simple_handler = _lint_snippet_handler,
     }
 }
 
 @(private="file")
-_lint_snippet_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+_lint_snippet_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
     source, err := _extract_string_param(params, "source")
-    if err != "" { return err, true }
+    if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
 
     filename := "snippet.odin"
     if fn, fn_err := _extract_string_param(params, "filename"); fn_err == "" {
@@ -90,12 +90,12 @@ _lint_snippet_handler :: proc(params: json.Value, allocator: runtime.Allocator) 
     collector := make([dynamic]core.Diagnostic, allocator)
     core.analyze_content(filename, source, &_ts_parser, &collector)
 
-    return _diags_to_json(collector[:], allocator), false
+    return mcp.tool_ok(_diags_to_json(collector[:], allocator), allocator)
 }
 
 // make_lint_fix_tool returns proposed fixes for a file without writing to disk.
-make_lint_fix_tool :: proc() -> mcp.RegisteredTool {
-    return mcp.RegisteredTool{
+make_lint_fix_tool :: proc() -> mcp.Tool {
+    return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "lint_fix",
             description = "Return proposed odin-lint fixes for a file as JSON. Does NOT write to disk.",
@@ -114,17 +114,17 @@ make_lint_fix_tool :: proc() -> mcp.RegisteredTool {
                 "required": ["path"]
             }`,
         },
-        handler = _lint_fix_handler,
+        simple_handler = _lint_fix_handler,
     }
 }
 
 @(private="file")
-_lint_fix_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+_lint_fix_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
     path, err := _extract_string_param(params, "path")
-    if err != "" { return err, true }
+    if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
 
     if !os.exists(path) {
-        return fmt.tprintf("file not found: %s", path), true
+        return mcp.tool_error(.Not_Found, fmt.tprintf("file not found: %s", path), allocator)
     }
 
     opts := core.LintOptions{recursive = false}
@@ -140,7 +140,7 @@ _lint_fix_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (
     fixes := core.generate_fixes(collector[:], false)
     defer delete(fixes)
 
-    return _fixes_to_json(fixes[:], allocator), false
+    return mcp.tool_ok(_fixes_to_json(fixes[:], allocator), allocator)
 }
 
 // ── JSON serialisation helpers ────────────────────────────────────────────────

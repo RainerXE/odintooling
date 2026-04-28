@@ -10,15 +10,15 @@ import "core:strconv"
 import "core:strings"
 import "base:runtime"
 
-import mcp  "../../vendor/odin-mcp"
+import mcp  "../../vendor/odin-mcp/mcp"
 import core "../core"
 
 // =============================================================================
 // lint_workspace — batch lint an entire directory
 // =============================================================================
 
-make_lint_workspace_tool :: proc() -> mcp.RegisteredTool {
-    return mcp.RegisteredTool{
+make_lint_workspace_tool :: proc() -> mcp.Tool {
+    return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "lint_workspace",
             description = "Run odin-lint on all .odin files under a directory. Returns all diagnostics as a JSON array.",
@@ -37,14 +37,14 @@ make_lint_workspace_tool :: proc() -> mcp.RegisteredTool {
                 "required": ["path"]
             }`,
         },
-        handler = _lint_workspace_handler,
+        simple_handler = _lint_workspace_handler,
     }
 }
 
 @(private="file")
-_lint_workspace_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+_lint_workspace_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
     path, err := _extract_string_param(params, "path")
-    if err != "" { return err, true }
+    if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
 
     opts := core.LintOptions{recursive = true}
 
@@ -69,21 +69,21 @@ _lint_workspace_handler :: proc(params: json.Value, allocator: runtime.Allocator
         core.analyze_file(file_path, &_ts_parser, opts, &collector)
     }
 
-    return _diags_to_json(collector[:], allocator), false
+    return mcp.tool_ok(_diags_to_json(collector[:], allocator), allocator)
 }
 
 // =============================================================================
 // list_rules — return the full rule catalog as JSON
 // =============================================================================
 
-make_list_rules_tool :: proc() -> mcp.RegisteredTool {
-    return mcp.RegisteredTool{
+make_list_rules_tool :: proc() -> mcp.Tool {
+    return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "list_rules",
             description = "Return the full odin-lint rule catalog as JSON: id, tier, error_class, description, fix_hint, enabled_by_default.",
             input_schema = `{"type": "object", "properties": {}}`,
         },
-        handler = _list_rules_handler,
+        simple_handler = _list_rules_handler,
     }
 }
 
@@ -191,7 +191,7 @@ _RULES :: []RuleCatalogEntry{
 }
 
 @(private="file")
-_list_rules_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+_list_rules_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
     b := strings.builder_make(allocator)
     strings.write_string(&b, `{"rules":[`)
     for entry, i in _RULES {
@@ -211,15 +211,15 @@ _list_rules_handler :: proc(params: json.Value, allocator: runtime.Allocator) ->
         strings.write_string(&b, "}")
     }
     strings.write_string(&b, `]}`)
-    return strings.to_string(b), false
+    return mcp.tool_ok(strings.to_string(b), allocator)
 }
 
 // =============================================================================
 // run_odin_check — invoke `odin check` as a subprocess and return diagnostics
 // =============================================================================
 
-make_run_odin_check_tool :: proc() -> mcp.RegisteredTool {
-    return mcp.RegisteredTool{
+make_run_odin_check_tool :: proc() -> mcp.Tool {
+    return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "run_odin_check",
             description = "Run `odin check` on a file or directory and return compiler diagnostics as structured JSON. Complements odin-lint with type-checking and semantic errors that static analysis cannot detect.",
@@ -242,7 +242,7 @@ make_run_odin_check_tool :: proc() -> mcp.RegisteredTool {
                 "required": ["path"]
             }`,
         },
-        handler = _run_odin_check_handler,
+        simple_handler = _run_odin_check_handler,
     }
 }
 
@@ -257,9 +257,9 @@ OdinCheckDiag :: struct {
 }
 
 @(private="file")
-_run_odin_check_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> (string, bool) {
+_run_odin_check_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
     path, err := _extract_string_param(params, "path")
-    if err != "" { return err, true }
+    if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
 
     // Build command: ["odin", "check", <path>, ...extra_flags]
     odin_exe := "odin"
@@ -294,7 +294,7 @@ _run_odin_check_handler :: proc(params: json.Value, allocator: runtime.Allocator
         strings.write_string(&b_err, `{"ok":false,"error":`)
         _json_str(&b_err, msg)
         strings.write_string(&b_err, `,"diagnostics":[]}`)
-        return strings.to_string(b_err), true
+        return mcp.tool_error(.Internal, strings.to_string(b_err), allocator)
     }
 
     // odin check writes errors to stderr; stdout may have build output.
@@ -338,18 +338,16 @@ _run_odin_check_handler :: proc(params: json.Value, allocator: runtime.Allocator
     strings.write_string(&b, `],"raw_output":`)
     _json_str(&b, combined)
     strings.write_string(&b, "}")
-    return strings.to_string(b), false
+    return mcp.tool_ok(strings.to_string(b), allocator)
 }
 
 // _parse_odin_check_line attempts to parse a single line of `odin check` output.
 // Odin compiler format: /path/file.odin(line:col) Level: message
-// Returns the parsed diagnostic and true on success; zero value + false otherwise.
 @(private="file")
 _parse_odin_check_line :: proc(raw: string) -> (OdinCheckDiag, bool) {
     line := strings.trim(raw, " \t\r")
     if len(line) == 0 { return {}, false }
 
-    // Find opening paren — the location marker.
     paren_open := strings.last_index(line, "(")
     if paren_open < 0 { return {}, false }
     paren_close := strings.index(line[paren_open:], ")")
@@ -357,19 +355,17 @@ _parse_odin_check_line :: proc(raw: string) -> (OdinCheckDiag, bool) {
     paren_close += paren_open
 
     file_part  := strings.trim(line[:paren_open], " \t")
-    loc_part   := line[paren_open+1:paren_close]  // "42:5"
+    loc_part   := line[paren_open+1:paren_close]
     after_paren := strings.trim(line[paren_close+1:], " \t")
 
     if len(file_part) == 0 || len(loc_part) == 0 { return {}, false }
 
-    // Parse "line:col"
     colon := strings.index(loc_part, ":")
     if colon < 0 { return {}, false }
     line_num, line_ok := strconv.parse_int(loc_part[:colon])
     col_num,  col_ok  := strconv.parse_int(loc_part[colon+1:])
     if !line_ok || !col_ok { return {}, false }
 
-    // Parse level from "Error: ..." / "Warning: ..." / "Note: ..."
     level   := "error"
     message := after_paren
     if strings.has_prefix(after_paren, "Error: ") {
@@ -385,7 +381,7 @@ _parse_odin_check_line :: proc(raw: string) -> (OdinCheckDiag, bool) {
         level   = "error"
         message = after_paren[14:]
     } else {
-        return {}, false  // not a recognised diagnostic line
+        return {}, false
     }
 
     return OdinCheckDiag{
