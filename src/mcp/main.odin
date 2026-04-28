@@ -43,7 +43,7 @@ package mcp_server
 import "core:fmt"
 import "core:os"
 
-import mcp  "../../vendor/odin-mcp"
+import mcp  "../../vendor/odin-mcp/mcp"
 import core "../core"
 
 // Package-level tree-sitter parser — initialised once in main, reused across all tool calls.
