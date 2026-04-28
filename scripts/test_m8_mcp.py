@@ -15,7 +15,7 @@ import time
 # ---------------------------------------------------------------------------
 
 REPO_ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SERVER_BIN  = os.path.join(REPO_ROOT, "artifacts", "odin-lint-mcp")
+SERVER_BIN  = os.path.join(REPO_ROOT, "artifacts", "macos-arm64", "olt-mcp")
 FAIL_FIXTURE = os.path.join(REPO_ROOT, "tests", "C002_COR_POINTER", "c002_fixture_fail.odin")
 PASS_FIXTURE = os.path.join(REPO_ROOT, "tests", "C001_COR_MEMORY",  "c001_pass.odin")
 TEST_DIR     = os.path.join(REPO_ROOT, "tests", "C001_COR_MEMORY")
