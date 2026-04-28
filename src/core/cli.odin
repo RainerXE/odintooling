@@ -21,7 +21,7 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 // CLI — argument parsing, version, help, rule listing
 // =============================================================================
 
-OLT_VERSION          :: "0.95.0"
+OLT_VERSION          :: "0.96.0"
 ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
 ODIN_GRAMMAR_VERSION :: "dev-2026-04"
 
@@ -212,7 +212,7 @@ print_help :: proc() {
     fmt.println("  --help                 Show this help message")
     fmt.println("  --list-rules           List all rules (tab-separated: id, tier, message)")
     fmt.println("  --init                 Interactive first-run setup (OLS, olt.toml, install)")
-    fmt.println("  --install              Create symlinks in ~/.local/bin/ for olt, olt-mcp, olt-lsp")
+    fmt.println("  --install              Install olt to ~/.local/bin/ and create ols/olt-lsp/olt-mcp symlinks")
     fmt.println("  --explain C001         Show detailed documentation for a rule")
     fmt.println("  --rule C001,C002       Run only the specified rules")
     fmt.println("  --tier correctness     Run only rules of the given tier (correctness|style)")

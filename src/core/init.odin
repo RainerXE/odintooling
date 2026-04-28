@@ -128,16 +128,23 @@ _install_step :: proc() {
 		return
 	}
 
-	bin_dir  := _own_bin_dir()
-	dst_dir  := strings.join([]string{home, ".local", "bin"}, "/")
+	bin_dir := _own_bin_dir()
+	dst_dir := strings.join([]string{home, ".local", "bin"}, "/")
 	defer delete(dst_dir)
 
-	fmt.printfln("  Source:  %s/", bin_dir)
+	// Resolve bin_dir to an absolute path so symlinks work from any directory.
+	abs_bin_dir := _resolve_path(bin_dir)
+	defer delete(abs_bin_dir)
+
+	olt_src := strings.join([]string{abs_bin_dir, "olt"}, "/")
+	defer delete(olt_src)
+
+	fmt.printfln("  Source:  %s", olt_src)
 	fmt.printfln("  Target:  %s/", dst_dir)
 	fmt.println()
-	fmt.print("  Install olt, olt-mcp, olt-lsp? [Y/n]: ")
-	if !_yn_default_yes() {
-		fmt.println("  Skipped.")
+
+	if !os.is_file(olt_src) {
+		fmt.printfln("  ✗  olt binary not found at %s — build it first.", olt_src)
 		return
 	}
 
@@ -153,33 +160,37 @@ _install_step :: proc() {
 		}
 	}
 
-	// Resolve bin_dir to an absolute path so symlinks work from any directory.
-	abs_bin_dir := _resolve_path(bin_dir)
-	defer delete(abs_bin_dir)
-
-	bins := [?]string{"olt", "olt-mcp", "olt-lsp"}
-	for name in bins {
-		src := strings.join([]string{abs_bin_dir, name}, "/")
-		defer delete(src)
-		dst := strings.join([]string{dst_dir, name}, "/")
-		defer delete(dst)
-
-		if !os.is_file(src) {
-			fmt.printfln("  -  %s not found at %s — skipping", name, src)
-			continue
-		}
-		// Remove existing entry (ignore error — may not exist yet).
-		_ = os.remove(dst)
+	// Install the olt binary.
+	fmt.print("  Install olt binary? [Y/n]: ")
+	if _yn_default_yes() {
+		olt_dst := strings.join([]string{dst_dir, "olt"}, "/")
+		defer delete(olt_dst)
+		_ = os.remove(olt_dst)
 		state, _, _, err := os.process_exec(
-			os.Process_Desc{command = []string{"ln", "-sf", src, dst}},
+			os.Process_Desc{command = []string{"cp", olt_src, olt_dst}},
 			context.allocator,
 		)
 		if err != nil || !state.success {
-			fmt.printfln("  ✗  %s", name)
+			fmt.println("  ✗  olt")
 		} else {
-			fmt.printfln("  ✓  %s", name)
+			fmt.println("  ✓  olt")
 		}
 	}
+
+	// Symlinks — each is optional and asked separately.
+	fmt.println()
+	fmt.println("  Symlinks (all point to olt, enable argv[0] mode dispatch):")
+	fmt.println()
+
+	olt_dst := strings.join([]string{dst_dir, "olt"}, "/")
+	defer delete(olt_dst)
+
+	_ask_symlink(dst_dir, olt_dst, "ols",
+		"IDE OLS language server integration — point your editor here instead of vanilla OLS")
+	_ask_symlink(dst_dir, olt_dst, "olt-lsp",
+		"Backward-compatible LSP binary name")
+	_ask_symlink(dst_dir, olt_dst, "olt-mcp",
+		"Backward-compatible MCP binary name (for MCP clients that cannot set args)")
 
 	// Report PATH status.
 	fmt.println()
@@ -191,6 +202,29 @@ _install_step :: proc() {
 		fmt.printfln("  %s is NOT in PATH", dst_dir)
 		fmt.println("  Add this to your shell profile (~/.zshrc or ~/.bashrc):")
 		fmt.printfln(`    export PATH="%s:$PATH"`, dst_dir)
+	}
+}
+
+// _ask_symlink prompts the user to create one named symlink pointing to target.
+@(private = "file")
+_ask_symlink :: proc(dst_dir: string, target: string, link_name: string, description: string) {
+	link_path := strings.join([]string{dst_dir, link_name}, "/")
+	defer delete(link_path)
+	fmt.printfln("  %s — %s", link_name, description)
+	fmt.printf("    Install %s → olt symlink? [Y/n]: ", link_name)
+	if !_yn_default_yes() {
+		fmt.println("    Skipped.")
+		return
+	}
+	_ = os.remove(link_path)
+	state, _, _, err := os.process_exec(
+		os.Process_Desc{command = []string{"ln", "-sf", target, link_path}},
+		context.allocator,
+	)
+	if err != nil || !state.success {
+		fmt.printfln("    ✗  %s", link_name)
+	} else {
+		fmt.printfln("    ✓  %s → olt", link_name)
 	}
 }
 
