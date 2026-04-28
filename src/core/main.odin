@@ -571,17 +571,9 @@ analyze_file :: proc(
 // Entry point
 // =============================================================================
 
-// main delegates to _main so that defers run cleanly before os.exit.
-// Guard: when loaded as a shared library (plugin), os.args is empty.
-// Return immediately so the dylib constructor does not crash.
-main :: proc() {
-    if len(os.args) == 0 {
-        return
-    }
-    os.exit(_main())
-}
-
-_main :: proc() -> int {
+// cli_main is the CLI entry point, called from src/main.odin.
+// Returns an OS exit code (0 = success).
+cli_main :: proc() -> int {
     opts, parse_ok := parse_args(os.args[1:])
     if !parse_ok { return 2 }
 
