@@ -20,7 +20,7 @@ Fix: Add 'defer delete(buf)' immediately after the allocation
 Download from [Releases](https://github.com/RainerXE/odintooling/releases) for your platform, then:
 
 ```bash
-./olt --install       # installs to ~/.local/bin/
+olt setup        # detects OLS, installs to ~/.local/bin/, creates symlinks
 ```
 
 ### Build from source
@@ -31,17 +31,16 @@ Requires Odin `dev-2026-04` or newer.
 git clone --recurse-submodules https://github.com/RainerXE/odintooling
 cd odintooling
 ./scripts/build.sh        # → artifacts/macos-arm64/olt
-./scripts/build_mcp.sh    # → artifacts/macos-arm64/olt-mcp  (AI agent interface)
-./scripts/build_lsp.sh    # → artifacts/macos-arm64/olt-lsp  (editor interface)
 ```
 
 ### First-run setup
 
 ```bash
-olt --init
+olt setup        # full system setup: OLS detection, install, symlinks
+olt init         # create olt.toml in a project directory
 ```
 
-Detects OLS, creates `olt.toml` with a rule profile, and installs binaries to `~/.local/bin/`.
+`olt init` detects if setup has been run and offers to run it first if needed.
 
 ---
 
@@ -51,12 +50,14 @@ Detects OLS, creates `olt.toml` with a rule profile, and installs binaries to `~
 olt src/                      # lint a directory (recursive)
 olt file.odin                 # lint a single file
 olt src/ --fix                # apply safe auto-fixes in-place
-olt src/ --propose            # show proposed fixes as a diff
 olt src/ --format json        # machine-readable output (json or sarif)
 olt src/ --rule C001,C201     # run specific rules only
 olt src/ --tier correctness   # run only correctness-tier rules
 olt --explain C001            # detailed rule documentation
 olt --list-rules              # show all available rules
+
+olt mcp                       # start MCP server (AI agent interface)
+olt lsp                       # start LSP proxy (editor interface)
 ```
 
 ### Exit codes
@@ -112,7 +113,7 @@ Enable in `olt.toml`:
 
 ## Configuration — olt.toml
 
-Place `olt.toml` at your project root (or run `olt --init` to generate one):
+Run `olt init` in your project directory to generate one, or create it manually:
 
 ```toml
 [domains]
@@ -128,7 +129,7 @@ c020_min_length = 3
 c020_allowed    = "i,j,k,x,y,z,n,ok,err,db,id"
 
 [tools]
-ols_path = "/usr/local/bin/ols"   # path to OLS (if not in PATH)
+ols_path = "/usr/local/bin/ols_lsp"   # path to OLS (if not in PATH)
 ```
 
 ### Inline suppression
@@ -143,45 +144,47 @@ Legacy alias `// odin-lint:ignore` is also accepted.
 
 ---
 
-## Editor integration — olt-lsp
+## Editor integration
 
-`olt-lsp` is an LSP proxy: your editor talks to it as the single Odin language server.
-It forwards everything to vanilla [OLS](https://github.com/DanielGavin/ols) (completions, hover, go-to-definition) and injects olt lint diagnostics into the diagnostic stream.
+`olt lsp` is an LSP proxy: your editor talks to it as the single Odin language server.
+It forwards everything to vanilla [OLS](https://github.com/DanielGavin/ols) (completions, hover, go-to-definition) and injects olt diagnostics into the diagnostic stream.
+
+After `olt setup`, an `ols` symlink is created pointing to `olt`. Point your editor at that symlink — no other changes needed.
 
 **VS Code** (`settings.json`):
 ```json
-"odin.languageServer.path": "/path/to/olt-lsp"
+"odin.languageServer.path": "/path/to/ols"
 ```
 
 **Helix** (`languages.toml`):
 ```toml
 [[language]]
 name = "odin"
-language-servers = ["olt-lsp"]
+language-servers = ["ols"]
 
-[language-server.olt-lsp]
-command = "/path/to/olt-lsp"
+[language-server.ols]
+command = "/path/to/ols"
 ```
 
 **Neovim** (lspconfig):
 ```lua
-require('lspconfig').ols.setup { cmd = { '/path/to/olt-lsp' } }
+require('lspconfig').ols.setup { cmd = { '/path/to/ols' } }
 ```
 
 OLS must be installed separately: [github.com/DanielGavin/ols](https://github.com/DanielGavin/ols).
-Configure its path in `olt.toml` under `[tools] ols_path` or let olt find it via PATH.
+Homebrew installs it as `ols_lsp` — `olt setup` detects both names automatically.
 
 ---
 
-## AI agent integration — olt-mcp
+## AI agent integration
 
-`olt-mcp` exposes olt as an [MCP](https://modelcontextprotocol.io) server for Claude Code and other AI agents.
+`olt mcp` exposes olt as an [MCP](https://modelcontextprotocol.io) server for Claude Code and other AI agents.
 
 Register in `~/.claude/mcp_servers.json`:
 ```json
 {
   "mcpServers": {
-    "olt": { "command": "/path/to/olt-mcp", "args": [] }
+    "olt": { "command": "/path/to/olt", "args": ["mcp"] }
   }
 }
 ```
@@ -192,16 +195,17 @@ Available MCP tools:
 |------|-------------|
 | `lint_file` | Lint a file on disk |
 | `lint_snippet` | Lint in-memory source text |
-| `lint_fix` | Apply fixes and return a before/after diff |
+| `lint_fix` | Return proposed fixes as JSON |
 | `lint_workspace` | Batch-lint a directory |
 | `list_rules` | Return the full rule catalog as JSON |
 | `run_odin_check` | Run `odin check` and return compiler diagnostics |
-| `codegraph_search` | Search the code knowledge graph by symbol name |
-| `codegraph_context` | Get relevant context for a task |
-| `codegraph_callers` | Find what calls a function |
-| `codegraph_callees` | Find what a function calls |
-| `codegraph_impact` | See what's affected by changing a symbol |
-| `codegraph_node` | Get source and metadata for a symbol |
+| `get_symbol` | Look up a symbol in the code graph |
+| `export_symbols` | Build the code knowledge graph |
+| `get_dna_context` | Callers, callees, memory role for a proc |
+| `get_impact_radius` | Transitive impact of changing a symbol |
+| `get_callers` / `get_callees` | Direct call graph neighbours |
+| `search_symbols` | Full-text symbol search |
+| `rename_symbol` | Generate rename patches across the project |
 
 ### Code knowledge graph
 
@@ -211,46 +215,47 @@ Build a semantic graph of your project for deeper analysis:
 olt src/ --export-symbols
 ```
 
-This writes a SQLite database to `.codegraph/olt_graph.db` and enables:
-- C202 switch exhaustiveness checking
-- `codegraph_*` MCP tools for AI-assisted refactoring
-- C012 T3 graph-backed ownership analysis
+This writes a SQLite database to `.codegraph/olt_graph.db` and enables C202 switch exhaustiveness checking and all `get_*` / `search_symbols` MCP tools.
 
 ---
 
 ## Architecture
 
 ```
-                ┌─────────────┐
-  $ olt src/    │  olt (CLI)  │  analyze_file → rule pipeline
-                └─────────────┘
+                ┌─────────────────────────────┐
+                │           olt               │
+                │  argv[0] / subcommand       │
+                │  dispatch                   │
+                └──────┬──────────┬───────────┘
+                       │          │
+              ┌────────┴──┐  ┌────┴──────┐
+              │  olt lsp  │  │  olt mcp  │
+              │  (editor) │  │  (agent)  │
+              └────────┬──┘  └───────────┘
                        │
-               shared rule engine
-               analyze_content()
+                  shared rule engine
+                  analyze_content()
                        │
-         ┌─────────────┼──────────────┐
-         │             │              │
-  ┌──────────┐  ┌──────────┐  ┌────────────┐
-  │  olt-lsp │  │ olt-mcp  │  │ rule files │
-  │ (editor) │  │  (agent) │  │ C001–C203  │
-  └──────────┘  └──────────┘  └────────────┘
-       │
-  [OLS proxy]
-  Forwards to vanilla OLS, injects lint diagnostics
+                  C001–C203 rules
 ```
+
+Symlinks created by `olt setup`:
+- `ols → olt` — IDE OLS integration (argv[0] dispatch → LSP mode)
+- `olt-lsp → olt` — backward compat
+- `olt-mcp → olt` — backward compat
 
 ---
 
 ## Project layout
 
 ```
+src/main.odin      Unified entry point (argv[0] + subcommand dispatch)
 src/core/          Rule engine, CLI, config parsing, graph DB
 src/mcp/           MCP server tools
-src/lsp/           LSP proxy (olt-lsp)
+src/lsp/           LSP proxy
 ffi/tree_sitter/   Tree-sitter grammar + static libraries
 ffi/sqlite/        SQLite static library
 vendor/odin-mcp    MCP protocol library (https://github.com/RainerXE/odin-mcp)
-vendor/odin-sqlite3 SQLite Odin bindings
 tests/             Rule test fixtures
 scripts/           Build and test scripts
 ```
@@ -264,7 +269,6 @@ Run the full test suite before submitting:
 ```bash
 ./scripts/run_c001_tests.sh
 ./scripts/run_c002_tests.sh
-./scripts/run_c029_c033_tests.sh
 # ... see scripts/run_*.sh for all rule suites
 ./artifacts/macos-arm64/olt src/   # must produce 0 violations
 ```
@@ -273,4 +277,6 @@ Run the full test suite before submitting:
 
 ## License
 
-MIT
+[MIT](https://en.wikipedia.org/wiki/MIT_License)
+
+> "The miracle is this: The more we share the more we have." — Leonard Nimoy
