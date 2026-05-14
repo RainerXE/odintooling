@@ -28,7 +28,7 @@
 # ── Test results (generated, not source) ─────────────────────────────────────
 test_results/
 
-# ── RuiShin test results (internal project, not for public repo) ─────────────
+# ── RuiShin (internal project, not for public repo) ──────────────────────────
 test_results/ruishin/
 test_results/ruishin_*/
 test_results/ruishin*.md
@@ -36,6 +36,10 @@ test_results/ruishin*.txt
 test_results/generic_report_*.md
 test_results/all_libraries/
 test_results/FINAL_COMPREHENSIVE_REPORT_*.md
+scripts/test_ruishin.sh
+scripts/test_ruishin.py
+scripts/analyze_ruishin_production.sh
+plans/ruishin_check_c001.md
 
 # ── Developer notes (not for public repo) ────────────────────────────────────
 CLAUDE.md
