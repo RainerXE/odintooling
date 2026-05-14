@@ -100,22 +100,16 @@ LINKER_FLAGS="$LIBS/libtree-sitter.a $LIBS/libtree-sitter-odin.a $LIBS/libsqlite
 
 echo ""
 echo "--- Building olt ---"
-odin build "$BUILD/src/core" \
+odin build "$BUILD/src" \
     -out:"$OUT/olt" \
     -extra-linker-flags:"$LINKER_FLAGS"
 echo "  ✓ olt"
 
-echo "--- Building olt-mcp ---"
-odin build "$BUILD/src/mcp" \
-    -out:"$OUT/olt-mcp" \
-    -extra-linker-flags:"$LINKER_FLAGS"
-echo "  ✓ olt-mcp"
-
-echo "--- Building olt-lsp ---"
-odin build "$BUILD/src/lsp" \
-    -out:"$OUT/olt-lsp" \
-    -extra-linker-flags:"$LINKER_FLAGS"
-echo "  ✓ olt-lsp"
+# olt-mcp and olt-lsp are symlinks — argv[0] dispatch in src/main.odin handles routing.
+ln -sf "$OUT/olt" "$OUT/olt-mcp"
+echo "  ✓ olt-mcp → olt (symlink)"
+ln -sf "$OUT/olt" "$OUT/olt-lsp"
+echo "  ✓ olt-lsp → olt (symlink)"
 
 # ── 7. Smoke tests ────────────────────────────────────────────────────────────
 echo ""

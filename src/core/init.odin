@@ -214,6 +214,23 @@ _install_step :: proc() {
 	dst_dir := strings.join([]string{home, ".local", "bin"}, "/")
 	defer delete(dst_dir)
 
+	// Guard (b): refuse to install when running from the install location itself.
+	// This prevents olt from removing itself before the copy (source == destination).
+	if abs_bin_dir == dst_dir {
+		fmt.println("  olt is running from the install location — install step skipped.")
+		fmt.println("  To upgrade: rebuild olt and run 'olt setup' from the build artifacts folder.")
+		return
+	}
+
+	// Guard (a): skip if olt is already installed at the destination.
+	olt_installed := strings.join([]string{dst_dir, "olt"}, "/")
+	defer delete(olt_installed)
+	if os.is_file(olt_installed) {
+		fmt.printfln("  olt is already installed at %s — skipping.", olt_installed)
+		fmt.println("  To upgrade: run 'olt setup' from the build artifacts folder.")
+		return
+	}
+
 	fmt.printfln("  Source:  %s", olt_src)
 	fmt.printfln("  Target:  %s/", dst_dir)
 	fmt.println()
