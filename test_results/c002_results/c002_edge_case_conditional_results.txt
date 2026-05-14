@@ -1,7 +1,0 @@
-🔴 tests/C002_COR_POINTER/c002_edge_case_conditional.odin:13:9: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 tests/C002_COR_POINTER/c002_edge_case_conditional.odin:22:9: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-🔴 tests/C002_COR_POINTER/c002_edge_case_conditional.odin:24:9: C001 [correctness] Allocation without matching defer free in same scope
-Fix: Add 'defer free()' or 'defer delete()' immediately after this allocation
-3 violation(s) in 1 file(s)
