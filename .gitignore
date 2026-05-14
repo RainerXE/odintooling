@@ -28,6 +28,15 @@
 # ── Test results (generated, not source) ─────────────────────────────────────
 test_results/
 
+# ── RuiShin test results (internal project, not for public repo) ─────────────
+test_results/ruishin/
+test_results/ruishin_*/
+test_results/ruishin*.md
+test_results/ruishin*.txt
+test_results/generic_report_*.md
+test_results/all_libraries/
+test_results/FINAL_COMPREHENSIVE_REPORT_*.md
+
 # ── Developer notes (not for public repo) ────────────────────────────────────
 CLAUDE.md
 SKILL.md
