@@ -106,9 +106,10 @@ odin build "$BUILD/src" \
 echo "  ✓ olt"
 
 # olt-mcp and olt-lsp are symlinks — argv[0] dispatch in src/main.odin handles routing.
-ln -sf "$OUT/olt" "$OUT/olt-mcp"
+# Use relative target so symlinks work outside the container (not /build/... absolute).
+ln -sf olt "$OUT/olt-mcp"
 echo "  ✓ olt-mcp → olt (symlink)"
-ln -sf "$OUT/olt" "$OUT/olt-lsp"
+ln -sf olt "$OUT/olt-lsp"
 echo "  ✓ olt-lsp → olt (symlink)"
 
 # ── 7. Smoke tests ────────────────────────────────────────────────────────────
