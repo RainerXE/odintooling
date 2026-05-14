@@ -20,12 +20,12 @@ Fix: Add 'defer delete(buf)' immediately after the allocation
 Download from [Releases](https://github.com/RainerXE/odintooling/releases) for your platform, then:
 
 ```bash
-olt setup        # detects OLS, installs to ~/.local/bin/, creates symlinks
+olt setup        # OLS detection → install → MCP registration (3-step wizard)
 ```
 
 ### Build from source
 
-Requires Odin `dev-2026-04` or newer.
+Requires Odin `dev-2026-05` or newer.
 
 ```bash
 git clone --recurse-submodules https://github.com/RainerXE/odintooling
@@ -36,11 +36,34 @@ cd odintooling
 ### First-run setup
 
 ```bash
-olt setup        # full system setup: OLS detection, install, symlinks
+olt setup        # full system setup — runs the 3-step wizard below
 olt init         # create olt.toml in a project directory
 ```
 
-`olt init` detects if setup has been run and offers to run it first if needed.
+`olt setup` is a 3-step wizard:
+
+**Step 1 — OLS** — detects [OLS](https://github.com/DanielGavin/ols) in `PATH` (both `ols` and `ols_lsp` / Homebrew). Lets you confirm or override the path.
+
+**Step 2 — Install** — copies `olt` to `~/.local/bin/` and creates three symlinks that enable argv[0] dispatch:
+- `ols → olt` — point your editor here instead of vanilla OLS
+- `olt-lsp → olt` — backward-compat LSP name
+- `olt-mcp → olt` — backward-compat MCP name
+
+**Step 3 — MCP** — detects installed AI coding tools and registers `olt-mcp` in each one's config file automatically. Supports:
+
+| Tool | Config file written |
+|------|-------------------|
+| Claude Code | `claude mcp add` (CLI) |
+| Cursor | `~/.cursor/mcp.json` |
+| Cline | `…/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` |
+| Codex | `~/.codex/config.toml` |
+| OpenCode | `~/.config/opencode/opencode.json` |
+| Antigravity | `~/.gemini/antigravity/mcp_config.json` |
+| Hermes Agent | `~/.hermes/config.yaml` |
+
+Config paths resolve correctly on macOS, Linux, and Windows. If a tool's config directory isn't at the expected location, the wizard asks for it.
+
+`olt init` checks whether setup has been run and offers to run it first if needed.
 
 ---
 
@@ -180,13 +203,31 @@ Homebrew installs it as `ols_lsp` — `olt setup` detects both names automatical
 
 `olt mcp` exposes olt as an [MCP](https://modelcontextprotocol.io) server for Claude Code and other AI agents.
 
-Register in `~/.claude/mcp_servers.json`:
+`olt setup` registers `olt-mcp` automatically for every detected tool (see [First-run setup](#first-run-setup)).
+
+For manual registration, add to your tool's MCP config file — the binary is `~/.local/bin/olt-mcp` after setup:
+
 ```json
 {
   "mcpServers": {
-    "olt": { "command": "/path/to/olt", "args": ["mcp"] }
+    "olt-mcp": { "command": "/Users/you/.local/bin/olt-mcp", "args": [] }
   }
 }
+```
+
+Codex (`~/.codex/config.toml`):
+```toml
+[mcp_servers.olt_mcp]
+command = "/Users/you/.local/bin/olt-mcp"
+enabled = true
+```
+
+Hermes Agent (`~/.hermes/config.yaml`):
+```yaml
+mcp_servers:
+  olt-mcp:
+    command: /Users/you/.local/bin/olt-mcp
+    args: []
 ```
 
 Available MCP tools:
