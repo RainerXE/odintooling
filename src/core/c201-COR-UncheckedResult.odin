@@ -103,8 +103,10 @@ c201_scm_run :: proc(
     return diagnostics[:]
 }
 
-// c201_extract_fn_name returns the called function's short name (identifier only,
-// not the package qualifier). Returns "" if not extractable.
+// c201_extract_fn_name returns the package-qualified function name for calls whose
+// result is discarded, e.g. "net.send" for a bare net.send(...) call.
+// Using the qualified form prevents false-positives when user code defines its own
+// proc with the same short name (e.g. a custom send :: proc(...)).
 @(private="file")
 c201_extract_fn_name :: proc(call_node: TSNode, file_lines: []string) -> string {
     child_count := ts_node_child_count(call_node)
@@ -116,20 +118,48 @@ c201_extract_fn_name :: proc(call_node: TSNode, file_lines: []string) -> string 
     fn_type := string(ts_node_type(fn_node))
     switch fn_type {
     case "identifier":
-        return naming_extract_text(fn_node, file_lines)
-    case "member_expression":
-        // member_expression children: [pkg_ident, ".", fn_ident]
-        // The last named child is the field identifier.
-        n := ts_node_child_count(fn_node)
-        for i := n; i > 0; i -= 1 {
-            child := ts_node_child(fn_node, i - 1)
-            if ts_node_is_null(child) { continue }
-            ct := string(ts_node_type(child))
-            if ct == "field_identifier" || ct == "identifier" {
-                text := naming_extract_text(child, file_lines)
-                if len(text) > 0 { return text }
+        fn_name := naming_extract_text(fn_node, file_lines)
+        // In tree-sitter-odin, pkg.fn(args) is sometimes parsed as:
+        //   member_expression → call_expression → identifier
+        // If our call_node's parent is a member_expression, extract the package
+        // identifier from it and return "pkg.fn" to match the qualified stdlib list.
+        parent := ts_node_parent(call_node)
+        if !ts_node_is_null(parent) && string(ts_node_type(parent)) == "member_expression" {
+            pc := ts_node_child_count(parent)
+            for i in 0..<int(pc) {
+                child := ts_node_child(parent, u32(i))
+                if ts_node_is_null(child) { continue }
+                if string(ts_node_type(child)) == "identifier" {
+                    pkg := naming_extract_text(child, file_lines)
+                    if len(pkg) > 0 && pkg != fn_name {
+                        return fmt.tprintf("%s.%s", pkg, fn_name)
+                    }
+                }
             }
         }
+        return fn_name
+    case "member_expression":
+        // Standard grammar: call_expression with member_expression as function child.
+        // Extract pkg (first identifier) and fn (field_identifier or second identifier).
+        n   := ts_node_child_count(fn_node)
+        pkg := ""
+        fn  := ""
+        for i in 0..<int(n) {
+            child := ts_node_child(fn_node, u32(i))
+            if ts_node_is_null(child) { continue }
+            ct   := string(ts_node_type(child))
+            text := naming_extract_text(child, file_lines)
+            if len(text) == 0 { continue }
+            switch ct {
+            case "identifier":
+                if pkg == "" { pkg = text } else { fn = text }
+            case "field_identifier":
+                fn = text
+            }
+        }
+        if len(pkg) > 0 && len(fn) > 0 { return fmt.tprintf("%s.%s", pkg, fn) }
+        if len(fn)  > 0               { return fn }
+        return pkg
     }
     return ""
 }

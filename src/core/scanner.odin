@@ -19,6 +19,7 @@ collect_odin_files :: proc(
     targets:        []string,
     recursive:      bool,
     include_vendor: bool,
+    ignore_paths:   []string = nil,
 ) -> [dynamic]string {
     files := make([dynamic]string)
     for target in targets {
@@ -29,14 +30,24 @@ collect_odin_files :: proc(
                     target,
                 )
             }
-            walk_dir(target, recursive, include_vendor, &files)
+            walk_dir(target, recursive, include_vendor, ignore_paths, &files)
         } else if strings.has_suffix(target, ".odin") {
-            append(&files, strings.clone(target))
+            if !path_is_ignored(target, ignore_paths) {
+                append(&files, strings.clone(target))
+            }
         } else {
             fmt.eprintfln("warning: '%s' is not a .odin file or directory, skipping", target)
         }
     }
     return files
+}
+
+// path_is_ignored returns true when path contains any of the ignore_paths substrings.
+path_is_ignored :: proc(path: string, ignore_paths: []string) -> bool {
+    for pat in ignore_paths {
+        if strings.contains(path, pat) { return true }
+    }
+    return false
 }
 
 // group_files_by_dir groups a flat file list by parent directory.
@@ -71,6 +82,7 @@ walk_dir :: proc(
     dir_path:       string,
     recursive:      bool,
     include_vendor: bool,
+    ignore_paths:   []string,
     files:          ^[dynamic]string,
 ) {
     handle, open_err := os.open(dir_path)
@@ -95,9 +107,12 @@ walk_dir :: proc(
             if !recursive { continue }
             if info.name == "vendor" && !include_vendor { continue }
             if len(info.name) > 0 && info.name[0] == '.' { continue }
-            walk_dir(info.fullpath, recursive, include_vendor, files)
+            if path_is_ignored(info.fullpath, ignore_paths) { continue }
+            walk_dir(info.fullpath, recursive, include_vendor, ignore_paths, files)
         } else if strings.has_suffix(info.name, ".odin") {
-            append(files, strings.clone(info.fullpath))
+            if !path_is_ignored(info.fullpath, ignore_paths) {
+                append(files, strings.clone(info.fullpath))
+            }
         }
     }
 }
