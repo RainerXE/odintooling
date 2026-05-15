@@ -21,7 +21,7 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 // CLI — argument parsing, version, help, rule listing
 // =============================================================================
 
-OLT_VERSION          :: "0.97.0"
+OLT_VERSION          :: "0.97.1"
 ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
 ODIN_GRAMMAR_VERSION :: "dev-2026-04"
 
@@ -230,6 +230,12 @@ print_help :: proc() {
     fmt.println("  --fix                  Apply safe machine-applicable fixes in-place (C001)")
     fmt.println("  --unsafe-fix           Apply fixes that change API surface (e.g. C009 os2 migration)")
     fmt.println("  --propose              Show proposed fixes as a diff without writing")
+    fmt.println()
+    fmt.println("Inline suppression:")
+    fmt.println("  Add a comment on the same line (or the line above) to silence a specific rule:")
+    fmt.println("    buf := make([]u8, n)  // olt:ignore C001 caller owns this")
+    fmt.println("    // olt:ignore C001,C029 arena pattern — no defer needed")
+    fmt.println("  Both 'olt:ignore' and the legacy 'odin-lint:ignore' prefix are accepted.")
     fmt.println()
     fmt.println("Exit codes:")
     fmt.println("  0  No violations found")

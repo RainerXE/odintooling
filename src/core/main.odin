@@ -627,8 +627,8 @@ cli_main :: proc() -> int {
         return 0
     }
 
-    // Collect all .odin files from targets
-    files := collect_odin_files(opts.targets[:], opts.recursive, opts.include_vendor)
+    // Collect all .odin files from targets (honouring [ignore] paths from olt.toml).
+    files := collect_odin_files(opts.targets[:], opts.recursive, opts.include_vendor, opts.config.ignore_paths[:])
     defer {
         for f in files { delete(f) }
         delete(files)

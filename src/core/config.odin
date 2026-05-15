@@ -59,6 +59,10 @@ OdinLintConfig :: struct {
     // C001 behaviour tuning.
     c001_ownership_hints: bool, // default true — emit INFO when allocation is passed to a function
 
+    // Path patterns to exclude from scanning ([ignore] paths = "...").
+    // Each entry is matched as a substring of the file path.
+    ignore_paths: [dynamic]string,
+
     // Internal: whether a toml file was found and loaded.
     loaded: bool,
 }
@@ -155,7 +159,9 @@ apply_auto_detection :: proc(cfg: ^OdinLintConfig, search_dirs: []string) {
 }
 
 // parse_toml_config reads and parses an olt.toml file.
-// Only the keys we care about are parsed; unknown keys are silently ignored.
+// Unknown sections and unknown keys emit a warning to stderr (with file:line context)
+// and are otherwise ignored — the tool never crashes on unexpected config content.
+// Redirect stderr to capture warnings as a log: olt . 2>olt-config.log
 @(private)
 parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
     data, err := os.read_entire_file_from_path(path, context.allocator)
@@ -166,17 +172,26 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
     lines   := strings.split(content, "\n")
     defer delete(lines)
 
-    current_section := ""
+    current_section       := ""
+    current_section_known := true  // false → suppress per-key warnings already issued
 
-    for raw_line in lines {
-        line := strings.trim(raw_line, " \t\r")
+    for raw_line, line_idx in lines {
+        line_num := line_idx + 1
+        line     := strings.trim(raw_line, " \t\r")
 
         // Skip blanks and comments.
         if len(line) == 0 || strings.has_prefix(line, "#") { continue }
 
-        // Section header.
+        // Section header: must start with '[' AND end with ']'.
         if strings.has_prefix(line, "[") && strings.has_suffix(line, "]") {
-            current_section = line[1 : len(line)-1]
+            // Guard: the slice line[1:len-1] is always safe because len >= 2 here
+            // (line starts with '[' and ends with ']', so len >= 2).
+            current_section       = line[1 : len(line)-1]
+            current_section_known = _toml_section_known(current_section)
+            if !current_section_known {
+                fmt.eprintfln("%s:%d: warning: unknown section [%s] — ignored (known: domains, naming, target, correctness, tools, ignore)",
+                    path, line_num, current_section)
+            }
             continue
         }
 
@@ -189,6 +204,16 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
         // Strip inline comments.
         if hash := strings.index(val, " #"); hash >= 0 {
             val = strings.trim(val[:hash], " \t")
+        }
+
+        // Skip keys in unknown sections — we already warned about the section.
+        if !current_section_known { continue }
+
+        // Warn on unknown keys within known sections (helps catch typos).
+        if !_toml_key_known(current_section, key) {
+            fmt.eprintfln("%s:%d: warning: unknown key '%s' in [%s] — ignored",
+                path, line_num, key, current_section)
+            continue
         }
 
         switch current_section {
@@ -232,10 +257,65 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             case "ols_path":
                 cfg.tools_ols_path = strings.clone(strings.trim(val, "\"'"))
             }
+        case "ignore":
+            switch key {
+            case "paths", "path":
+                // Comma-separated path substrings to exclude from scanning.
+                // e.g. paths = "tests/,generated/,vendor/"
+                cleaned := strings.trim(val, "\"'")
+                parts   := strings.split(cleaned, ",")
+                defer delete(parts)
+                for part in parts {
+                    p := strings.trim(part, " \t\"'")
+                    if len(p) > 0 { append(&cfg.ignore_paths, strings.clone(p)) }
+                }
+            }
         }
     }
 
     return true
+}
+
+// _toml_section_known returns true for every section header olt.toml recognises.
+@(private)
+_toml_section_known :: proc(s: string) -> bool {
+    switch s {
+    case "domains", "naming", "target", "correctness", "tools", "ignore":
+        return true
+    }
+    return false
+}
+
+// _toml_key_known returns true when key is a valid key inside section.
+@(private)
+_toml_key_known :: proc(section, key: string) -> bool {
+    switch section {
+    case "domains":
+        switch key {
+        case "ffi", "odin_2026", "semantic_naming", "dead_code", "go_migration", "stdlib_safety":
+            return true
+        }
+    case "naming":
+        switch key {
+        case "c016", "c017", "c018", "c019", "c020", "c020_min_length", "c020_allowed":
+            return true
+        }
+    case "target":
+        return key == "odin_version"
+    case "correctness":
+        return key == "c001_ownership_hints"
+    case "tools":
+        switch key {
+        case "odin_path", "ols_path":
+            return true
+        }
+    case "ignore":
+        switch key {
+        case "paths", "path":
+            return true
+        }
+    }
+    return false
 }
 
 // config_domain_enabled returns whether a rule should be active according to
@@ -317,5 +397,9 @@ print_config_summary :: proc(cfg: OdinLintConfig) {
         fmt.eprintfln("  tools: odin=%s ols=%s",
             cfg.tools_odin_path if cfg.tools_odin_path != "" else "(PATH)",
             cfg.tools_ols_path  if cfg.tools_ols_path  != "" else "(PATH)")
+    }
+    if len(cfg.ignore_paths) > 0 {
+        fmt.eprintfln("  ignore paths: %d pattern(s)", len(cfg.ignore_paths))
+        for p in cfg.ignore_paths { fmt.eprintfln("    - %s", p) }
     }
 }
