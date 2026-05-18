@@ -26,7 +26,6 @@ olt setup        # OLS detection → install → MCP registration (3-step wizard
 ### Build from source
 
 Requires Odin `dev-2026-05` or newer.
-
 ```bash
 git clone --recurse-submodules https://github.com/RainerXE/odintooling
 cd odintooling
@@ -256,13 +255,7 @@ Build a semantic graph of your project for deeper analysis:
 olt src/ --export-symbols
 ```
 
-By default this writes to `.codegraph/odin_lint_graph.db` and `.codegraph/symbols.json`. The `.codegraph/` directory is a shared convention — other code intelligence tools (e.g. CodeGraph) also use it, each with their own filename, so they coexist without conflict.
-
-Pass a custom path via the MCP `export_symbols` tool:
-```json
-{ "path": "src/", "db_path": "/tmp/my_project.db" }
-```
-`symbols_path` in the response is always derived from `db_path` — `/tmp/my_project.db` → `/tmp/symbols.json`.
+By default this writes to `.codegraph/odin_lint_graph.db` and `.codegraph/symbols.json`. Pass a custom path via `--db=<path>` or the MCP `export_symbols` tool.
 
 Add `.codegraph/` to your `.gitignore` to keep generated graph files out of version control:
 ```
@@ -272,6 +265,39 @@ Add `.codegraph/` to your `.gitignore` to keep generated graph files out of vers
 Once exported, this enables:
 - C202 switch exhaustiveness checking
 - All `get_*` / `search_symbols` MCP tools for AI-assisted refactoring
+
+### CodeGraph integration
+
+[CodeGraph](https://github.com/colbymchenry/codegraph) is a code intelligence MCP server that gives AI agents fast symbol search, call graphs, and impact analysis across 19+ languages. olt can write a CodeGraph-compatible database so Odin projects work with it too.
+
+**First-time setup** (run once per project):
+
+```bash
+olt --codegraph-init src/
+```
+
+This does a full index and writes `.codegraph/codegraph.db` in the schema CodeGraph expects. It also writes `.codegraph/.gitignore` so the database is not committed. No `codegraph init` needed — olt handles everything.
+
+**Keeping it updated** (run after code changes):
+
+```bash
+olt --codegraph-sync src/
+```
+
+Incremental — only re-indexes changed files. Prints a clear error if `--codegraph-init` has not been run yet.
+
+Once the database is in place, all CodeGraph MCP tools work on your Odin codebase:
+
+| Tool | What it does |
+|------|-------------|
+| `codegraph_search` | Find symbols by name |
+| `codegraph_context` | Get code context relevant to a task |
+| `codegraph_callers` | What calls a function |
+| `codegraph_callees` | What a function calls |
+| `codegraph_impact` | Transitive impact of changing a symbol |
+| `codegraph_node` | Full details + source for a symbol |
+
+> **Note**: Do not run `codegraph init` on an Odin project. CodeGraph does not support Odin and will hang trying to pre-load its WASM grammars. `olt --codegraph-init` is the correct entry point.
 
 ---
 
