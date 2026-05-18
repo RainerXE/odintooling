@@ -627,6 +627,72 @@ cli_main :: proc() -> int {
         return 0
     }
 
+    // --codegraph-init: wipe and rebuild from scratch, then write codegraph.db.
+    if opts.codegraph_init {
+        ts_parser, ts_ok := initTreeSitterParser()
+        if !ts_ok {
+            fmt.eprintln("error: failed to initialize tree-sitter parser")
+            return 2
+        }
+        defer deinitTreeSitterParser(ts_parser)
+
+        db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
+        // Force full rebuild by removing the existing graph db.
+        _ = os.remove(db_path)
+
+        r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config)
+        if !r.ok {
+            fmt.eprintln("error: codegraph-init: symbol export failed")
+            return 2
+        }
+
+        sr := codegraph_sync_from_db(db_path, CODEGRAPH_DB_PATH)
+        if !sr.ok {
+            fmt.eprintln("error: codegraph-init: codegraph.db write failed")
+            return 2
+        }
+        fmt.printfln("codegraph-init: %d files indexed, %d nodes, %d edges",
+            r.files_indexed, sr.nodes_written, sr.edges_written)
+        fmt.printfln("  odin-lint graph: %s", db_path)
+        fmt.printfln("  codegraph db:    %s", sr.db_path)
+        fmt.println()
+        fmt.println("CodeGraph is ready. To keep it updated after code changes:")
+        fmt.printfln("  olt --codegraph-sync <target>")
+        return 0
+    }
+
+    // --codegraph-sync: incremental update. Requires a prior --codegraph-init run.
+    if opts.codegraph_sync {
+        if !os.is_file(CODEGRAPH_DB_PATH) {
+            fmt.eprintfln("error: %s not found.", CODEGRAPH_DB_PATH)
+            fmt.eprintln("  Run 'olt --codegraph-init <target>' first to set up CodeGraph for this project.")
+            return 2
+        }
+
+        ts_parser, ts_ok := initTreeSitterParser()
+        if !ts_ok {
+            fmt.eprintln("error: failed to initialize tree-sitter parser")
+            return 2
+        }
+        defer deinitTreeSitterParser(ts_parser)
+
+        db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
+        r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config)
+        if !r.ok {
+            fmt.eprintln("error: codegraph-sync: symbol export failed")
+            return 2
+        }
+
+        sr := codegraph_sync_from_db(db_path, CODEGRAPH_DB_PATH)
+        if !sr.ok {
+            fmt.eprintln("error: codegraph-sync: codegraph.db write failed")
+            return 2
+        }
+        cached_msg := " (no changes)" if r.cached else ""
+        fmt.printfln("codegraph-sync: %d nodes, %d edges%s", sr.nodes_written, sr.edges_written, cached_msg)
+        return 0
+    }
+
     // Collect all .odin files from targets (honouring [ignore] paths from olt.toml).
     files := collect_odin_files(opts.targets[:], opts.recursive, opts.include_vendor, opts.config.ignore_paths[:])
     defer {

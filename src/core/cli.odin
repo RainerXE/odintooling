@@ -21,9 +21,9 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 // CLI — argument parsing, version, help, rule listing
 // =============================================================================
 
-OLT_VERSION          :: "0.97.1"
+OLT_VERSION          :: "0.97.2"
 ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
-ODIN_GRAMMAR_VERSION :: "dev-2026-04"
+ODIN_GRAMMAR_VERSION :: "dev-2026-05"
 
 LintOptions :: struct {
     targets:          [dynamic]string,
@@ -38,6 +38,8 @@ LintOptions :: struct {
     unsafe_fix_mode:  bool,            // --unsafe-fix: apply fixes that change API surface
     propose_mode:     bool,            // --propose: show proposed fixes without writing
     export_symbols:   bool,            // --export-symbols: build code graph + symbols.json
+    codegraph_init:   bool,            // --codegraph-init: full rebuild + emit codegraph.db (first run)
+    codegraph_sync:   bool,            // --codegraph-sync: incremental update of codegraph.db
     graph_db_path:    string,          // --db: output path for graph db (default GRAPH_DB_PATH)
     show_help:        bool,
     show_version:     bool,
@@ -81,6 +83,10 @@ parse_args :: proc(args: []string) -> (LintOptions, bool) {
             opts.propose_mode = true
         case arg == "--export-symbols":
             opts.export_symbols = true
+        case arg == "--codegraph-init":
+            opts.codegraph_init = true
+        case arg == "--codegraph-sync":
+            opts.codegraph_sync = true
         case strings.has_prefix(arg, "--db="):
             opts.graph_db_path = arg[len("--db="):]
         case arg == "--db":
@@ -227,6 +233,9 @@ print_help :: proc() {
     fmt.println("  --non-recursive        Scan directories without recursing into subdirectories")
     fmt.println("  --include-vendor       Include vendor/ directories in scan")
     fmt.println("  --enable-c012          Enable C012 semantic ownership naming hints")
+    fmt.println("  --export-symbols       Build code graph + symbols.json (enables C202, C012-T3, C014, C015)")
+    fmt.println("  --codegraph-init       First-time setup: full rebuild + emit .codegraph/codegraph.db")
+    fmt.println("  --codegraph-sync       Incremental update of .codegraph/codegraph.db (requires --codegraph-init first)")
     fmt.println("  --fix                  Apply safe machine-applicable fixes in-place (C001)")
     fmt.println("  --unsafe-fix           Apply fixes that change API surface (e.g. C009 os2 migration)")
     fmt.println("  --propose              Show proposed fixes as a diff without writing")
