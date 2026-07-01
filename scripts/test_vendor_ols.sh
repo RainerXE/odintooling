@@ -6,7 +6,9 @@ echo "Generated: $(date)"
 echo
 
 # Configuration
-LINT_BINARY="./artifacts/odin-lint"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_platform.sh"
+LINT_BINARY="$OLT_BINARY"
 OUTPUT_DIR="test_results"
 OUTPUT_FILE="$OUTPUT_DIR/ols_focused_analysis_$(date +%Y%m%d).txt"
 DETAILED_REPORT="$OUTPUT_DIR/ols_focused_detailed_$(date +%Y%m%d).txt"

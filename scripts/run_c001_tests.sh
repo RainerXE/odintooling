@@ -4,6 +4,9 @@
 # Tests all C001 memory allocation rule test cases and generates detailed reports
 
 echo "=== C001 COMPREHENSIVE TEST RUNNER ==="
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_platform.sh"
+BINARY="$OLT_BINARY"
 echo "Testing C001 memory allocation rule implementation"
 echo "Date: $(date)"
 echo
