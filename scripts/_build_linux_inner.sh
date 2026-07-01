@@ -83,17 +83,25 @@ ar rcs "$LIBS/libsqlite3.a" "$LIBS/sqlite3.o"
 rm -rf /tmp/sqlite-$$.zip "/tmp/sqlite-$$"
 echo "  ✓ libsqlite3.a"
 
-# ── 5. Install Odin ───────────────────────────────────────────────────────────
-echo "--- Installing Odin ---"
-ODIN_TAG="dev-2026-04"
-ODIN_URL="https://github.com/odin-lang/Odin/releases/download/${ODIN_TAG}/odin-linux-${ODIN_ARCH}-${ODIN_TAG}.tar.gz"
-wget -q "$ODIN_URL" -O /tmp/odin-$$.tar.gz
-mkdir -p /opt/odin
-tar xzf /tmp/odin-$$.tar.gz -C /opt/odin --strip-components=1
-rm -f /tmp/odin-$$.tar.gz
-export PATH="/opt/odin:$PATH"
-odin version
-echo "  ✓ Odin installed"
+# ── 5. Odin toolchain ─────────────────────────────────────────────────────────
+echo "--- Odin toolchain ---"
+if [ "$SUFFIX" = "podman" ] || ! command -v odin &>/dev/null; then
+  # Podman/containers and hosts without Odin: download a pinned release.
+  ODIN_TAG="dev-2026-04"
+  ODIN_URL="https://github.com/odin-lang/Odin/releases/download/${ODIN_TAG}/odin-linux-${ODIN_ARCH}-${ODIN_TAG}.tar.gz"
+  wget -q "$ODIN_URL" -O /tmp/odin-$$.tar.gz
+  mkdir -p /opt/odin
+  tar xzf /tmp/odin-$$.tar.gz -C /opt/odin --strip-components=1
+  rm -f /tmp/odin-$$.tar.gz
+  export PATH="/opt/odin:$PATH"
+  odin version
+  echo "  ✓ Odin installed to /opt/odin"
+else
+  # Native Linux self-hosted runner: use system Odin already on PATH.
+  echo "  Using system Odin: $(command -v odin)"
+  odin version
+  echo "  ✓ System Odin ready"
+fi
 
 # ── 6. Build binaries ─────────────────────────────────────────────────────────
 LINKER_FLAGS="$LIBS/libtree-sitter.a $LIBS/libtree-sitter-odin.a $LIBS/libsqlite3.a"
