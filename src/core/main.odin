@@ -158,7 +158,8 @@ analyze_file :: proc(
 
     // C001 + C101: AST walker rules (share one parse)
     if rule_enabled("C001", "correctness", opts) || rule_enabled("C101", "correctness", opts) {
-        ast_root, parse_ok := parseFile(ts_parser^, file_path)
+        ast_root, ast_content, parse_ok := parseFile(ts_parser^, file_path)
+        defer delete(ast_content)
         if !parse_ok {
             violations += emit_or_collect(
                 createInternalError(file_path, 1, 1,
@@ -189,7 +190,8 @@ analyze_file :: proc(
     // C029: stdlib alloc without defer delete (stdlib_safety domain)
     // C033: strings.Builder without defer strings.builder_destroy (stdlib_safety domain)
     if rule_enabled("C029", "correctness", opts) || rule_enabled("C033", "correctness", opts) {
-        ast_root, parse_ok := parseFile(ts_parser^, file_path)
+        ast_root, ast_content, parse_ok := parseFile(ts_parser^, file_path)
+        defer delete(ast_content)
         if parse_ok {
             std_content, std_err := os.read_entire_file_from_path(file_path, context.allocator)
             if std_err == nil {
@@ -629,6 +631,10 @@ cli_main :: proc() -> int {
 
     // --codegraph-init: wipe and rebuild from scratch, then write codegraph.db.
     if opts.codegraph_init {
+        if len(opts.targets) == 0 {
+            fmt.eprintln("error: --codegraph-init requires a target directory, e.g. 'olt --codegraph-init .'")
+            return 2
+        }
         ts_parser, ts_ok := initTreeSitterParser()
         if !ts_ok {
             fmt.eprintln("error: failed to initialize tree-sitter parser")
@@ -663,6 +669,10 @@ cli_main :: proc() -> int {
 
     // --codegraph-sync: incremental update. Requires a prior --codegraph-init run.
     if opts.codegraph_sync {
+        if len(opts.targets) == 0 {
+            fmt.eprintln("error: --codegraph-sync requires a target directory, e.g. 'olt --codegraph-sync .'")
+            return 2
+        }
         if !os.is_file(CODEGRAPH_DB_PATH) {
             fmt.eprintfln("error: %s not found.", CODEGRAPH_DB_PATH)
             fmt.eprintln("  Run 'olt --codegraph-init <target>' first to set up CodeGraph for this project.")

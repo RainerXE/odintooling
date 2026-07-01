@@ -4,7 +4,8 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BINARY="$REPO_ROOT/artifacts/odin-lint"
+source "$SCRIPT_DIR/_platform.sh"
+BINARY="$OLT_BINARY"
 FAIL_FIXTURE="$REPO_ROOT/tests/C019_P2_TYPE_MARKER/c019_p2_fixture_fail.odin"
 PASS_FIXTURE="$REPO_ROOT/tests/C019_P2_TYPE_MARKER/c019_p2_fixture_pass.odin"
 TEST_DB="$REPO_ROOT/test_results/c019_p2_results/c019_p2_test.db"

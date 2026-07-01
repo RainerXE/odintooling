@@ -15,7 +15,9 @@ ODIN_ROOT="/Users/rainer/odin"
 TEST_DIRS=("core" "base")
 OUTPUT_DIR="test_results"
 REPORT_FILE="$OUTPUT_DIR/comprehensive_test_report_$(date +%Y%m%d).md"
-LINT_BINARY="./artifacts/odin-lint"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_platform.sh"
+LINT_BINARY="$OLT_BINARY"
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"

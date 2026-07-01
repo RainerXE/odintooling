@@ -47,6 +47,12 @@ SKILL.md
 agents.md
 plans/
 
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.idea/
+
+# ── Synology Drive sync conflicts ─────────────────────────────────────────────
+**/*_Conflict
+
 # ── macOS metadata ────────────────────────────────────────────────────────────
 .DS_Store
 **/.DS_Store
