@@ -222,14 +222,9 @@ _install_step :: proc() {
 		return
 	}
 
-	// Guard (a): skip if olt is already installed at the destination.
 	olt_installed := strings.join([]string{dst_dir, "olt"}, "/")
 	defer delete(olt_installed)
-	if os.is_file(olt_installed) {
-		fmt.printfln("  olt is already installed at %s — skipping.", olt_installed)
-		fmt.println("  To upgrade: run 'olt setup' from the build artifacts folder.")
-		return
-	}
+	already_installed := os.is_file(olt_installed)
 
 	fmt.printfln("  Source:  %s", olt_src)
 	fmt.printfln("  Target:  %s/", dst_dir)
@@ -252,7 +247,11 @@ _install_step :: proc() {
 	}
 
 	// Install the olt binary.
-	fmt.print("  Install olt binary? [Y/n]: ")
+	if already_installed {
+		fmt.print("  olt is already installed. Overwrite/upgrade? [Y/n]: ")
+	} else {
+		fmt.print("  Install olt binary? [Y/n]: ")
+	}
 	if _yn_default_yes() {
 		olt_dst := strings.join([]string{dst_dir, "olt"}, "/")
 		defer delete(olt_dst)
@@ -264,7 +263,11 @@ _install_step :: proc() {
 		if err != nil || !state.success {
 			fmt.println("  ✗  olt")
 		} else {
-			fmt.println("  ✓  olt")
+			if already_installed {
+				fmt.println("  ✓  olt updated")
+			} else {
+				fmt.println("  ✓  olt")
+			}
 		}
 	}
 

@@ -273,18 +273,20 @@ Once exported, this enables:
 **First-time setup** (run once per project):
 
 ```bash
-olt --codegraph-init src/
+olt --codegraph-init .        # index current directory
+olt --codegraph-init src/     # or a specific subdirectory
 ```
 
-This does a full index and writes `.codegraph/codegraph.db` in the schema CodeGraph expects. It also writes `.codegraph/.gitignore` so the database is not committed. No `codegraph init` needed — olt handles everything.
+A target directory is required — `olt --codegraph-init` without one will exit with an error. Use `.` to index the current directory. This does a full index and writes `.codegraph/codegraph.db` in the schema CodeGraph expects. It also writes `.codegraph/.gitignore` so the database is not committed. No `codegraph init` needed — olt handles everything.
 
 **Keeping it updated** (run after code changes):
 
 ```bash
-olt --codegraph-sync src/
+olt --codegraph-sync .        # sync current directory
+olt --codegraph-sync src/     # or a specific subdirectory
 ```
 
-Incremental — only re-indexes changed files. Prints a clear error if `--codegraph-init` has not been run yet.
+A target directory is required here too. Incremental — only re-indexes changed files. Prints a clear error if `--codegraph-init` has not been run yet.
 
 Once the database is in place, all CodeGraph MCP tools work on your Odin codebase:
 

@@ -4,6 +4,9 @@
 # Runs all C002 tests and captures results
 
 echo "🧪 Running C002 Test Suite..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_platform.sh"
+BINARY="$OLT_BINARY"
 echo "============================"
 
 # Create test results directory

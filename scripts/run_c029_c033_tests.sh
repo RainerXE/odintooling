@@ -62,7 +62,13 @@ check "C033 pass fixture 0 violations"             "$([ "$c033_pass_count" -eq 0
 # ── Domain gate: off by default ──
 echo ""
 echo "── Domain gate: stdlib_safety off by default ──"
+if [ -f "$REPO_ROOT/olt.toml" ]; then
+    mv "$REPO_ROOT/olt.toml" "$REPO_ROOT/olt.toml.bak"
+fi
 default_out=$("$BINARY" "$c029_fail" 2>&1 || true)
+if [ -f "$REPO_ROOT/olt.toml.bak" ]; then
+    mv "$REPO_ROOT/olt.toml.bak" "$REPO_ROOT/olt.toml"
+fi
 default_count=$(echo "$default_out" | grep -c "C029" || true)
 check "C029 NOT fired in default scan"             "$([ "$default_count" -eq 0 ] && echo true || echo false)" "got $default_count"
 
