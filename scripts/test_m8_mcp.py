@@ -27,29 +27,16 @@ SYMBOLS_JSON = os.path.join(REPO_ROOT, ".codegraph", "symbols.json")
 # ---------------------------------------------------------------------------
 
 def _frame(msg: dict) -> bytes:
-    body = json.dumps(msg).encode()
-    header = f"Content-Length: {len(body)}\r\n\r\n".encode()
-    return header + body
+    # MCP stdio uses one UTF-8 JSON-RPC message per line. Messages must not
+    # contain embedded newlines, so use the compact JSON representation.
+    return json.dumps(msg, separators=(",", ":")).encode("utf-8") + b"\n"
 
 def _read_response(proc: subprocess.Popen) -> dict:
-    """Read one Content-Length-framed JSON-RPC response from the server."""
-    header = b""
-    while not header.endswith(b"\r\n\r\n"):
-        ch = proc.stdout.read(1)
-        if not ch:
-            raise EOFError("server closed stdout while reading header")
-        header += ch
-
-    content_length = 0
-    for line in header.split(b"\r\n"):
-        if line.lower().startswith(b"content-length:"):
-            content_length = int(line.split(b":")[1].strip())
-
-    if content_length == 0:
-        raise ValueError("missing or zero Content-Length")
-
-    body = proc.stdout.read(content_length)
-    return json.loads(body)
+    """Read one newline-delimited JSON-RPC response from the server."""
+    line = proc.stdout.readline()
+    if not line:
+        raise EOFError("server closed stdout while reading response")
+    return json.loads(line)
 
 
 class MCPClient:
@@ -68,13 +55,17 @@ class MCPClient:
 
     def _handshake(self):
         resp = self.call("initialize", {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": "2025-11-25",
             "clientInfo": {"name": "m8-test", "version": "1.0"},
             "capabilities": {},
         })
         assert "result" in resp, f"initialize failed: {resp}"
         # send initialized notification (no response expected)
-        self._proc.stdin.write(_frame({"jsonrpc": "2.0", "method": "initialized", "params": {}}))
+        self._proc.stdin.write(_frame({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            "params": {},
+        }))
         self._proc.stdin.flush()
 
     def call(self, method: str, params: dict) -> dict:
