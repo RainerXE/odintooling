@@ -21,9 +21,9 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 // CLI — argument parsing, version, help, rule listing
 // =============================================================================
 
-OLT_VERSION          :: "0.97.2"
+OLT_VERSION          :: "0.97.3"
 ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
-ODIN_GRAMMAR_VERSION :: "dev-2026-05"
+ODIN_GRAMMAR_VERSION :: "dev-2026-07"
 
 LintOptions :: struct {
     targets:          [dynamic]string,

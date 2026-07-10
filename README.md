@@ -359,6 +359,14 @@ Run the full test suite before submitting:
 
 ---
 
+## Changelog
+
+### 0.97.3 (2026-07-10)
+- Fix installer issues: binary now properly installs to target directory
+- Fix MCP configuration corruption issues
+- Add backup/restore for existing configurations
+- Improve error handling in installation process
+
 ## License
 
 [MIT](https://en.wikipedia.org/wiki/MIT_License)

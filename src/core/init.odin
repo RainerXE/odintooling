@@ -255,18 +255,26 @@ _install_step :: proc() {
 	if _yn_default_yes() {
 		olt_dst := strings.join([]string{dst_dir, "olt"}, "/")
 		defer delete(olt_dst)
-		_ = os.remove(olt_dst)
+		
+		// Create parent directory if needed
+		last_slash := strings.last_index(olt_dst, "/")
+		if last_slash > 0 {
+			dir := olt_dst[:last_slash]
+			_mkdir_p(dir)
+		}
+		
+		// Copy with proper error handling
 		state, _, _, err := os.process_exec(
-			os.Process_Desc{command = []string{"cp", olt_src, olt_dst}},
+			os.Process_Desc{command = []string{"cp", "-f", olt_src, olt_dst}},
 			context.allocator,
 		)
 		if err != nil || !state.success {
-			fmt.println("  ✗  olt")
+			fmt.printfln("  ✗  Failed to copy binary: %v", err)
 		} else {
 			if already_installed {
 				fmt.println("  ✓  olt updated")
 			} else {
-				fmt.println("  ✓  olt")
+				fmt.println("  ✓  olt installed")
 			}
 		}
 	}
@@ -810,29 +818,51 @@ _mcp_codex :: proc(codex_dir, mcp_bin: string) {
 @(private = "file")
 _mcp_opencode :: proc(opencode_dir, mcp_bin: string) {
 	cfg_path := _pjoin(opencode_dir, "opencode.json")
+
+	// Create backup of existing config if it exists
+	backup_path := ""
 	if os.is_file(cfg_path) {
 		existing, err := os.read_entire_file_from_path(cfg_path, context.temp_allocator)
 		if err == nil && strings.contains(string(existing), "olt") {
 			fmt.println("    Already configured ✓")
 			return
 		}
-		fmt.println("    Config exists — add under the \"mcp\" key:")
-		_snippet_opencode_entry(mcp_bin)
-		return
+        backup_path = strings.join([]string{cfg_path, ".bak"}, "", allocator = context.temp_allocator)
+		_ = os.rename(cfg_path, backup_path)
 	}
+
 	fmt.print("    Create opencode.json with olt-mcp entry? [Y/n]: ")
 	if !_yn_default_yes() {
 		fmt.println("    Skipped. Create opencode.json with:")
 		_snippet_opencode_full(mcp_bin)
 		return
 	}
-	if !os.is_dir(opencode_dir) { _mkdir_p(opencode_dir) }
+
+	// Create directory if needed
+	if !os.is_dir(opencode_dir) {
+		_mkdir_p(opencode_dir)
+	}
+
+  // Create new configuration
 	content := _snippet_opencode_full_str(mcp_bin)
 	defer delete(content)
+
+	// Debug: print the content
+	fmt.printfln("DEBUG: Writing content: %s", content)
+
+	// Write with error handling
 	if err := os.write_entire_file(cfg_path, transmute([]u8)content); err != nil {
+		// Restore backup if write fails
+		if backup_path != "" {
+			_ = os.rename(backup_path, cfg_path)
+		}
 		fmt.println("    ✗  Write failed. Create opencode.json with:")
 		_snippet_opencode_full(mcp_bin)
 	} else {
+		// Remove backup if successful
+		if backup_path != "" {
+			_ = os.remove(backup_path)
+		}
 		fmt.println("    ✓  Created opencode.json")
 	}
 }
@@ -979,11 +1009,13 @@ _snippet_opencode_full :: proc(mcp_bin: string) {
 
 @(private = "file")
 _snippet_opencode_full_str :: proc(mcp_bin: string) -> string {
+	part1 := "{\n  \"mcp\": {\n    \"olt-mcp\": {\n      \"type\": \"local\",\n      \"command\": [\""
+	part2 := "\"]\n    }\n  }\n}"
 	b := strings.builder_make()
 	defer strings.builder_destroy(&b)
-	fmt.sbprintf(&b,
-		"{\n  \"mcp\": {\n    \"olt-mcp\": {\n      \"type\": \"local\",\n      \"command\": [\"%s\"]\n    }\n  }\n}\n",
-		mcp_bin)
+	strings.write_string(&b, part1)
+	strings.write_string(&b, mcp_bin)
+	strings.write_string(&b, part2)
 	return strings.clone(strings.to_string(b))
 }
 
