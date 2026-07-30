@@ -45,8 +45,16 @@ load_query_src :: proc(language: rawptr, src: string, label: string = "<embedded
         length: u32
         raw_ptr := ts_query_capture_name_for_id(handle, i, &length)
         if raw_ptr != nil && length > 0 {
-            cstr := strings.string_from_null_terminated_ptr(cast(^u8)raw_ptr, 1024)
-            names[i] = strings.clone(cstr)
+            // tree-sitter's capture-name buffer is NOT guaranteed to be
+            // null-terminated — it already gives the exact byte length via
+            // `length`. Build the string directly from (ptr, length) rather
+            // than scanning up to an arbitrary 1024-byte cap for a NUL byte:
+            // that scan could run off the end of the (typically much
+            // smaller) actual allocation and segfault — this was a real,
+            // build/layout-dependent crash in the LSP proxy (SIGSEGV in
+            // bytes.index_byte via strings.truncate_to_byte).
+            raw_slice := mem.slice_ptr(cast(^u8)raw_ptr, int(length))
+            names[i] = strings.clone(string(raw_slice))
         }
     }
 
