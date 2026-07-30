@@ -57,6 +57,28 @@ jobs:
           lsp_rc=0; echo "" | timeout 3 ./artifacts/macos-arm64/olt-lsp >/dev/null 2>&1 || lsp_rc=$?
           [ "$lsp_rc" -ne 139 ] && [ "$lsp_rc" -ne 134 ] && echo "olt-lsp starts OK" || (echo "olt-lsp crashed" && exit 1)
 
+      - name: Rule test suites
+        # Runs every scripts/run_*.sh fixture suite (C001, C002, B001-B003,
+        # C012, C014-C025, C029-C033, C101, C201-C203, M7 — self-updating as
+        # new run_*.sh scripts are added) plus the MCP and config test suites.
+        # Previously only the 4-line smoke test above ran in CI, so a rule
+        # regression could ship silently to a tagged release.
+        run: |
+          set -e
+          FAILED=0
+          for t in scripts/run_*.sh; do
+            echo "--- $t ---"
+            if ! bash "$t"; then
+              echo "FAILED: $t"
+              FAILED=1
+            fi
+          done
+          echo "--- scripts/test_m9_config.sh ---"
+          bash scripts/test_m9_config.sh || FAILED=1
+          echo "--- scripts/test_m8_mcp.py ---"
+          python3 scripts/test_m8_mcp.py || FAILED=1
+          exit $FAILED
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
