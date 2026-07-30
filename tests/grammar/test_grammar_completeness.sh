@@ -7,6 +7,9 @@ echo "=== ODIN GRAMMAR COMPLETENESS TEST ==="
 echo "Testing tree-sitter grammar against real Odin source code"
 echo
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../scripts/_platform.sh"
+
 # Test files from different categories
 test_files=(
     "/Users/rainer/odin/core/fmt/format.odin"      # Core formatting
@@ -22,14 +25,19 @@ fail_count=0
 for file in "${test_files[@]}"; do
     if [ -f "$file" ]; then
         echo "🔍 Testing: $file"
-        
-        # Test parsing with our CLI
-        if ./odin-lint "$file" > /dev/null 2>&1; then
-            echo "✅ PASS: Successfully parsed $(basename $file)"
-            ((success_count++))
-        else
-            echo "❌ FAIL: Could not parse $(basename $file)"
+
+        # Test parsing with our CLI. olt exits 1 when it finds real
+        # violations (expected on stdlib files, not a parse failure) — the
+        # actual "couldn't parse this" signal is an INTERNAL ERROR diagnostic
+        # in the output, not the exit code.
+        output=$("$OLT_BINARY" "$file" 2>&1)
+        if echo "$output" | grep -q "INTERNAL ERROR"; then
+            echo "❌ FAIL: Could not parse $(basename "$file")"
+            echo "$output" | grep "INTERNAL ERROR"
             ((fail_count++))
+        else
+            echo "✅ PASS: Successfully parsed $(basename "$file")"
+            ((success_count++))
         fi
         echo
     else

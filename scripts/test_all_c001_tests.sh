@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "=== C001 RULE COMPREHENSIVE TEST SUMMARY ==="
-echo "Automatically testing all C001 test cases in tests/c001/"
+echo "Automatically testing all C001 test cases in tests/C001_COR_MEMORY/"
 echo "Generated: $(date)"
 echo
 
@@ -11,7 +11,7 @@ source "$SCRIPT_DIR/_platform.sh"
 LINT_BINARY="$OLT_BINARY"
 OUTPUT_DIR="test_results"
 SUMMARY_FILE="$OUTPUT_DIR/c001_test_summary_$(date +%Y%m%d).txt"
-TEST_DIR="./test/c001"
+TEST_DIR="$SCRIPT_DIR/../tests/C001_COR_MEMORY"
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"

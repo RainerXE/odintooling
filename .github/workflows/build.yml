@@ -37,8 +37,10 @@ jobs:
       - name: Build olt, olt-mcp, olt-lsp
         run: |
           ./scripts/build.sh
-          ./scripts/build_mcp.sh
-          ./scripts/build_lsp.sh
+          # olt-mcp and olt-lsp are symlinks — argv[0] dispatch in src/main.odin
+          # handles routing (same approach as build_linux_x86.sh / _build_linux_inner.sh).
+          ln -sf olt ./artifacts/macos-arm64/olt-mcp
+          ln -sf olt ./artifacts/macos-arm64/olt-lsp
 
       - name: Smoke test
         run: |
@@ -49,6 +51,11 @@ jobs:
           $BIN /tmp/s.odin && echo "clean lint OK"
           echo 'package l; l::proc(){_=make([]u8,10)}' > /tmp/l.odin
           $BIN /tmp/l.odin; [ $? -eq 1 ] && echo "leak detection OK"
+          # olt-mcp / olt-lsp: start cleanly and exit on EOF (same check as Linux).
+          mcp_rc=0; echo "" | timeout 3 ./artifacts/macos-arm64/olt-mcp >/dev/null 2>&1 || mcp_rc=$?
+          [ "$mcp_rc" -ne 139 ] && [ "$mcp_rc" -ne 134 ] && echo "olt-mcp starts OK" || (echo "olt-mcp crashed" && exit 1)
+          lsp_rc=0; echo "" | timeout 3 ./artifacts/macos-arm64/olt-lsp >/dev/null 2>&1 || lsp_rc=$?
+          [ "$lsp_rc" -ne 139 ] && [ "$lsp_rc" -ne 134 ] && echo "olt-lsp starts OK" || (echo "olt-lsp crashed" && exit 1)
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

@@ -2,6 +2,12 @@
 # olt — .gitignore
 # =============================================================================
 
+# Shared cross-project doc symlinks (Principles/Style/Memory), sourced from
+# outside this repo — see the sibling Odin projects for the same convention.
+ODIN_MEMORY.md
+ODIN_STYLE.md
+ODIN_PRINCIPLES.md
+
 # ── Binaries (committed per-platform in artifacts/<platform>/) ────────────────
 # Root-level strays (leading / anchors to repo root only)
 /odin-lint

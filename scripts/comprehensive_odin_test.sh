@@ -58,10 +58,14 @@ for dir in "${TEST_DIRS[@]}"; do
         # Run linter
         output=$($LINT_BINARY "$file" 2>&1)
         
-        # Count violations
-        violation_count=$(echo "$output" | grep -c "C001" || echo "0")
-        contextual_count=$(echo "$output" | grep -c "Intentional? Performance" || echo "0")
-        error_count=$(echo "$output" | grep -c "INTERNAL ERROR" || echo "0")
+        # Count violations. `grep -c` alone already prints "0" and exits 1 on
+        # no match — the old `|| echo "0"` appended a second literal "0" line
+        # on top of that, breaking the later `-gt 0` integer test (comparing
+        # against "0\n0"). `grep -c`'s exit-1-on-no-match would also trip
+        # `set -e` above, so these three are explicitly exempted.
+        violation_count=$(echo "$output" | { grep -c "C001" || true; })
+        contextual_count=$(echo "$output" | { grep -c "Intentional? Performance" || true; })
+        error_count=$(echo "$output" | { grep -c "INTERNAL ERROR" || true; })
         
         if [ "$violation_count" -gt 0 ]; then
             total_violations=$((total_violations + violation_count))
