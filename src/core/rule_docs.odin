@@ -611,7 +611,7 @@ Tier: style
 =============================================================================
 
 WHAT IT DETECTS
-  'if !ok { panic(...) }' or 'if err != nil { panic(...) }' patterns where
+  'if !ok { panic }' or 'if err != nil { panic }' style patterns where
   a proper error return would be more idiomatic Odin.
 
 NOTE
@@ -648,8 +648,8 @@ Tier: style
 =============================================================================
 
 WHAT IT DETECTS
-  'for v, _ in collection' where the index is discarded — the blank index
-  is unnecessary in Odin.
+  A for-range loop with a discarded blank index (value, _ in collection) —
+  the blank index is unnecessary in Odin.
 
 FIX
   Use 'for v in collection'. Run 'olt --fix' to apply automatically.
