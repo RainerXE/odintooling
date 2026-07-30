@@ -11,6 +11,8 @@
 
 echo "Running C014 Test Suite..."
 echo "=========================="
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_platform.sh"
 mkdir -p test_results/c014_results
 
 FIXTURE_DIR="tests/C014_DEA_UNUSEDPROC"
@@ -29,7 +31,7 @@ failed_tests=0
 # --- Pass fixture ---
 echo "Testing: c014_fixture_pass.odin"
 output_pass="test_results/c014_results/c014_fixture_pass_results.txt"
-./artifacts/olt --export-symbols "$FIXTURE_DIR/c014_fixture_pass.odin" \
+"$OLT_BINARY" --export-symbols "$FIXTURE_DIR/c014_fixture_pass.odin" \
     --db /tmp/c014_pass_test.db > "$output_pass" 2>&1
 if ! grep -q "C014 \[dead_code\]" "$output_pass"; then
     echo "  PASS: No C014 violations (as expected)"
@@ -44,7 +46,7 @@ rm -f /tmp/c014_pass_test.db
 # --- Fail fixture ---
 echo "Testing: c014_fixture_fail.odin"
 output_fail="test_results/c014_results/c014_fixture_fail_results.txt"
-./artifacts/olt --export-symbols "$FIXTURE_DIR/c014_fixture_fail.odin" \
+"$OLT_BINARY" --export-symbols "$FIXTURE_DIR/c014_fixture_fail.odin" \
     --db /tmp/c014_fail_test.db > "$output_fail" 2>&1
 if grep -q "C014 \[dead_code\]" "$output_fail"; then
     count=$(grep -c "C014 \[dead_code\]" "$output_fail")
