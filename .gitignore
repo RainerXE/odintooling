@@ -6,6 +6,7 @@
 # outside this repo — see the sibling Odin projects for the same convention.
 ODIN_MEMORY.md
 ODIN_STYLE.md
+ODIN_PROJECT_RAILS.md
 ODIN_PRINCIPLES.md
 
 # ── Binaries (committed per-platform in artifacts/<platform>/) ────────────────
