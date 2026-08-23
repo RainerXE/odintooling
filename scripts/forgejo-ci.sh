@@ -50,6 +50,7 @@ unzip -q "$SQ_TMP/sq.zip" -d "$SQ_TMP"
 "$CC" -O2 -fPIC \
     -DSQLITE_THREADSAFE=0 \
     -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1 \
+    -DSQLITE_ENABLE_FTS5 \
     -c "$SQ_TMP/sqlite-amalgamation-${SQLITE_VER}/sqlite3.c" -o "$SQ_TMP/sqlite3.o"
 ar rcs ffi/sqlite/libsqlite3.a "$SQ_TMP/sqlite3.o"
 rm -rf "$SQ_TMP"
