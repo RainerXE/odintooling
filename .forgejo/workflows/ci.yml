@@ -49,6 +49,10 @@ jobs:
           git remote add origin "$AUTH_URL"
           git fetch -q --depth 1 origin "$SHA"
           git checkout -q FETCH_HEAD
+          # Rewrite same-server URLs so private submodules (vendor/odin-sqlite3)
+          # authenticate with the job token during submodule update.
+          SRV="${SERVER#*://}"
+          git config url."${SERVER%%://*}://oauth2:${GH_TOKEN}@${SRV}/".insteadOf "${SERVER}/"
           git submodule update --init --recursive
           echo "checked out: $(git log --oneline -1)"
 

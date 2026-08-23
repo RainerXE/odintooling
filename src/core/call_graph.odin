@@ -104,7 +104,12 @@ graph_open :: proc(path: string) -> (db: ^GraphDB, ok: bool) {
     db = new(GraphDB)
     db.conn = conn
     db.path = strings.clone(path)
-    if !sq.db_exec_script(db.conn, GRAPH_SCHEMA) {
+    schema_ok, schema_err := sq.db_exec_script(db.conn, GRAPH_SCHEMA)
+    if !schema_ok {
+        if schema_err != "" {
+            fmt.eprintfln("export-symbols: graph schema failed: %s", schema_err)
+            delete(schema_err)
+        }
         sq.db_close(conn)
         delete(db.path)
         free(db)
