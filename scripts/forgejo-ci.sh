@@ -75,6 +75,11 @@ echo "binary: $BIN"
 ln -sf olt "artifacts/$PLAT/olt-mcp"
 ln -sf olt "artifacts/$PLAT/olt-lsp"
 echo "linked olt-mcp / olt-lsp -> olt"
+# Several older rule suites (b001, b002/b003, c012, c019, c020, c101) still
+# invoke the pre-platform-layout binary path ./artifacts/odin-lint. Provide
+# it so those suites exercise the freshly built binary too.
+ln -sf "$PLAT/olt" "artifacts/odin-lint"
+echo "linked artifacts/odin-lint -> $PLAT/olt (legacy suite path)"
 
 echo "== rule test suites (scripts/run_*.sh) =="
 FAILED=0
