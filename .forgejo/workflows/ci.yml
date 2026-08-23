@@ -32,10 +32,25 @@ jobs:
     name: Build & test (Linux, proj-odin)
     runs-on: [self-hosted, proj-odin, linux, odin]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Checkout (plain git — no external action dependency)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -e
+          case "$SERVER" in
+            http://*)  AUTH_URL="http://oauth2:${GH_TOKEN}@${SERVER#http://}/$REPO" ;;
+            https://*) AUTH_URL="https://oauth2:${GH_TOKEN}@${SERVER#https://}/$REPO" ;;
+            *)         AUTH_URL="$SERVER/$REPO" ;;
+          esac
+          git init -q .
+          git remote add origin "$AUTH_URL"
+          git fetch -q --depth 1 origin "$SHA"
+          git checkout -q FETCH_HEAD
+          git submodule update --init --recursive
+          echo "checked out: $(git log --oneline -1)"
 
       - name: Build, test, Go-migration focus
         run: ./scripts/forgejo-ci.sh
