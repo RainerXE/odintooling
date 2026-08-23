@@ -20,6 +20,24 @@ fi
 odin version
 
 echo "== build olt =="
+# Defensive: make sure the tree-sitter submodules' C sources are present
+# (the .a files are compiled from them). The checkout step requests
+# submodules: recursive, but re-init here so `make` can't fail on missing src.
+git submodule update --init --recursive 2>/dev/null || echo "submodule update skipped/failed (continuing)"
+# The tree-sitter static libs are GITIGNORED build artifacts, not present on a
+# fresh checkout — which is exactly why the first CI run failed with
+# "no such file or directory: .../libtree-sitter.a". `build.sh` only does
+# `odin build` against those .a files and ASSUMES they exist. So we compile
+# them from the submodule C sources first (the project's own `make` target
+# drops libtree-sitter.a / libtree-sitter-odin.a at the submodule root, which
+# is what build.sh links). SQLite's libsqlite3.a is committed, so it's reused.
+CC=$(command -v gcc || command -v cc || command -v clang || true)
+if [ -z "$CC" ]; then echo "no C compiler (gcc/cc/clang) found" >&2; exit 1; fi
+export CC
+for d in ffi/tree_sitter/tree-sitter-lib ffi/tree_sitter/tree-sitter-odin; do
+  echo "--- make $d (CC=$CC) ---"
+  ( cd "$d" && make )
+done
 ./scripts/build.sh
 # Pick the binary for the current platform (avoids stale cross-build dirs
 # like artifacts/linux-arm64-podman/olt which would sort first alphabetically).
