@@ -6,16 +6,37 @@ Exercises every new tool added in M8 against the running odin-lint-mcp server.
 
 import json
 import os
+import platform
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
 REPO_ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SERVER_BIN  = os.path.join(REPO_ROOT, "artifacts", "macos-arm64", "olt-mcp")
+# Platform-aware binary path: the MCP server binary lives under
+# artifacts/<platform>/olt-mcp. Fall back to scanning artifacts/ so the suite
+# also works when the layout changes or on an unexpected platform.
+_PLAT_MAP = {
+    "Darwin-arm64":  "macos-arm64",
+    "Darwin-x86_64": "macos-x86_64",
+    "Linux-x86_64":  "linux-x86_64",
+    "Linux-aarch64": "linux-arm64",
+}
+_PLAT = _PLAT_MAP.get(f"{platform.system()}-{platform.machine()}", "")
+if _PLAT and os.path.exists(os.path.join(REPO_ROOT, "artifacts", _PLAT, "olt-mcp")):
+    SERVER_BIN = os.path.join(REPO_ROOT, "artifacts", _PLAT, "olt-mcp")
+else:
+    _candidates = sorted(
+        p for p in Path(REPO_ROOT, "artifacts").glob("*/olt-mcp")
+        if p.is_file()
+    ) if os.path.isdir(os.path.join(REPO_ROOT, "artifacts")) else []
+    if not _candidates:
+        sys.exit(f"no olt-mcp binary found under {REPO_ROOT}/artifacts/")
+    SERVER_BIN = str(_candidates[0])
 FAIL_FIXTURE = os.path.join(REPO_ROOT, "tests", "C002_COR_POINTER", "c002_fixture_fail.odin")
 PASS_FIXTURE = os.path.join(REPO_ROOT, "tests", "C001_COR_MEMORY",  "c001_pass.odin")
 TEST_DIR     = os.path.join(REPO_ROOT, "tests", "C001_COR_MEMORY")
