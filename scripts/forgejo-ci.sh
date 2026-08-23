@@ -38,6 +38,22 @@ for d in ffi/tree_sitter/tree-sitter-lib ffi/tree_sitter/tree-sitter-odin; do
   echo "--- make $d (CC=$CC) ---"
   ( cd "$d" && make )
 done
+# libsqlite3.a IS tracked in git but was built for macOS (Mach-O arm64) — GNU
+# ld silently skips incompatible members, producing undefined sqlite3_*
+# references. Rebuild it natively for this platform (same recipe as
+# scripts/_build_linux_inner.sh); this only touches the working tree copy.
+echo "--- building platform-native libsqlite3.a ---"
+SQLITE_VER="3460100"
+SQ_TMP=$(mktemp -d)
+wget -q "https://sqlite.org/2024/sqlite-amalgamation-${SQLITE_VER}.zip" -O "$SQ_TMP/sq.zip"
+unzip -q "$SQ_TMP/sq.zip" -d "$SQ_TMP"
+"$CC" -O2 -fPIC \
+    -DSQLITE_THREADSAFE=0 \
+    -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1 \
+    -c "$SQ_TMP/sqlite-amalgamation-${SQLITE_VER}/sqlite3.c" -o "$SQ_TMP/sqlite3.o"
+ar rcs ffi/sqlite/libsqlite3.a "$SQ_TMP/sqlite3.o"
+rm -rf "$SQ_TMP"
+echo "  ✓ libsqlite3.a rebuilt for $(uname -m)"
 ./scripts/build.sh
 # Pick the binary for the current platform (avoids stale cross-build dirs
 # like artifacts/linux-arm64-podman/olt which would sort first alphabetically).
