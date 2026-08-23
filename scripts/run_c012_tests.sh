@@ -10,6 +10,17 @@ mkdir -p "$OUT"
 passed=0
 failed=0
 
+# Execute a SQL statement against the graph DB via python3's built-in sqlite3
+# module — the sqlite3 CLI is not installed on every runner image.
+dbexec() {
+    python3 -c '
+import sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+con.execute(sys.argv[2])
+con.commit()
+' "$1" "$2"
+}
+
 check_pass() {
     local label=$1 file=$2
     local out="$OUT/${label}.txt"
@@ -49,7 +60,7 @@ rm -f "$DB"
 # Export symbols from the T3 fixture so get_scratch gets into the graph.
 # We manually update its memory_role to 'allocator' to simulate T3 scenario.
 $LINT "$FIXTURE_DIR" --export-symbols --db="$DB" 2>/dev/null
-sqlite3 "$DB" "UPDATE nodes SET memory_role='allocator', return_type='mem.Allocator' WHERE name='get_scratch';" 2>/dev/null
+dbexec "$DB" "UPDATE nodes SET memory_role='allocator', return_type='mem.Allocator' WHERE name='get_scratch';"
 echo "  Graph built and get_scratch tagged as allocator."
 
 echo ""

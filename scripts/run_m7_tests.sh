@@ -27,41 +27,55 @@ check() {
     fi
 }
 
+# Query a scalar from the graph DB. Uses python3's built-in sqlite3 module
+# instead of the sqlite3 CLI, which is not installed on every runner image
+# (host runners and container runners differ). NULL renders as empty string,
+# matching sqlite3 CLI output.
+dbq() {
+    python3 -c '
+import sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+for row in con.execute(sys.argv[2]):
+    v = row[0] if len(row) > 0 else None
+    print("" if v is None else str(v))
+' "$1" "$2"
+}
+
 # ── Setup ─────────────────────────────────────────────────────────────────────
 rm -f "$DB"
 echo ""
 echo "--- Pass 1: Initial index (graph_fixture + eviction_fixture) ---"
 $LINT "$FIXTURE_DIR" --export-symbols --db="$DB" 2>/dev/null
 
-files_indexed=$(sqlite3 "$DB" "SELECT COUNT(*) FROM files;")
+files_indexed=$(dbq "$DB" "SELECT COUNT(*) FROM files;")
 check "2 files indexed on first run" "$files_indexed" "2"
 
 # ── Goal 1: package-level allocator var tagged ─────────────────────────────
-alloc_var=$(sqlite3 "$DB" "SELECT memory_role FROM nodes WHERE name='scratch_allocator' AND kind='variable';")
+alloc_var=$(dbq "$DB" "SELECT memory_role FROM nodes WHERE name='scratch_allocator' AND kind='variable';")
 check "scratch_allocator has memory_role=allocator" "$alloc_var" "allocator"
 
 # ── Goal 1: plain package-level var — no allocator role ───────────────────
-plain_var=$(sqlite3 "$DB" "SELECT memory_role FROM nodes WHERE name='frame_count' AND kind='variable';")
+plain_var=$(dbq "$DB" "SELECT memory_role FROM nodes WHERE name='frame_count' AND kind='variable';")
 check "frame_count has no allocator role" "$plain_var" ""
 
 # ── Goal 1: local vars inside procs NOT indexed ─────────────────────────────
-local_alloc_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM nodes WHERE name='local_alloc';")
+local_alloc_count=$(dbq "$DB" "SELECT COUNT(*) FROM nodes WHERE name='local_alloc';")
 check "local_alloc inside proc not indexed" "$local_alloc_count" "0"
-local_count_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM nodes WHERE name='local_count';")
+local_count_count=$(dbq "$DB" "SELECT COUNT(*) FROM nodes WHERE name='local_count';")
 check "local_count inside proc not indexed" "$local_count_count" "0"
 
 # ── Goal 2: proc returning mem.Allocator tagged as allocator ───────────────
-get_scratch_role=$(sqlite3 "$DB" "SELECT memory_role FROM nodes WHERE name='get_scratch' AND kind='proc';")
+get_scratch_role=$(dbq "$DB" "SELECT memory_role FROM nodes WHERE name='get_scratch' AND kind='proc';")
 check "get_scratch tagged memory_role=allocator (returns mem.Allocator)" "$get_scratch_role" "allocator"
 
-get_scratch_rt=$(sqlite3 "$DB" "SELECT return_type FROM nodes WHERE name='get_scratch' AND kind='proc';")
+get_scratch_rt=$(dbq "$DB" "SELECT return_type FROM nodes WHERE name='get_scratch' AND kind='proc';")
 check "get_scratch return_type=mem.Allocator" "$get_scratch_rt" "mem.Allocator"
 
 # ── Goal 2: proc NOT returning allocator — not tagged ─────────────────────
-get_frame_role=$(sqlite3 "$DB" "SELECT memory_role FROM nodes WHERE name='get_frame_count' AND kind='proc';")
+get_frame_role=$(dbq "$DB" "SELECT memory_role FROM nodes WHERE name='get_frame_count' AND kind='proc';")
 check "get_frame_count not tagged as allocator" "$get_frame_role" "neutral"
 
-get_frame_rt=$(sqlite3 "$DB" "SELECT return_type FROM nodes WHERE name='get_frame_count' AND kind='proc';")
+get_frame_rt=$(dbq "$DB" "SELECT return_type FROM nodes WHERE name='get_frame_count' AND kind='proc';")
 check "get_frame_count return_type=int" "$get_frame_rt" "int"
 
 # ── Goal 5: incremental — second run skips unchanged files ─────────────────
@@ -73,8 +87,8 @@ files2=$(echo "$output2" | grep -oE '[0-9]+ files' | grep -oE '[0-9]+' | head -1
 check "0 files re-indexed on unchanged run" "$files2" "0"
 
 # Node count stable after second run
-nodes_after=$(sqlite3 "$DB" "SELECT COUNT(*) FROM nodes;")
-nodes_first=$(sqlite3  "$DB" "SELECT COUNT(*) FROM nodes;")
+nodes_after=$(dbq "$DB" "SELECT COUNT(*) FROM nodes;")
+nodes_first=$(dbq "$DB" "SELECT COUNT(*) FROM nodes;")
 check "node count stable after cached run" "$nodes_after" "$nodes_first"
 
 # ── Goal 5: eviction — delete one file, rebuild, confirm node gone ─────────
@@ -85,10 +99,10 @@ rm "$FIXTURE_DIR/eviction_fixture.odin"
 
 $LINT "$FIXTURE_DIR" --export-symbols --db="$DB" 2>/dev/null
 
-evicted_proc=$(sqlite3 "$DB" "SELECT COUNT(*) FROM nodes WHERE name='extra_proc';")
+evicted_proc=$(dbq "$DB" "SELECT COUNT(*) FROM nodes WHERE name='extra_proc';")
 check "extra_proc evicted after file deletion" "$evicted_proc" "0"
 
-files_after_evict=$(sqlite3 "$DB" "SELECT COUNT(*) FROM files;")
+files_after_evict=$(dbq "$DB" "SELECT COUNT(*) FROM files;")
 check "files table shrinks to 1 after eviction" "$files_after_evict" "1"
 
 # Restore eviction fixture
