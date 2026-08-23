@@ -26,7 +26,10 @@ jobs:
   # Labels set when you registered the runner: self-hosted, macos, arm64
   build-macos:
     name: macOS ARM64
-    if: ${{ github.event.inputs.platforms == '' || contains(fromJSON('["all","macos"]'), github.event.inputs.platforms) }}
+    # Skip on Forgejo (repo is Rainer/odintooling there); this legacy GitHub
+    # CI only runs on the GitHub mirror (RainerXE/odintooling). The Forgejo
+    # CI lives in .forgejo/workflows/ci.yml.
+    if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","macos"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
     runs-on: [self-hosted, macos, arm64]
     steps:
       - name: Checkout (with submodules)
@@ -91,7 +94,8 @@ jobs:
   # Labels set when you registered the runner: self-hosted, linux, x86_64
   build-linux-x86:
     name: Linux x86_64
-    if: ${{ github.event.inputs.platforms == '' || contains(fromJSON('["all","linux"]'), github.event.inputs.platforms) }}
+    # Skip on Forgejo; see build-macos note.
+    if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","linux"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
     runs-on: [self-hosted, linux, x86_64]
     steps:
       - name: Checkout (with submodules)
@@ -115,7 +119,8 @@ jobs:
   # Labels set when you registered the runner: self-hosted, windows, x86_64
   build-windows:
     name: Windows x86_64
-    if: ${{ github.event.inputs.platforms == '' || contains(fromJSON('["all","windows"]'), github.event.inputs.platforms) }}
+    # Skip on Forgejo; see build-macos note.
+    if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","windows"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
     runs-on: [self-hosted, windows, x86_64]
     steps:
       - name: Checkout (with submodules)

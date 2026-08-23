@@ -1,38 +1,41 @@
 name: CI
 
-# Forgejo Actions — runs on a self-hosted runner registered on the owner's
-# metal (see the runner-setup notes in the project; the Rainer/tools repo
-# documents the registration command and labels to use).
+# Forgejo Actions — runs on the shared self-hosted runner that serves proj-odin
+# (see tools/ci-runner/README.md). Owner label `proj-odin` is REQUIRED so the
+# job lands on the right machine; capability labels `linux, odin` describe the
+# toolchain.
 #
 # What it does:
 #   1. checks out the repo (incl. submodules)
-#   2. builds olt
+#   2. builds olt (against the runner's installed Odin)
 #   3. runs every scripts/run_*.sh rule fixture suite + the MCP/config suites
-#   4. asserts the training-relevant Go-migration rules (C021/C022/C023/C025/
-#      C034/C201) actually fire on known-bad Odin
-#   5. on green, mirrors the push to GitHub (RainerXE/odintooling) using the
-#      MIRROR_TOKEN secret (a GitHub PAT or deploy key)
+#   4. reports whether the training-relevant Go-migration rules (C021/C022/
+#      C023/C025/C034/C201) fire on known-bad Odin
+#
+# Mirroring to GitHub is NOT done here: Forgejo has built-in push mirroring
+# (repo Settings -> Mirrors -> Add push mirror to RainerXE/odintooling with a
+# GitHub PAT). That keeps the GitHub token out of the repo and survives token
+# rotation.
 on:
   push:
     branches: [master]
   workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'        # Mondays 03:00 UTC — catch Odin grammar drift
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-test-mirror:
-    name: Build, test, mirror to GitHub
-    # Register the runner with these labels so this job routes to it.
-    runs-on: [self-hosted, odintooling-ci]
+  build-test:
+    name: Build & test (Linux, proj-odin)
+    runs-on: [self-hosted, proj-odin, linux, odin]
     steps:
       - name: Checkout
-        uses: https://code.forgejo.org/actions/checkout@v4
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Build, test, Go-migration focus
-        run: ./scripts/forgejo-ci.sh
-
-      - name: Mirror to GitHub
-        if: ${{ github.ref == 'refs/heads/master' }}
-        env:
-          MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
         run: ./scripts/forgejo-ci.sh
