@@ -154,8 +154,14 @@ codegraph_sync_from_db :: proc(
     }
     defer sq.db_close(dst)
 
-    if !sq.db_exec_script(dst, CODEGRAPH_SCHEMA) {
-        fmt.eprintfln("codegraph-sync: schema init failed: %s", sq.db_errmsg(dst))
+    schema_ok, schema_err := sq.db_exec_script(dst, CODEGRAPH_SCHEMA)
+    if !schema_ok {
+        if schema_err != "" {
+            fmt.eprintfln("codegraph-sync: schema init failed: %s", schema_err)
+            delete(schema_err)
+        } else {
+            fmt.eprintfln("codegraph-sync: schema init failed: %s", sq.db_errmsg(dst))
+        }
         return result
     }
 
