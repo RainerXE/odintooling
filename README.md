@@ -394,6 +394,7 @@ Run the full test suite before submitting:
 
 ## License
 
-[MIT](https://en.wikipedia.org/wiki/MIT_License)
+olt is released under the zlib-style licence in [`LICENSE`](LICENSE). Third-party components keep their own
+(permissive) licences; see [`NOTICE.md`](NOTICE.md).
 
 > "The miracle is this: The more we share the more we have." — Leonard Nimoy
