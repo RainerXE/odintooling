@@ -61,16 +61,16 @@ c015_query_dead_consts :: proc(db: ^GraphDB, all_files: []string) -> []Diagnosti
     }
 
     s, ok := sq.db_prepare(db.conn, `
-        SELECT name, file, line, kind FROM nodes
+        SELECT name, file_path, start_line, kind FROM nodes
         WHERE kind IN ('constant','variable') AND is_exported = 0
-        ORDER BY file, line;`)
+        ORDER BY file_path, start_line;`)
     if !ok { return diags[:] }
     defer sq.stmt_finalize(&s)
 
     for sq.stmt_step(&s) {
         append(&targets, ConstInfo{
             name = strings.clone(sq.stmt_col_text(&s, 0)),
-            file = strings.clone(sq.stmt_col_text(&s, 1)),
+            file = graph_abs(db, sq.stmt_col_text(&s, 1)),
             line = sq.stmt_col_int(&s, 2),
             kind = strings.clone(sq.stmt_col_text(&s, 3)),
         })

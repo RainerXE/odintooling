@@ -1,0 +1,233 @@
+-- CodeGraph SQLite Schema
+-- Version 1
+
+-- Schema version tracking
+CREATE TABLE IF NOT EXISTS schema_versions (
+    version INTEGER PRIMARY KEY,
+    applied_at INTEGER NOT NULL,
+    description TEXT
+);
+
+-- Insert initial version
+INSERT INTO schema_versions (version, applied_at, description)
+VALUES (1, strftime('%s', 'now') * 1000, 'Initial schema');
+
+-- =============================================================================
+-- Core Tables
+-- =============================================================================
+
+-- Nodes: Code symbols (functions, classes, variables, etc.)
+CREATE TABLE IF NOT EXISTS nodes (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    qualified_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    language TEXT NOT NULL,
+    start_line INTEGER NOT NULL,
+    end_line INTEGER NOT NULL,
+    start_column INTEGER NOT NULL,
+    end_column INTEGER NOT NULL,
+    docstring TEXT,
+    signature TEXT,
+    visibility TEXT,
+    is_exported INTEGER DEFAULT 0,
+    is_async INTEGER DEFAULT 0,
+    is_static INTEGER DEFAULT 0,
+    is_abstract INTEGER DEFAULT 0,
+    decorators TEXT, -- JSON array
+    type_parameters TEXT, -- JSON array
+    return_type TEXT, -- normalized return/result type name (e.g. C++ method return, for receiver-type inference)
+    updated_at INTEGER NOT NULL
+);
+
+-- Edges: Relationships between nodes
+CREATE TABLE IF NOT EXISTS edges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    target TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    metadata TEXT, -- JSON object
+    line INTEGER,
+    col INTEGER,
+    provenance TEXT DEFAULT NULL,
+    FOREIGN KEY (source) REFERENCES nodes(id) ON DELETE CASCADE,
+    FOREIGN KEY (target) REFERENCES nodes(id) ON DELETE CASCADE
+);
+
+-- Files: Tracked source files.
+-- `generated` is the index-time verdict from extraction/generated-detection.ts:
+-- the filename convention (*.pb.go, *.g.dart, …) OR a generation banner in the
+-- file's header. Go's convention is a CONTENT marker, so a generated
+-- `payroll.go` beside hand-written use-cases is invisible to the path check
+-- alone (#1500) — deciding it here means ranking never reads file headers per
+-- request. Migration v9 adds the column to existing databases; rows keep the
+-- 0 default until the next full index, so readers treat it as a hint that
+-- only ever ADDS to the path signal, never overrides it.
+CREATE TABLE IF NOT EXISTS files (
+    path TEXT PRIMARY KEY,
+    content_hash TEXT NOT NULL,
+    language TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    modified_at INTEGER NOT NULL,
+    indexed_at INTEGER NOT NULL,
+    node_count INTEGER DEFAULT 0,
+    errors TEXT, -- JSON array
+    generated INTEGER NOT NULL DEFAULT 0
+);
+
+-- Unresolved References: References that need resolution after full indexing.
+-- status lifecycle: rows are inserted 'pending' by extraction; a completed
+-- resolution pass either deletes a row (resolved) or marks it 'failed'
+-- (attempted, no match — kept so a later sync can retry it when a changed
+-- file introduces a symbol that could satisfy it, #1240). name_tail is the
+-- last segment of reference_name ('util.greet' → 'greet'), written when a
+-- row is marked failed, so the retry lookup matches new node names against
+-- dotted refs too. Rows follow their from_node via ON DELETE CASCADE, so
+-- re-extracting or deleting a file clears its stale rows in any status.
+CREATE TABLE IF NOT EXISTS unresolved_refs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_node_id TEXT NOT NULL,
+    reference_name TEXT NOT NULL,
+    reference_kind TEXT NOT NULL,
+    line INTEGER NOT NULL,
+    col INTEGER NOT NULL,
+    candidates TEXT, -- JSON array
+    file_path TEXT NOT NULL DEFAULT '',
+    language TEXT NOT NULL DEFAULT 'unknown',
+    status TEXT NOT NULL DEFAULT 'pending',
+    name_tail TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (from_node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+
+-- =============================================================================
+-- Indexes for Query Performance
+-- =============================================================================
+
+-- Node indexes
+CREATE INDEX IF NOT EXISTS idx_nodes_kind ON nodes(kind, file_path, start_line, id);
+CREATE INDEX IF NOT EXISTS idx_nodes_name ON nodes(name);
+CREATE INDEX IF NOT EXISTS idx_nodes_qualified_name ON nodes(qualified_name);
+CREATE INDEX IF NOT EXISTS idx_nodes_file_path ON nodes(file_path);
+CREATE INDEX IF NOT EXISTS idx_nodes_language ON nodes(language);
+CREATE INDEX IF NOT EXISTS idx_nodes_file_line ON nodes(file_path, start_line);
+CREATE INDEX IF NOT EXISTS idx_nodes_lower_name ON nodes(lower(name));
+
+-- Full-text search index on node names, docstrings, and signatures
+CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
+    id,
+    name,
+    qualified_name,
+    docstring,
+    signature,
+    content='nodes',
+    content_rowid='rowid'
+);
+
+-- Triggers to keep FTS index in sync
+CREATE TRIGGER IF NOT EXISTS nodes_ai AFTER INSERT ON nodes BEGIN
+    INSERT INTO nodes_fts(rowid, id, name, qualified_name, docstring, signature)
+    VALUES (NEW.rowid, NEW.id, NEW.name, NEW.qualified_name, NEW.docstring, NEW.signature);
+END;
+
+CREATE TRIGGER IF NOT EXISTS nodes_ad AFTER DELETE ON nodes BEGIN
+    INSERT INTO nodes_fts(nodes_fts, rowid, id, name, qualified_name, docstring, signature)
+    VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.qualified_name, OLD.docstring, OLD.signature);
+END;
+
+CREATE TRIGGER IF NOT EXISTS nodes_au AFTER UPDATE ON nodes BEGIN
+    INSERT INTO nodes_fts(nodes_fts, rowid, id, name, qualified_name, docstring, signature)
+    VALUES ('delete', OLD.rowid, OLD.id, OLD.name, OLD.qualified_name, OLD.docstring, OLD.signature);
+    INSERT INTO nodes_fts(rowid, id, name, qualified_name, docstring, signature)
+    VALUES (NEW.rowid, NEW.id, NEW.name, NEW.qualified_name, NEW.docstring, NEW.signature);
+END;
+
+-- Prose-word → symbol-name lookup for the prompt hook's graph-derived gate.
+-- One row per (segment, name): segment is a lowercased word of a symbol name
+-- ("OrderStateMachine" → order, state, machine — see identifier-segments.ts),
+-- which lets natural-language prompt words be verified against the graph in
+-- any language whose technical nouns are Latin script. File nodes are
+-- excluded — a file's basename duplicates the symbols inside it and skews the
+-- singleton-vs-cluster rarity statistics. FTS can't serve this lookup (its
+-- tokenizer keeps camelCase names as single tokens), so segments are
+-- materialized on the node write path.
+-- Deletions leave orphan rows ON PURPOSE: rows are PROPOSALS, always
+-- re-verified against nodes before being surfaced (CodeGraph.getSegmentMatches),
+-- and a full index prunes them once it completes (a fresh one starts the table
+-- empty). Populated lazily on old databases (empty until the next index/sync
+-- heals it).
+CREATE TABLE IF NOT EXISTS name_segment_vocab (
+    segment TEXT NOT NULL,
+    name TEXT NOT NULL,
+    PRIMARY KEY (segment, name)
+) WITHOUT ROWID;
+
+-- Edge indexes.
+-- idx_edges_source / idx_edges_target are intentionally omitted —
+-- the (source, kind) and (target, kind) composites below cover the
+-- corresponding source-only / target-only lookups via SQLite's
+-- left-prefix scan, so the narrow indexes are dead weight on writes.
+-- Migration v4 drops them on existing databases.
+CREATE INDEX IF NOT EXISTS idx_edges_kind ON edges(kind);
+CREATE INDEX IF NOT EXISTS idx_edges_source_kind ON edges(source, kind);
+CREATE INDEX IF NOT EXISTS idx_edges_target_kind ON edges(target, kind);
+
+-- Edge identity uniqueness. An edge IS uniquely (source, target, kind, line,
+-- col); insertEdge uses `INSERT OR IGNORE`, but without something UNIQUE to
+-- conflict on it behaved like a plain INSERT, so two passes emitting the same
+-- edge produced byte-identical duplicate rows that inflated counts and flowed
+-- into callers/impact (#1034). IFNULL folds the nullable line/col so
+-- coordinate-less edges (synthesized / file-level) dedup too — SQLite treats
+-- each NULL as distinct otherwise. Migration v6 dedups existing rows + adds
+-- this on older databases.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_edges_identity
+  ON edges(source, target, kind, IFNULL(line, -1), IFNULL(col, -1));
+
+-- File indexes.
+-- idx_files_generated is PARTIAL: the generated set is a small minority of any
+-- repo, so a lookup that intersects a bounded candidate list with it stays
+-- proportional to the generated files, not to the repo.
+CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
+CREATE INDEX IF NOT EXISTS idx_files_modified_at ON files(modified_at);
+CREATE INDEX IF NOT EXISTS idx_files_generated ON files(path) WHERE generated = 1;
+
+-- Unresolved refs indexes
+CREATE INDEX IF NOT EXISTS idx_unresolved_from_node ON unresolved_refs(from_node_id);
+CREATE INDEX IF NOT EXISTS idx_unresolved_name ON unresolved_refs(reference_name);
+CREATE INDEX IF NOT EXISTS idx_unresolved_file_path ON unresolved_refs(file_path);
+CREATE INDEX IF NOT EXISTS idx_unresolved_from_name ON unresolved_refs(from_node_id, reference_name);
+CREATE INDEX IF NOT EXISTS idx_unresolved_status ON unresolved_refs(status);
+CREATE INDEX IF NOT EXISTS idx_unresolved_failed_tail ON unresolved_refs(name_tail) WHERE status = 'failed';
+-- Sync's failed-import retry looks failed imports up by tail and by whole
+-- name. The leading reference_kind is what makes the planner pick these over
+-- idx_unresolved_failed_tail / idx_unresolved_name, whose per-key averages
+-- hide how many failed calls a common tail (`index`, `types`) has.
+CREATE INDEX IF NOT EXISTS idx_unresolved_failed_import_tail ON unresolved_refs(reference_kind, name_tail) WHERE status = 'failed' AND reference_kind = 'imports';
+CREATE INDEX IF NOT EXISTS idx_unresolved_failed_import_name ON unresolved_refs(reference_kind, reference_name) WHERE status = 'failed' AND reference_kind = 'imports';
+-- A failed ref through an import binding is parked under its module
+-- (`module:tag`) and looked up by its whole name as well. The leading status
+-- is the equality term that keeps the planner on this small index.
+CREATE INDEX IF NOT EXISTS idx_unresolved_failed_module_name ON unresolved_refs(status, reference_name) WHERE status = 'failed' AND name_tail GLOB 'module:*';
+-- A member reference through an import binding (`store.get`) is parked under
+-- its module too, and still looked up by its member: the tail its name gives,
+-- what follows its last dot. Spell the expression exactly as MEMBER_TAIL_SQL
+-- (reference-tail.ts) does, or SQLite will not use this index.
+CREATE INDEX IF NOT EXISTS idx_unresolved_failed_module_member ON unresolved_refs(status, substr(reference_name, length(rtrim(reference_name, replace(reference_name, '.', ''))) + 1)) WHERE status = 'failed' AND name_tail GLOB 'module:*';
+CREATE INDEX IF NOT EXISTS idx_edges_provenance ON edges(provenance);
+-- Sync's third-file wiring lookup must not scan every synthesized edge.
+-- CASE short-circuits malformed metadata; keep these expressions identical
+-- in migrations and synthesis queries so SQLite can use the partial index.
+CREATE INDEX IF NOT EXISTS idx_edges_synthesis_site ON edges(CASE WHEN json_valid(metadata) THEN json_extract(metadata, '$.registeredAt') END)
+    WHERE CASE WHEN json_valid(metadata) THEN json_extract(metadata, '$.synthesizedBy') END IS NOT NULL;
+
+-- Retain the cheap source-gate verdict when a later sync deletes the source.
+CREATE TABLE IF NOT EXISTS synthesis_inputs (
+    file_path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE
+);
+
+-- Project metadata for version/provenance tracking
+CREATE TABLE IF NOT EXISTS project_metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+);

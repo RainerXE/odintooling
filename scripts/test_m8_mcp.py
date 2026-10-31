@@ -251,7 +251,7 @@ def test_schema_version_in_symbols_json(client: MCPClient):
 
 def test_get_callers_callees(client: MCPClient):
     section("LSP parity — get_callers / get_callees")
-    DB_PATH = os.path.join(REPO_ROOT, ".codegraph", "odin_lint_graph.db")
+    DB_PATH = os.path.join(REPO_ROOT, ".codegraph", "olt.db")
 
     # Confirm get_symbol works first (simpler lookup, same DB path)
     sym = client.tool("get_symbol", {"symbol": "dedupDiagnostics", "db_path": DB_PATH})

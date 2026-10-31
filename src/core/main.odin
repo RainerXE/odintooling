@@ -377,7 +377,7 @@ analyze_file :: proc(
                         type_ctx: TypeResolveContext
                         db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
                         if os.is_file(db_path) {
-                            db, db_ok := graph_open(db_path)
+                            db, db_ok := graph_open_existing(db_path)
                             if db_ok { type_ctx.db = db }
                         }
                         defer if type_ctx.db != nil { graph_close(type_ctx.db) }
@@ -406,7 +406,7 @@ analyze_file :: proc(
                     defer ts_tree_delete(tree)
                     root := getRootNode(tree)
                     if !ts_node_is_null(root) {
-                        db, db_ok := graph_open(db_path)
+                        db, db_ok := graph_open_existing(db_path)
                         if db_ok {
                             defer graph_close(db)
                             for d in dedupDiagnostics(c202_run(file_path, root, c202_lines, db)) {
@@ -459,7 +459,7 @@ analyze_file :: proc(
                         c019_db: ^GraphDB
                         db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
                         if os.is_file(db_path) {
-                            if db, db_ok := graph_open(db_path); db_ok {
+                            if db, db_ok := graph_open_existing(db_path); db_ok {
                                 c019_db = db
                             }
                         }
@@ -629,7 +629,8 @@ cli_main :: proc() -> int {
         return 0
     }
 
-    // --codegraph-init: wipe and rebuild from scratch, then write codegraph.db.
+    // --codegraph-init: wipe and rebuild from scratch into .codegraph/codegraph.db.
+    // The graph is a CodeGraph database, so this is the ordinary export at that path.
     if opts.codegraph_init {
         if len(opts.targets) == 0 {
             fmt.eprintln("error: --codegraph-init requires a target directory, e.g. 'olt --codegraph-init .'")
@@ -642,25 +643,19 @@ cli_main :: proc() -> int {
         }
         defer deinitTreeSitterParser(ts_parser)
 
-        db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
-        // Force full rebuild by removing the existing graph db.
-        _ = os.remove(db_path)
+        db_path := opts.graph_db_path if opts.graph_db_path != "" else CODEGRAPH_DB_PATH
+        codegraph_reset(db_path)
+        graph_ensure_dir(db_path)
+        codegraph_write_gitignore(db_path)
 
         r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config)
         if !r.ok {
             fmt.eprintln("error: codegraph-init: symbol export failed")
             return 2
         }
-
-        sr := codegraph_sync_from_db(db_path, CODEGRAPH_DB_PATH)
-        if !sr.ok {
-            fmt.eprintln("error: codegraph-init: codegraph.db write failed")
-            return 2
-        }
         fmt.printfln("codegraph-init: %d files indexed, %d nodes, %d edges",
-            r.files_indexed, sr.nodes_written, sr.edges_written)
-        fmt.printfln("  odin-lint graph: %s", db_path)
-        fmt.printfln("  codegraph db:    %s", sr.db_path)
+            r.files_indexed, r.nodes_written, r.edges_written)
+        fmt.printfln("  codegraph db: %s", r.db_path)
         fmt.println()
         fmt.println("CodeGraph is ready. To keep it updated after code changes:")
         fmt.printfln("  olt --codegraph-sync <target>")
@@ -673,8 +668,9 @@ cli_main :: proc() -> int {
             fmt.eprintln("error: --codegraph-sync requires a target directory, e.g. 'olt --codegraph-sync .'")
             return 2
         }
-        if !os.is_file(CODEGRAPH_DB_PATH) {
-            fmt.eprintfln("error: %s not found.", CODEGRAPH_DB_PATH)
+        db_path := opts.graph_db_path if opts.graph_db_path != "" else CODEGRAPH_DB_PATH
+        if !os.is_file(db_path) {
+            fmt.eprintfln("error: %s not found.", db_path)
             fmt.eprintln("  Run 'olt --codegraph-init <target>' first to set up CodeGraph for this project.")
             return 2
         }
@@ -686,20 +682,13 @@ cli_main :: proc() -> int {
         }
         defer deinitTreeSitterParser(ts_parser)
 
-        db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
         r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config)
         if !r.ok {
             fmt.eprintln("error: codegraph-sync: symbol export failed")
             return 2
         }
-
-        sr := codegraph_sync_from_db(db_path, CODEGRAPH_DB_PATH)
-        if !sr.ok {
-            fmt.eprintln("error: codegraph-sync: codegraph.db write failed")
-            return 2
-        }
         cached_msg := " (no changes)" if r.cached else ""
-        fmt.printfln("codegraph-sync: %d nodes, %d edges%s", sr.nodes_written, sr.edges_written, cached_msg)
+        fmt.printfln("codegraph-sync: %d nodes, %d edges%s", r.nodes_written, r.edges_written, cached_msg)
         return 0
     }
 

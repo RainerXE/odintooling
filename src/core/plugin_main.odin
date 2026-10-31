@@ -275,7 +275,7 @@ _ols_prepare_call_hierarchy :: proc "c" (
 	if len(word) == 0 { return nil }
 
 	db_path := _graph_db_path_for(string(doc.path))
-	db, ok := graph_open(db_path)
+	db, ok := graph_open_existing(db_path)
 	if !ok { return nil }
 	defer graph_close(db)
 
@@ -314,7 +314,7 @@ _ols_incoming_calls :: proc "c" (name: cstring, uri: cstring) -> ^OLSPluginCallH
 	if name == nil { return nil }
 
 	db_path := _graph_db_path_for(_uri_to_path(string(uri)))
-	db, ok := graph_open(db_path)
+	db, ok := graph_open_existing(db_path)
 	if !ok { return nil }
 	defer graph_close(db)
 
@@ -334,7 +334,7 @@ _ols_outgoing_calls :: proc "c" (name: cstring, uri: cstring) -> ^OLSPluginCallH
 	if name == nil { return nil }
 
 	db_path := _graph_db_path_for(_uri_to_path(string(uri)))
-	db, ok := graph_open(db_path)
+	db, ok := graph_open_existing(db_path)
 	if !ok { return nil }
 	defer graph_close(db)
 
@@ -415,7 +415,7 @@ _is_ident :: proc(r: rune) -> bool {
 }
 
 // _graph_db_path_for returns the graph DB path by walking up from file_path
-// looking for .codegraph/odin_lint_graph.db.  Falls back to GRAPH_DB_PATH (cwd-relative).
+// looking for .codegraph/olt.db.  Falls back to GRAPH_DB_PATH (cwd-relative).
 @(private = "file")
 _graph_db_path_for :: proc(file_path: string) -> string {
 	// Find the last separator to get the directory.

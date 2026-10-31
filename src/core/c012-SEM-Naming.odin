@@ -221,7 +221,7 @@ c012_t3_run :: proc(
     q:          ^CompiledQuery,
     db_path:    string,
 ) -> []Diagnostic {
-    db, db_ok := graph_open(db_path)
+    db, db_ok := graph_open_existing(db_path)
     if !db_ok { return nil }
     defer graph_close(db)
 
@@ -288,7 +288,8 @@ c012_t3_run :: proc(
 @(private)
 _c012_t3_get_role :: proc(db: ^GraphDB, name: string) -> string {
     s, ok := sq.db_prepare(db.conn,
-        "SELECT memory_role FROM nodes WHERE name=? AND kind='proc' LIMIT 1;")
+        `SELECT i.memory_role FROM nodes n JOIN odin_node_info i ON i.node_id = n.id
+         WHERE n.name=? AND n.kind='function' LIMIT 1;`)
     if !ok { return "" }
     defer sq.stmt_finalize(&s)
     sq.stmt_bind_text(&s, 1, name)

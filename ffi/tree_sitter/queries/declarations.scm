@@ -18,6 +18,14 @@
 (struct_declaration
   (identifier) @struct_name) @type_decl
 
+; Union type declarations
+(union_declaration
+  (identifier) @union_name) @type_decl
+
+; Bit field type declarations
+(bit_field_declaration
+  (identifier) @bitfield_name) @type_decl
+
 ; Enum type declarations
 (enum_declaration
   (identifier) @enum_name) @type_decl

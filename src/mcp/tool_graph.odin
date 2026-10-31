@@ -26,7 +26,7 @@ make_get_dna_context_tool :: proc() -> mcp.Tool {
                 "type": "object",
                 "properties": {
                     "proc_name": {"type": "string", "description": "Exact procedure name to look up"},
-                    "db_path":   {"type": "string", "description": "Path to graph db (default: .codegraph/odin_lint_graph.db)"}
+                    "db_path":   {"type": "string", "description": "Path to graph db (default: .codegraph/olt.db)"}
                 },
                 "required": ["proc_name"]
             }`,
@@ -41,7 +41,7 @@ _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocato
     if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
     db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
 
-    db, ok := core.graph_open(db_path)
+    db, ok := core.graph_open_existing(db_path)
     if !ok {
         return mcp.tool_error(.Not_Found,
             fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path, allocator = allocator),
@@ -121,7 +121,7 @@ _get_impact_radius_handler :: proc(params: json.Value, allocator: runtime.Alloca
     depth   := _graph_opt_int(params, "depth", 3)
     db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
 
-    db, ok := core.graph_open(db_path)
+    db, ok := core.graph_open_existing(db_path)
     if !ok {
         return mcp.tool_error(.Not_Found,
             fmt.aprintf("graph db not found at %s", db_path, allocator = allocator),
@@ -175,7 +175,7 @@ make_find_allocators_tool :: proc() -> mcp.Tool {
 _find_allocators_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
     db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
 
-    db, ok := core.graph_open(db_path)
+    db, ok := core.graph_open_existing(db_path)
     if !ok {
         return mcp.tool_error(.Not_Found,
             fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path, allocator = allocator),
@@ -224,7 +224,7 @@ _find_all_references_handler :: proc(params: json.Value, allocator: runtime.Allo
     if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
     db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
 
-    db, ok := core.graph_open(db_path)
+    db, ok := core.graph_open_existing(db_path)
     if !ok {
         return mcp.tool_error(.Not_Found,
             fmt.aprintf("graph db not found at %s", db_path, allocator = allocator),
@@ -263,7 +263,7 @@ make_rename_symbol_tool :: proc() -> mcp.Tool {
                 "properties": {
                     "old_name": {"type": "string", "description": "Current symbol name"},
                     "new_name": {"type": "string", "description": "New symbol name"},
-                    "db_path":  {"type": "string", "description": "Path to graph db (default: .codegraph/odin_lint_graph.db)"}
+                    "db_path":  {"type": "string", "description": "Path to graph db (default: .codegraph/olt.db)"}
                 },
                 "required": ["old_name", "new_name"]
             }`,
@@ -284,7 +284,7 @@ _rename_symbol_handler :: proc(params: json.Value, allocator: runtime.Allocator)
         return mcp.tool_ok(`{"edits":[],"edit_count":0,"note":"old and new names are identical"}`, allocator)
     }
 
-    db, ok := core.graph_open(db_path)
+    db, ok := core.graph_open_existing(db_path)
     if !ok {
         return mcp.tool_error(.Not_Found,
             fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path, allocator = allocator),
@@ -427,7 +427,7 @@ _get_symbol_handler :: proc(params: json.Value, allocator: runtime.Allocator) ->
     if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
     db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
 
-    db, ok := core.graph_open(db_path)
+    db, ok := core.graph_open_existing(db_path)
     if !ok {
         return mcp.tool_error(.Not_Found,
             fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path, allocator = allocator),
@@ -522,7 +522,7 @@ _get_callers_handler :: proc(params: json.Value, allocator: runtime.Allocator) -
     if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
     db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
 
-    db, ok := core.graph_open(db_path)
+    db, ok := core.graph_open_existing(db_path)
     if !ok {
         return mcp.tool_error(.Not_Found,
             fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path, allocator = allocator),
@@ -579,7 +579,7 @@ _get_callees_handler :: proc(params: json.Value, allocator: runtime.Allocator) -
     if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
     db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
 
-    db, ok := core.graph_open(db_path)
+    db, ok := core.graph_open_existing(db_path)
     if !ok {
         return mcp.tool_error(.Not_Found,
             fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path, allocator = allocator),
@@ -643,7 +643,7 @@ _search_symbols_handler :: proc(params: json.Value, allocator: runtime.Allocator
     limit     := min(max(raw_limit, 1), 100)
     db_path   := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
 
-    db, ok := core.graph_open(db_path)
+    db, ok := core.graph_open_existing(db_path)
     if !ok {
         return mcp.tool_error(.Not_Found,
             fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path, allocator = allocator),
