@@ -15,11 +15,15 @@ import "core:strings"
 // collect_odin_files expands a list of file/directory targets into a flat
 // list of .odin file paths. The caller owns the returned slice and each
 // string in it (all are cloned).
+//
+// respect_gitignore drops files git ignores from directory scans (see gitignore.odin);
+// a file named as a target is always kept.
 collect_odin_files :: proc(
-    targets:        []string,
-    recursive:      bool,
-    include_vendor: bool,
-    ignore_paths:   []string = nil,
+    targets:           []string,
+    recursive:         bool,
+    include_vendor:    bool,
+    ignore_paths:      []string = nil,
+    respect_gitignore: bool     = true,
 ) -> [dynamic]string {
     files := make([dynamic]string)
     for target in targets {
@@ -30,7 +34,9 @@ collect_odin_files :: proc(
                     target,
                 )
             }
+            start := len(files)
             walk_dir(target, recursive, include_vendor, ignore_paths, &files)
+            if respect_gitignore { filter_gitignored(&files, start, target) }
         } else if strings.has_suffix(target, ".odin") {
             if !path_is_ignored(target, ignore_paths) {
                 append(&files, strings.clone(target))

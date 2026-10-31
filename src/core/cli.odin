@@ -29,6 +29,7 @@ LintOptions :: struct {
     targets:          [dynamic]string,
     recursive:        bool,            // default true
     include_vendor:   bool,            // default false
+    no_gitignore:     bool,            // --no-gitignore: scan files git ignores too
     rule_filter:      [dynamic]string, // empty = all rules
     tier_filter:      string,          // "" = all tiers
     c012_enabled:     bool,
@@ -72,6 +73,8 @@ parse_args :: proc(args: []string) -> (LintOptions, bool) {
             opts.recursive = false
         case arg == "--include-vendor":
             opts.include_vendor = true
+        case arg == "--no-gitignore":
+            opts.no_gitignore = true
         case arg == "--enable-c012":
             opts.c012_enabled = true
         case arg == "--fix":
@@ -232,6 +235,7 @@ print_help :: proc() {
     fmt.println("  --format text|json|sarif  Output format (default: text)")
     fmt.println("  --non-recursive        Scan directories without recursing into subdirectories")
     fmt.println("  --include-vendor       Include vendor/ directories in scan")
+    fmt.println("  --no-gitignore         Also scan files that .gitignore excludes (default: skip them)")
     fmt.println("  --enable-c012          Enable C012 semantic ownership naming hints")
     fmt.println("  --export-symbols       Build code graph + symbols.json (enables C202, C012-T3, C014, C015)")
     fmt.println("  --codegraph-init       First-time setup: full rebuild + emit .codegraph/codegraph.db")

@@ -614,7 +614,7 @@ cli_main :: proc() -> int {
         defer deinitTreeSitterParser(ts_parser)
 
         db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
-        r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config)
+        r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config, !opts.no_gitignore)
         if !r.ok {
             fmt.eprintln("error: export-symbols failed")
             return 2
@@ -648,7 +648,7 @@ cli_main :: proc() -> int {
         graph_ensure_dir(db_path)
         codegraph_write_gitignore(db_path)
 
-        r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config)
+        r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config, !opts.no_gitignore)
         if !r.ok {
             fmt.eprintln("error: codegraph-init: symbol export failed")
             return 2
@@ -682,7 +682,7 @@ cli_main :: proc() -> int {
         }
         defer deinitTreeSitterParser(ts_parser)
 
-        r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config)
+        r := export_symbols(opts.targets[:], &ts_parser, db_path, opts.config, !opts.no_gitignore)
         if !r.ok {
             fmt.eprintln("error: codegraph-sync: symbol export failed")
             return 2
@@ -693,7 +693,7 @@ cli_main :: proc() -> int {
     }
 
     // Collect all .odin files from targets (honouring [ignore] paths from olt.toml).
-    files := collect_odin_files(opts.targets[:], opts.recursive, opts.include_vendor, opts.config.ignore_paths[:])
+    files := collect_odin_files(opts.targets[:], opts.recursive, opts.include_vendor, opts.config.ignore_paths[:], !opts.no_gitignore)
     defer {
         for f in files { delete(f) }
         delete(files)

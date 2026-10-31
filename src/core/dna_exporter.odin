@@ -36,6 +36,7 @@ export_symbols :: proc(
     ts_parser: ^TreeSitterASTParser,
     db_path:   string = GRAPH_DB_PATH,
     cfg:       OdinLintConfig = {},
+    respect_gitignore: bool = true,
 ) -> ExportResult {
     symbols_path := _symbols_path_for(db_path)
     result := ExportResult{db_path = db_path, symbols_path = symbols_path}
@@ -52,7 +53,7 @@ export_symbols :: proc(
     }
     defer graph_close(db)
 
-    files := collect_odin_files(paths, true, false)
+    files := collect_odin_files(paths, true, false, nil, respect_gitignore)
     defer {
         for f in files { delete(f) }
         delete(files)

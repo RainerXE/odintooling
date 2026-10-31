@@ -100,6 +100,7 @@ Config paths resolve correctly on macOS, Linux, and Windows. If a tool's config 
 ```bash
 olt src/                      # lint a directory (recursive)
 olt file.odin                 # lint a single file
+olt src/ --no-gitignore       # also scan files .gitignore excludes (default: skip them)
 olt src/ --fix                # apply safe auto-fixes in-place
 olt src/ --format json        # machine-readable output (json or sarif)
 olt src/ --rule C001,C201     # run specific rules only
