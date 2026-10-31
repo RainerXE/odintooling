@@ -29,4 +29,24 @@ CREATE TABLE IF NOT EXISTS odin_node_info (
     lint_violations TEXT    -- JSON array of rule ids, e.g. '["C001"]'
 );
 CREATE INDEX IF NOT EXISTS idx_odin_node_info_role ON odin_node_info(memory_role);
+
+-- One row per file: the package it declares. A package is a directory, so (dir, name)
+-- is what an import's default name is matched against.
+CREATE TABLE IF NOT EXISTS odin_package (
+    file_path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
+    dir       TEXT NOT NULL,   -- project-relative directory of the file ('' = project root)
+    name      TEXT NOT NULL    -- the name after "package"
+);
+CREATE INDEX IF NOT EXISTS idx_odin_package_dir ON odin_package(dir, name);
+
+-- One row per import declaration: what a file's qualifiers (the "pkg" in pkg.fn())
+-- refer to.
+CREATE TABLE IF NOT EXISTS odin_import (
+    file_path TEXT    NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+    line      INTEGER NOT NULL,
+    path      TEXT    NOT NULL,   -- as written: "core:fmt", "../shared"
+    alias     TEXT,               -- explicit name in  import alias "path";  NULL = the package's own name
+    dir       TEXT,               -- project-relative directory the path names; NULL = outside the project
+    PRIMARY KEY (file_path, line, path)
+);
 `

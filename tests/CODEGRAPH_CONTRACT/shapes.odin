@@ -4,7 +4,11 @@
 //                                                     proc `inner` has ended; a "last proc
 //                                                     that started before this line" rule
 //                                                     would wrongly say `inner`)
+//   callers of `util` (package lib, a sibling directory) = main   (pkg.fn() through an import)
 package demo
+
+import "core:fmt"
+import "lib"
 
 Colour :: enum {
 	Red,
@@ -38,4 +42,6 @@ outer :: proc() {
 main :: proc() {
 	_ = helper(3)
 	outer()
+	_ = lib.util()        // qualified call into another package of the project
+	fmt.println("hi")     // qualified call into core: (outside the project)
 }

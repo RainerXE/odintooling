@@ -259,9 +259,17 @@ _pass1_index_declarations :: proc(
     defer free_query_results(matches)
 
     // An Odin package is a directory; qualified names are "<package>::<name>".
-    pkg := _package_from_path(file_path)
+    pkg := _package_from_path(file_path)   // until the file's `package` line says otherwise
 
     for &m in matches {
+        if pkg_node, has_pkg := m.captures["package_name"]; has_pkg {
+            pkg_name := naming_extract_text(pkg_node, lines)
+            if pkg_name != "" {
+                graph_set_package(db, file_path, pkg_name)
+                pkg = pkg_name   // qualified names use the declared name, not the directory's
+            }
+            continue
+        }
         if name_node, has_proc := m.captures["proc_name"]; has_proc {
             name := naming_extract_text(name_node, lines)
             if name == "" { continue }
@@ -330,6 +338,19 @@ _pass1_index_declarations :: proc(
             graph_insert_node(db, path_raw, path_raw, "import", file_path, line, "", false,
                 end_line  = _decl_end_line(m.captures["import_decl"], line),
                 start_col = int(pt.column))
+
+            // `import alias "path"`: an identifier directly under the declaration is the alias.
+            alias := ""
+            if decl, has_decl := m.captures["import_decl"]; has_decl {
+                for i: u32 = 0; i < ts_node_child_count(decl); i += 1 {
+                    c := ts_node_child(decl, i)
+                    if string(ts_node_type(c)) == "identifier" {
+                        alias = naming_extract_text(c, lines)
+                        break
+                    }
+                }
+            }
+            graph_add_import(db, file_path, path_raw, alias, line)
             continue
         }
         if name_node, has_const := m.captures["const_name"]; has_const {
@@ -408,6 +429,43 @@ _pass1_index_declarations :: proc(
 // Pass 2 — Call resolution
 // =============================================================================
 
+// CallShape is how a call names its target.
+@(private)
+CallShape :: enum {
+    Bare,       // f(x)            a name in the caller's own package
+    Qualified,  // pkg.f(x)        `pkg` names an import, or else it is a value (a member call)
+    Member,     // a.b.f(x)        a call through some value
+    Selector,   // obj->f(x)       a procedure field called with obj as its receiver
+}
+
+// _classify_call looks at where a call sits. The grammar parses `pkg.f(x)` as a
+// member_expression whose last child is the call, so the callee identifier alone
+// cannot tell `f(x)` from `pkg.f(x)`: only the parent can.
+@(private)
+_classify_call :: proc(callee: TSNode, lines: []string) -> (shape: CallShape, qualifier: string) {
+    call := ts_node_parent(callee)
+    if ts_node_is_null(call) { return .Bare, "" }
+    parent := ts_node_parent(call)
+    if ts_node_is_null(parent) { return .Bare, "" }
+    n := ts_node_child_count(parent)
+    if n < 2 { return .Bare, "" }
+    first := ts_node_child(parent, 0)
+    last  := ts_node_child(parent, n - 1)
+    // The call must be the trailing operand (`a.f()`), not merely a part (`f().a`).
+    if ts_node_start_byte(last) != ts_node_start_byte(call) { return .Bare, "" }
+
+    switch string(ts_node_type(parent)) {
+    case "member_expression":
+        if string(ts_node_type(first)) == "identifier" {
+            return .Qualified, naming_extract_text(first, lines)
+        }
+        return .Member, naming_extract_text(first, lines)
+    case "selector_call_expression":
+        return .Selector, naming_extract_text(first, lines)
+    }
+    return .Bare, ""
+}
+
 @(private)
 _pass2_resolve_calls :: proc(
     db:        ^GraphDB,
@@ -429,7 +487,11 @@ _pass2_resolve_calls :: proc(
         if !has_callee { continue }
 
         callee_name := naming_extract_text(callee_node, lines)
-        if callee_name == "" || _is_builtin(callee_name) { continue }
+        if callee_name == "" { continue }
+
+        shape, qualifier := _classify_call(callee_node, lines)
+        // Builtins (make, len, ...) are only builtins as bare names.
+        if shape == .Bare && _is_builtin(callee_name) { continue }
 
         call_pt   := ts_node_start_point(callee_node)
         call_line := int(call_pt.row) + 1
@@ -441,9 +503,28 @@ _pass2_resolve_calls :: proc(
         if caller_id < 0 { caller_id = file_node }
         if caller_id < 0 { continue }
 
-        callee_id := graph_find_node_in_package(db, callee_name, pkg_dir)
+        callee_id: i64 = -1
+        unresolved_name := callee_name
+        switch shape {
+        case .Bare:
+            callee_id = graph_find_node_in_package(db, callee_name, pkg_dir)
+        case .Qualified:
+            dir, internal, found := graph_resolve_qualifier(db, file_path, qualifier)
+            if found && internal {
+                callee_id = graph_find_node_in_package(db, callee_name, dir)
+                delete(dir)
+            }
+            // An import we cannot see into (core:fmt) or a package that lacks the
+            // name stays "pkg::name"; a qualifier that is no import is a value.
+            unresolved_name = fmt.tprintf("%s::%s" if found else "%s.%s", qualifier, callee_name)
+        case .Member:
+            unresolved_name = fmt.tprintf("%s.%s", qualifier, callee_name)
+        case .Selector:
+            unresolved_name = fmt.tprintf("%s->%s", qualifier, callee_name)
+        }
+
         if callee_id < 0 {
-            graph_insert_unresolved(db, caller_id, callee_name, "calls", file_path, call_line, call_col)
+            graph_insert_unresolved(db, caller_id, unresolved_name, "calls", file_path, call_line, call_col)
             continue
         }
         graph_insert_edge(db, caller_id, callee_id, "calls", call_line, call_col)

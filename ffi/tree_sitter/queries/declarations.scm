@@ -6,6 +6,10 @@
 ; Note: overloaded_procedure_declaration wraps a proc group (multiple bodies
 ; under one name). Capture the group name as a proc node too.
 
+; The package a file declares
+(package_declaration
+  (identifier) @package_name) @package_decl
+
 ; Procedure declarations
 (procedure_declaration
   (identifier) @proc_name) @proc_decl

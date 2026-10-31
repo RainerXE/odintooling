@@ -332,6 +332,116 @@ _handle_of :: proc(db: ^GraphDB, id: string) -> i64 {
     return -1
 }
 
+// graph_set_package records the package a file declares.
+graph_set_package :: proc(db: ^GraphDB, file: string, name: string) {
+    rel := graph_rel(db, file)
+    s, ok := sq.db_prepare(db.conn,
+        "INSERT OR REPLACE INTO odin_package(file_path, dir, name) VALUES(?,?,?);")
+    if !ok { return }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, rel)
+    sq.stmt_bind_text(&s, 2, graph_dir_of(rel))
+    sq.stmt_bind_text(&s, 3, name)
+    sq.stmt_exec(&s)
+}
+
+// _import_dir resolves an import path written in rel_file to a project-relative
+// directory. Only plain relative paths ("../shared", "sub") name project code; a
+// collection path ("core:fmt", "vendor:raylib") names something outside it.
+@(private)
+_import_dir :: proc(rel_file, path: string) -> (dir: string, ok: bool) {
+    if strings.contains(path, ":") { return "", false }
+    base := graph_dir_of(rel_file)
+    full := path if base == "" else fmt.tprintf("%s/%s", base, path)
+    parts := make([dynamic]string, context.temp_allocator)
+    for seg in strings.split(full, "/", context.temp_allocator) {
+        switch seg {
+        case "", ".":
+        case "..":
+            if len(parts) == 0 { return "", false }   // leaves the project
+            pop(&parts)
+        case:
+            append(&parts, seg)
+        }
+    }
+    return strings.join(parts[:], "/", context.temp_allocator), true
+}
+
+// graph_add_import records one import declaration of a file.
+graph_add_import :: proc(db: ^GraphDB, file: string, path: string, alias: string, line: int) {
+    rel := graph_rel(db, file)
+    dir, has_dir := _import_dir(rel, path)
+    s, ok := sq.db_prepare(db.conn,
+        `INSERT OR REPLACE INTO odin_import(file_path, line, path, alias, dir)
+         VALUES(?1, ?2, ?3, NULLIF(?4,''), CASE WHEN ?5 THEN ?6 END);`)
+    if !ok { return }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, rel)
+    sq.stmt_bind_int(&s,  2, line)
+    sq.stmt_bind_text(&s, 3, path)
+    sq.stmt_bind_text(&s, 4, alias)
+    sq.stmt_bind_int(&s,  5, 1 if has_dir else 0)
+    sq.stmt_bind_text(&s, 6, dir)
+    sq.stmt_exec(&s)
+}
+
+// graph_resolve_qualifier says what the "pkg" of a `pkg.name(...)` call in `file` refers to.
+//   found=false              no import in this file goes by that name (so it is a value, not a package)
+//   found, internal=false    an import outside the project (core:, vendor:, ...)
+//   found, internal=true     a package in the project; dir is its directory (project-relative)
+// An import goes by its explicit alias, else by the package name declared in the
+// directory it names, else (nothing indexed there) by the last segment of its path.
+//
+// A collection other than core/base/vendor ("src:server") is set by a compiler flag
+// the source does not show. It is taken to be project code when exactly one project
+// directory declares a package of that name, and left external otherwise.
+graph_resolve_qualifier :: proc(db: ^GraphDB, file: string, qualifier: string) -> (dir: string, internal: bool, found: bool) {
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT i.dir, i.dir IS NOT NULL, i.path FROM odin_import i
+         WHERE i.file_path = ?1 AND (
+               i.alias = ?2
+            OR (i.alias IS NULL AND (
+                   EXISTS (SELECT 1 FROM odin_package p WHERE p.dir = i.dir AND p.name = ?2)
+                OR i.path = ?2 OR i.path LIKE '%/' || ?2 OR i.path LIKE '%:' || ?2)))
+         ORDER BY i.alias IS NULL LIMIT 1;`)
+    if !ok { return }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, graph_rel(db, file))
+    sq.stmt_bind_text(&s, 2, qualifier)
+    if !sq.stmt_step(&s) { return }
+
+    found    = true
+    internal = sq.stmt_col_int(&s, 1) != 0
+    if internal {
+        dir = sq.stmt_col_text(&s, 0)   // heap string; caller deletes
+        return
+    }
+
+    path := sq.stmt_col_text(&s, 2)
+    defer delete(path)
+    colon := strings.index_byte(path, ':')
+    if colon < 0 { return }
+    collection := path[:colon]
+    if collection == "core" || collection == "base" || collection == "vendor" { return }
+
+    u, u_ok := sq.db_prepare(db.conn,
+        "SELECT dir FROM odin_package WHERE name=? GROUP BY dir LIMIT 2;")
+    if !u_ok { return }
+    defer sq.stmt_finalize(&u)
+    sq.stmt_bind_text(&u, 1, qualifier)
+    first_dir := ""
+    count := 0
+    for sq.stmt_step(&u) {
+        count += 1
+        if count == 1 { first_dir = sq.stmt_col_text(&u, 0) } else { delete(first_dir); first_dir = ""; }
+    }
+    if count == 1 {
+        internal = true
+        dir = first_dir
+    }
+    return
+}
+
 // graph_file_node returns the handle of a file's `file` node (-1 if the file is unknown).
 graph_file_node :: proc(db: ^GraphDB, file: string) -> i64 {
     return _handle_of(db, _file_node_id(graph_rel(db, file)))

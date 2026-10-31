@@ -26,7 +26,7 @@ command -v ${CG%% *} >/dev/null 2>&1 || { echo "codegraph not found (set CODEGRA
 WANT_VER="$(grep -E '^CODEGRAPH_SCHEMA_VERSION' "$REPO_ROOT/src/core/graph_schema.odin" | grep -oE '[0-9]+' | head -1)"
 echo "CodeGraph: $($CG --version 2>/dev/null | head -1)   expected schema version: $WANT_VER"
 
-mkdir -p "$WORK/proj" && cp "$FIX"/*.odin "$WORK/proj/" && (cd "$WORK/proj" && git init -q .)
+mkdir -p "$WORK/proj" && cp -r "$FIX"/. "$WORK/proj/" && (cd "$WORK/proj" && git init -q .)
 cd "$WORK/proj"
 
 echo "== 1. olt writes a CodeGraph database"
@@ -45,6 +45,9 @@ check "callers(helper) = main, outer and inner" \
 $CG callers after_nested >"$WORK/callers2.log" 2>&1
 check "a call after a nested proc ends belongs to the outer proc, not the nested one" \
       'grep -q "Callers of \"after_nested\" (1)" "$WORK/callers2.log" && grep -qw "outer" "$WORK/callers2.log" && ! grep -qw "inner" "$WORK/callers2.log"' "$(head -8 "$WORK/callers2.log")"
+$CG callers util >"$WORK/callers3.log" 2>&1
+check "pkg.fn() through an import reaches the other package's procedure" \
+      'grep -q "Callers of \"util\" (1)" "$WORK/callers3.log" && grep -qw "main" "$WORK/callers3.log"' "$(head -8 "$WORK/callers3.log")"
 $CG query Colour >"$WORK/query.log" 2>&1
 check "query finds the enum"                       'grep -qi "Colour" "$WORK/query.log"' "$(head -5 "$WORK/query.log")"
 
