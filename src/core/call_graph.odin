@@ -442,6 +442,58 @@ graph_resolve_qualifier :: proc(db: ^GraphDB, file: string, qualifier: string) -
     return
 }
 
+// graph_add_group_member records one member name listed by a procedure group.
+graph_add_group_member :: proc(db: ^GraphDB, group_node: i64, name: string, line, col: int) {
+    s, ok := sq.db_prepare(db.conn,
+        `INSERT OR IGNORE INTO odin_group_member(group_id, name, line, col)
+         SELECT id, ?, ?, ? FROM nodes WHERE rowid=?;`)
+    if !ok { return }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, name)
+    sq.stmt_bind_int(&s,  2, line)
+    sq.stmt_bind_int(&s,  3, col)
+    sq.stmt_bind_i64(&s,  4, group_node)
+    sq.stmt_exec(&s)
+}
+
+// graph_resolve_group_members links every procedure group to the members it lists
+// with a `references` edge (the way CodeGraph models a group), or records the name as
+// unresolved when no procedure of that name exists in the group's package. It re-reads
+// every group, so it can run after any export, whichever files changed.
+graph_resolve_group_members :: proc(db: ^GraphDB) {
+    GroupRow :: struct { group: i64, name, file: string, line, col: int }
+    rows := make([dynamic]GroupRow)
+    defer {
+        for r in rows { delete(r.name); delete(r.file) }
+        delete(rows)
+    }
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT g.rowid, m.name, g.file_path, m.line, m.col
+         FROM odin_group_member m JOIN nodes g ON g.id = m.group_id;`)
+    if !ok { return }
+    for sq.stmt_step(&s) {
+        append(&rows, GroupRow{
+            group = sq.stmt_col_i64(&s, 0),
+            name  = sq.stmt_col_text(&s, 1),
+            file  = sq.stmt_col_text(&s, 2),
+            line  = sq.stmt_col_int(&s, 3),
+            col   = sq.stmt_col_int(&s, 4),
+        })
+    }
+    sq.stmt_finalize(&s)
+
+    for r in rows {
+        member := graph_find_node_in_package(db, r.name, graph_dir_of(r.file))
+        if member >= 0 {
+            graph_insert_edge(db, r.group, member, "references", r.line, r.col)
+        } else {
+            abs := graph_abs(db, r.file)
+            graph_insert_unresolved(db, r.group, r.name, "references", abs, r.line, r.col)
+            delete(abs)
+        }
+    }
+}
+
 // graph_file_node returns the handle of a file's `file` node (-1 if the file is unknown).
 graph_file_node :: proc(db: ^GraphDB, file: string) -> i64 {
     return _handle_of(db, _file_node_id(graph_rel(db, file)))
@@ -693,21 +745,26 @@ graph_get_callees :: proc(db: ^GraphDB, node_id: i64) -> [dynamic]GraphNodeInfo 
     return result
 }
 
-// graph_get_impact returns all nodes transitively reached from node_id along
-// 'calls' edges. depth controls how many hops to follow (default 3).
-// Uses a recursive CTE — requires SQLite 3.35+.
+// graph_get_impact returns everything affected by a change to node_id: its callers,
+// their callers, and so on up to `depth` hops, following 'calls' edges backwards. A
+// 'references' edge counts too, so changing a procedure impacts the procedure group that
+// lists it (and then whatever calls the group). Uses a recursive CTE — SQLite 3.35+.
+//
+// (This used to walk the CALLEES, i.e. what node_id depends on, which is the opposite of
+// "what breaks if you change it".)
 graph_get_impact :: proc(db: ^GraphDB, node_id: i64, depth: int) -> [dynamic]GraphNodeInfo {
     result := make([dynamic]GraphNodeInfo)
     sql := fmt.tprintf(`
         WITH RECURSIVE impact(id, depth) AS (
-            SELECT target, 1 FROM edges
-            WHERE source = (SELECT id FROM nodes WHERE rowid=?) AND kind='calls'
+            SELECT source, 1 FROM edges
+            WHERE target = (SELECT id FROM nodes WHERE rowid=?) AND kind IN ('calls','references')
             UNION
-            SELECT e.target, i.depth+1
-            FROM edges e JOIN impact i ON e.source=i.id
-            WHERE i.depth < %d AND e.kind='calls'
+            SELECT e.source, i.depth+1
+            FROM edges e JOIN impact i ON e.target=i.id
+            WHERE i.depth < %d AND e.kind IN ('calls','references')
         )
-        SELECT DISTINCT %s FROM %s JOIN impact im ON n.id = im.id;`, depth, NODE_COLS, NODE_FROM)
+        SELECT DISTINCT %s FROM %s JOIN impact im ON n.id = im.id
+        WHERE n.kind != 'file';`, depth, NODE_COLS, NODE_FROM)
     s, ok := sq.db_prepare(db.conn, sql)
     if !ok { return result }
     defer sq.stmt_finalize(&s)

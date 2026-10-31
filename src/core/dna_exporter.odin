@@ -156,6 +156,9 @@ export_symbols :: proc(
     // drop the old ones first or each incremental run would duplicate them.
     sq.db_exec(db.conn, "DELETE FROM unresolved_refs;")
 
+    // Procedure groups link to their members, which may live in any file.
+    graph_resolve_group_members(db)
+
     for file_path in files {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
         if err != nil { continue }
@@ -242,6 +245,47 @@ _symbols_path_for :: proc(db_path: string) -> string {
 // Pass 1 — Declarations
 // =============================================================================
 
+// _index_proc_group indexes `name :: proc { a, b }`: one function node for the group, and
+// a record of each member name (linked to its procedure by graph_resolve_group_members).
+// The declaration's identifier children are the name first, then the members.
+@(private)
+_index_proc_group :: proc(db: ^GraphDB, file_path: string, group: TSNode, pkg: string, lines: []string) {
+    name_node: TSNode
+    members := make([dynamic]TSNode, context.temp_allocator)
+    for i: u32 = 0; i < ts_node_child_count(group); i += 1 {
+        c := ts_node_child(group, i)
+        if string(ts_node_type(c)) != "identifier" { continue }
+        if ts_node_is_null(name_node) { name_node = c } else { append(&members, c) }
+    }
+    if ts_node_is_null(name_node) { return }
+    name := naming_extract_text(name_node, lines)
+    if name == "" { return }
+
+    pt   := ts_node_start_point(name_node)
+    line := int(pt.row) + 1
+    sig  := strings.builder_make(context.temp_allocator)
+    strings.write_string(&sig, "proc { ")
+    for m, i in members {
+        if i > 0 { strings.write_string(&sig, ", ") }
+        strings.write_string(&sig, naming_extract_text(m, lines))
+    }
+    strings.write_string(&sig, " }")
+
+    node_id := graph_insert_node(db, name, fmt.tprintf("%s::%s", pkg, name), "function", file_path, line,
+        strings.to_string(sig), !proc_node_is_private(name_node, lines),
+        end_line  = _decl_end_line(group, line),
+        start_col = int(pt.column),
+        end_col   = int(ts_node_end_point(name_node).column))
+    if node_id < 0 { return }
+
+    for m in members {
+        member_name := naming_extract_text(m, lines)
+        if member_name == "" { continue }
+        mp := ts_node_start_point(m)
+        graph_add_group_member(db, node_id, member_name, int(mp.row) + 1, int(mp.column))
+    }
+}
+
 @(private)
 _decl_end_line :: proc(decl: TSNode, fallback: int) -> int {
     if ts_node_is_null(decl) { return fallback }
@@ -269,6 +313,10 @@ _pass1_index_declarations :: proc(
                 graph_set_package(db, file_path, pkg_name)
                 pkg = pkg_name   // qualified names use the declared name, not the directory's
             }
+            continue
+        }
+        if group, has_group := m.captures["group_decl"]; has_group {
+            _index_proc_group(db, file_path, group, pkg, lines)
             continue
         }
         if name_node, has_proc := m.captures["proc_name"]; has_proc {

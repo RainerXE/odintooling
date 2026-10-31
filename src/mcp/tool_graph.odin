@@ -99,7 +99,7 @@ make_get_impact_radius_tool :: proc() -> mcp.Tool {
     return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "get_impact_radius",
-            description = "Return all procedures transitively called by proc_name (what breaks if you change it).",
+            description = "Return everything affected by changing proc_name: its callers, their callers, and so on up to depth hops (also the procedure groups that list it).",
             input_schema = `{
                 "type": "object",
                 "properties": {

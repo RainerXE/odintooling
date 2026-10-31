@@ -48,6 +48,11 @@ check "a call after a nested proc ends belongs to the outer proc, not the nested
 $CG callers util >"$WORK/callers3.log" 2>&1
 check "pkg.fn() through an import reaches the other package's procedure" \
       'grep -q "Callers of \"util\" (1)" "$WORK/callers3.log" && grep -qw "main" "$WORK/callers3.log"' "$(head -8 "$WORK/callers3.log")"
+cgsql() { CG_DB=.codegraph/codegraph.db node -e "const {DatabaseSync}=require('node:sqlite');console.log(new DatabaseSync(process.env.CG_DB,{readOnly:true}).prepare(process.argv[1]).get().c)" "$1" 2>/dev/null; }
+GROUP_REFS="$(cgsql "select count(*) c from edges e join nodes s on s.id=e.source join nodes t on t.id=e.target where e.kind='references' and s.name='area' and t.name='area_point'")"
+MEMBER_NODES="$(cgsql "select count(*) c from nodes where name='area_point' and kind='function'")"
+check "a procedure group links to its member (references edge)" '[ "$GROUP_REFS" = 1 ]' "area -> area_point references edges: '$GROUP_REFS'"
+check "a group member is indexed once, not again from inside the group's braces" '[ "$MEMBER_NODES" = 1 ]' "area_point function nodes: '$MEMBER_NODES'"
 $CG query Colour >"$WORK/query.log" 2>&1
 check "query finds the enum"                       'grep -qi "Colour" "$WORK/query.log"' "$(head -5 "$WORK/query.log")"
 

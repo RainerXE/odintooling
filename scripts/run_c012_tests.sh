@@ -16,7 +16,7 @@ dbexec() {
     python3 -c '
 import sqlite3, sys
 con = sqlite3.connect(sys.argv[1])
-con.execute(sys.argv[2])
+con.executescript(sys.argv[2])
 con.commit()
 ' "$1" "$2"
 }
@@ -60,7 +60,8 @@ rm -f "$DB"
 # Export symbols from the T3 fixture so get_scratch gets into the graph.
 # We manually update its memory_role to 'allocator' to simulate T3 scenario.
 $LINT "$FIXTURE_DIR" --export-symbols --db="$DB" 2>/dev/null
-dbexec "$DB" "UPDATE nodes SET memory_role='allocator', return_type='mem.Allocator' WHERE name='get_scratch';"
+# The role lives in olt's odin_node_info table (keyed by the node's id); the return type is a CodeGraph column.
+dbexec "$DB" "INSERT INTO odin_node_info(node_id, memory_role) SELECT id, 'allocator' FROM nodes WHERE name='get_scratch' ON CONFLICT(node_id) DO UPDATE SET memory_role='allocator'; UPDATE nodes SET return_type='mem.Allocator' WHERE name='get_scratch';"
 echo "  Graph built and get_scratch tagged as allocator."
 
 echo ""

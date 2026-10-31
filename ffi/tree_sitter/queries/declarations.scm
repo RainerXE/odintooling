@@ -14,9 +14,10 @@
 (procedure_declaration
   (identifier) @proc_name) @proc_decl
 
-; Overloaded proc groups (proc { ... })
-(overloaded_procedure_declaration
-  (identifier) @proc_name) @proc_decl
+; Overloaded proc groups (proc { a, b }). The declaration's identifiers are the group's
+; name followed by its members; Pass 1 reads them off the declaration node, because
+; matching each identifier here would index every member a second time as a procedure.
+(overloaded_procedure_declaration) @group_decl
 
 ; Struct type declarations
 (struct_declaration

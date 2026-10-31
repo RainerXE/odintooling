@@ -27,6 +27,8 @@ check() {
     fi
 }
 
+# The graph is a CodeGraph database (nodes/edges/files from CodeGraph's schema); olt's own data,
+# such as a node's memory role, is in the odin_node_info table beside it.
 # Query a scalar from the graph DB. Uses python3's built-in sqlite3 module
 # instead of the sqlite3 CLI, which is not installed on every runner image
 # (host runners and container runners differ). NULL renders as empty string,
@@ -51,11 +53,11 @@ files_indexed=$(dbq "$DB" "SELECT COUNT(*) FROM files;")
 check "2 files indexed on first run" "$files_indexed" "2"
 
 # ── Goal 1: package-level allocator var tagged ─────────────────────────────
-alloc_var=$(dbq "$DB" "SELECT memory_role FROM nodes WHERE name='scratch_allocator' AND kind='variable';")
+alloc_var=$(dbq "$DB" "SELECT COALESCE(i.memory_role,'') FROM nodes n LEFT JOIN odin_node_info i ON i.node_id=n.id WHERE n.name='scratch_allocator' AND n.kind='variable';")
 check "scratch_allocator has memory_role=allocator" "$alloc_var" "allocator"
 
 # ── Goal 1: plain package-level var — no allocator role ───────────────────
-plain_var=$(dbq "$DB" "SELECT memory_role FROM nodes WHERE name='frame_count' AND kind='variable';")
+plain_var=$(dbq "$DB" "SELECT COALESCE(i.memory_role,'') FROM nodes n LEFT JOIN odin_node_info i ON i.node_id=n.id WHERE n.name='frame_count' AND n.kind='variable';")
 check "frame_count has no allocator role" "$plain_var" ""
 
 # ── Goal 1: local vars inside procs NOT indexed ─────────────────────────────
@@ -65,17 +67,17 @@ local_count_count=$(dbq "$DB" "SELECT COUNT(*) FROM nodes WHERE name='local_coun
 check "local_count inside proc not indexed" "$local_count_count" "0"
 
 # ── Goal 2: proc returning mem.Allocator tagged as allocator ───────────────
-get_scratch_role=$(dbq "$DB" "SELECT memory_role FROM nodes WHERE name='get_scratch' AND kind='proc';")
+get_scratch_role=$(dbq "$DB" "SELECT COALESCE(i.memory_role,'') FROM nodes n LEFT JOIN odin_node_info i ON i.node_id=n.id WHERE n.name='get_scratch' AND n.kind='function';")
 check "get_scratch tagged memory_role=allocator (returns mem.Allocator)" "$get_scratch_role" "allocator"
 
-get_scratch_rt=$(dbq "$DB" "SELECT return_type FROM nodes WHERE name='get_scratch' AND kind='proc';")
+get_scratch_rt=$(dbq "$DB" "SELECT COALESCE(return_type,'') FROM nodes WHERE name='get_scratch' AND kind='function';")
 check "get_scratch return_type=mem.Allocator" "$get_scratch_rt" "mem.Allocator"
 
 # ── Goal 2: proc NOT returning allocator — not tagged ─────────────────────
-get_frame_role=$(dbq "$DB" "SELECT memory_role FROM nodes WHERE name='get_frame_count' AND kind='proc';")
+get_frame_role=$(dbq "$DB" "SELECT COALESCE(i.memory_role,'') FROM nodes n LEFT JOIN odin_node_info i ON i.node_id=n.id WHERE n.name='get_frame_count' AND n.kind='function';")
 check "get_frame_count not tagged as allocator" "$get_frame_role" "neutral"
 
-get_frame_rt=$(dbq "$DB" "SELECT return_type FROM nodes WHERE name='get_frame_count' AND kind='proc';")
+get_frame_rt=$(dbq "$DB" "SELECT COALESCE(return_type,'') FROM nodes WHERE name='get_frame_count' AND kind='function';")
 check "get_frame_count return_type=int" "$get_frame_rt" "int"
 
 # ── Goal 5: incremental — second run skips unchanged files ─────────────────

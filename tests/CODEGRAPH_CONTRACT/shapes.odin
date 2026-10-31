@@ -4,6 +4,7 @@
 //                                                     proc `inner` has ended; a "last proc
 //                                                     that started before this line" rule
 //                                                     would wrongly say `inner`)
+//   `area` is a group over `area_point`: references edge area -> area_point, one area_point node
 //   callers of `util` (package lib, a sibling directory) = main   (pkg.fn() through an import)
 package demo
 
@@ -29,6 +30,16 @@ helper :: proc(x: int) -> int {
 }
 
 after_nested :: proc() {}
+
+area_point :: proc(p: Point) -> int {
+	return p.x * p.y
+}
+
+// A procedure group: ONE function node for `area`, a `references` edge to each member,
+// and no second copy of `area_point` created from the name inside the braces.
+area :: proc {
+	area_point,
+}
 
 outer :: proc() {
 	inner :: proc() {

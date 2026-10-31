@@ -130,8 +130,8 @@ olt lsp                       # start LSP proxy (editor interface)
 |------|----------------|
 | C001 | Heap allocation (`make`/`new`) without `defer delete`/`defer free` |
 | C002 | Double-free or use-after-free |
-| C009 | Deprecated `core:os/old` import — use `core:os` |
-| C010 | `Small_Array` superseded by `[dynamic; N]T` |
+| C009 | Import of `core:os/old`, which no longer exists in current Odin — use `core:os` |
+| C010 | `Small_Array` can be replaced by the built-in `[dynamic; N]T` |
 | C011 | FFI C resource (`ts_*_new`) without matching `defer ts_*_delete` |
 | C101 | `context.allocator` reassigned without defer restore |
 | C201 | Error return value discarded (unchecked result) |

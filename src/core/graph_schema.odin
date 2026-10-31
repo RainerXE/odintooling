@@ -30,6 +30,16 @@ CREATE TABLE IF NOT EXISTS odin_node_info (
 );
 CREATE INDEX IF NOT EXISTS idx_odin_node_info_role ON odin_node_info(memory_role);
 
+-- Procedure groups (f :: proc { f_a, f_b }): the member names a group lists, kept so the
+-- group -> member 'references' edges can be rebuilt whenever the members move.
+CREATE TABLE IF NOT EXISTS odin_group_member (
+    group_id TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    name     TEXT    NOT NULL,
+    line     INTEGER NOT NULL,
+    col      INTEGER NOT NULL,
+    PRIMARY KEY (group_id, name, line, col)
+);
+
 -- One row per file: the package it declares. A package is a directory, so (dir, name)
 -- is what an import's default name is matched against.
 CREATE TABLE IF NOT EXISTS odin_package (

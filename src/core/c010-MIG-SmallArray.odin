@@ -1,14 +1,15 @@
-// c010-MIG-SmallArray.odin — C010: deprecated Small_Array type detection.
-// Flags usage of the legacy container.Small_Array type that was superseded
-// by the built-in [dynamic; N]T fixed-capacity dynamic-array syntax.
+// c010-MIG-SmallArray.odin — C010: Small_Array where the built-in [dynamic; N]T fits.
+// Flags usage of container.Small_Array, which the built-in [dynamic; N]T
+// fixed-capacity dynamic-array syntax (dev-2026-04) can replace. Small_Array
+// itself still ships (core:container/small_array exists in dev-2026-10).
 package core
 
 import "core:fmt"
 
 // =============================================================================
-// C010: Flag Small_Array — superseded by [dynamic; N]T (dev-2026-04)
+// C010: Flag Small_Array — replaceable by [dynamic; N]T (dev-2026-04)
 // =============================================================================
-// core:container/small_array.Small_Array(N, T) is superseded by the built-in
+// core:container/small_array.Small_Array(N, T) can be replaced by the built-in
 // fixed-capacity dynamic array syntax [dynamic; N]T.
 // Category: CORRECTNESS
 // =============================================================================
@@ -24,7 +25,7 @@ c010_rule :: proc() -> Rule {
     }
 }
 
-c010_message  :: proc() -> string { return "Small_Array superseded by [dynamic; N]T" }
+c010_message  :: proc() -> string { return "Small_Array can be replaced by the built-in [dynamic; N]T" }
 c010_fix_hint :: proc() -> string { return "Replace Small_Array(N, T) with [dynamic; N]T" }
 
 // c010_leading_ident extracts the leading identifier from a node's source text.
