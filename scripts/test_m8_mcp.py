@@ -271,10 +271,11 @@ def test_get_ownership(client: MCPClient):
     olt = os.path.join(os.path.dirname(SERVER_BIN), "olt")
     with tempfile.TemporaryDirectory() as tmp:
         import shutil
+        tmp = os.path.realpath(tmp)        # macOS: /var/folders/... is /private/var/... for a process whose cwd is inside it
         proj = os.path.join(tmp, "proj")   # exported from inside the project, as a user would
         db = os.path.join(proj, ".codegraph", "g.db")
         shutil.copytree(os.path.join(REPO_ROOT, "tests", "OWNERSHIP"), proj, ignore=shutil.ignore_patterns("expected"))
-        subprocess.run([olt, "--export-symbols", "--db", os.path.join(proj, ".codegraph", "g.db"), "."], cwd=proj,
+        subprocess.run([olt, "--export-symbols", "--db", ".codegraph/g.db", "."], cwd=proj,   # relative paths, as typed in a shell
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
         everything = client.tool("get_ownership", {"db_path": db, "limit": 500}).get("sites", [])
         check("get_ownership returns the fixture's allocation sites", len(everything) >= 15, f"got {len(everything)}")
