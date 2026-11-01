@@ -53,6 +53,8 @@ GROUP_REFS="$(cgsql "select count(*) c from edges e join nodes s on s.id=e.sourc
 MEMBER_NODES="$(cgsql "select count(*) c from nodes where name='area_point' and kind='function'")"
 check "a procedure group links to its member (references edge)" '[ "$GROUP_REFS" = 1 ]' "area -> area_point references edges: '$GROUP_REFS'"
 check "a group member is indexed once, not again from inside the group's braces" '[ "$MEMBER_NODES" = 1 ]' "area_point function nodes: '$MEMBER_NODES'"
+OWN_EDGES="$(cgsql "select count(*) c from edges e join nodes s on s.id=e.source join nodes t on t.id=e.target where e.kind='instantiates' and s.name='make_point' and t.name='Point' and json_extract(e.metadata,'$.ownership')='returned' and json_extract(e.metadata,'$.allocator')='default'")"
+check "an allocation is an instantiates edge with ownership metadata" '[ "$OWN_EDGES" = 1 ]' "make_point -> Point instantiates edges with the expected metadata: '$OWN_EDGES'"
 $CG query Colour >"$WORK/query.log" 2>&1
 check "query finds the enum"                       'grep -qi "Colour" "$WORK/query.log"' "$(head -5 "$WORK/query.log")"
 
@@ -64,6 +66,12 @@ GOT_VER="$(CG_DB=.codegraph/codegraph.db node -e "const {DatabaseSync}=require('
 check "schema version is the expected one ($WANT_VER)" '[ "$GOT_VER" = "$WANT_VER" ]' "found '$GOT_VER'"
 $CG status >"$WORK/status2.log" 2>&1
 check "status still opens after sync"              'grep -q "Index Statistics" "$WORK/status2.log"' "$(head -5 "$WORK/status2.log")"
+# CodeGraph's sync re-extracts the files it sees as modified and replaces their rows, olt's
+# odin_* data (roles, ownership) with them. An olt re-export puts it back.
+"$OLT_BINARY" --export-symbols --db .codegraph/codegraph.db . >/dev/null 2>&1
+OWN_BACK="$(cgsql "select count(*) c from edges where kind='instantiates'")"
+SITES_BACK="$(cgsql "select count(*) c from odin_alloc_site")"
+check "an olt re-export after a CodeGraph sync restores the ownership data" '[ "$OWN_BACK" = 1 ] && [ "$SITES_BACK" = 1 ]' "instantiates=$OWN_BACK sites=$SITES_BACK"
 
 echo
 echo "contract: $PASS passed, $FAIL failed"

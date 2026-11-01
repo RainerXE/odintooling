@@ -1,0 +1,6 @@
+thing_create	Thing	returned	param	new
+conditional	Thing	returned	default	new
+with_arena	Node	unfreed	custom	new
+register	Thing	stored	default	new
+passes	Node	passed	default	new
+init_global	Thing	stored	default	new

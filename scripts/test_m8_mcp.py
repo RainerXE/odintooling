@@ -265,6 +265,28 @@ def test_impact_radius_follows_callers(client: MCPClient):
     check("get_impact_radius: found a known proc with callers", False)
 
 
+def test_get_ownership(client: MCPClient):
+    section("get_ownership — allocation sites, their allocator and what became of the memory")
+    import tempfile
+    olt = os.path.join(os.path.dirname(SERVER_BIN), "olt")
+    with tempfile.TemporaryDirectory() as tmp:
+        db = os.path.join(tmp, "own.db")
+        subprocess.run([olt, "--export-symbols", "--db", db, os.path.join(REPO_ROOT, "tests", "OWNERSHIP")],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
+        everything = client.tool("get_ownership", {"db_path": db, "limit": 500}).get("sites", [])
+        check("get_ownership returns the fixture's allocation sites", len(everything) >= 15, f"got {len(everything)}")
+        leaks = client.tool("get_ownership", {"db_path": db, "disposition": "unfreed"}).get("sites", [])
+        flagged = sorted(x["proc"] for x in leaks if x["leak_candidate"])
+        check("leak_candidate is set only for default/param memory that is never freed",
+              flagged == ["inner", "leaks", "read_all", "read_only"], f"flagged: {flagged}")
+        check("temp and arena memory is never a leak candidate",
+              not any(x["leak_candidate"] for x in leaks if x["allocator"] in ("temp", "custom")))
+        one = client.tool("get_ownership", {"db_path": db, "proc_name": "thing_create"}).get("sites", [])
+        check("proc_name filter narrows to that procedure",
+              {x["proc"] for x in one} == {"thing_create"} and any(x["allocator"] == "param" for x in one),
+              f"got {one}")
+
+
 def test_get_callers_callees(client: MCPClient):
     section("LSP parity — get_callers / get_callees")
     DB_PATH = os.path.join(REPO_ROOT, ".codegraph", "olt.db")
@@ -372,7 +394,7 @@ def test_tools_list(client: MCPClient):
         "lint_workspace", "list_rules", "run_odin_check",
         "get_symbol", "export_symbols", "get_dna_context",
         "get_impact_radius", "find_allocators", "find_all_references",
-        "rename_symbol", "get_callers", "get_callees",
+        "rename_symbol", "get_callers", "get_callees", "get_ownership",
     ]:
         check(f"tool '{expected}' is registered", expected in tool_names)
 
@@ -399,6 +421,7 @@ def main():
         test_schema_version_in_symbols_json(client)
         test_get_callers_callees(client)
         test_impact_radius_follows_callers(client)
+        test_get_ownership(client)
         test_run_odin_check(client)
     finally:
         client.close()

@@ -6,6 +6,8 @@
 //                                                     would wrongly say `inner`)
 //   `area` is a group over `area_point`: references edge area -> area_point, one area_point node
 //   callers of `util` (package lib, a sibling directory) = main   (pkg.fn() through an import)
+//   `make_point` allocates a Point and returns it: an `instantiates` edge make_point -> Point
+//                 whose JSON metadata says ownership=returned, allocator=default
 package demo
 
 import "core:fmt"
@@ -55,4 +57,8 @@ main :: proc() {
 	outer()
 	_ = lib.util()        // qualified call into another package of the project
 	fmt.println("hi")     // qualified call into core: (outside the project)
+}
+
+make_point :: proc() -> ^Point {
+	return new(Point)
 }

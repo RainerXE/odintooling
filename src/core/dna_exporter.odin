@@ -158,6 +158,8 @@ export_symbols :: proc(
 
     // Procedure groups link to their members, which may live in any file.
     graph_resolve_group_members(db)
+    // Procedures link to the types they allocate (needs every file's types and imports).
+    graph_resolve_alloc_types(db)
 
     for file_path in files {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
@@ -328,11 +330,15 @@ _pass1_index_declarations :: proc(
             is_exported := !proc_node_is_private(name_node, lines)
             sig         := _extract_proc_signature(name_node, lines)
             rt          := _extract_return_type(sig)
-            graph_insert_node(db, name, qualified, "function", file_path, line, sig, is_exported,
+            proc_id := graph_insert_node(db, name, qualified, "function", file_path, line, sig, is_exported,
                 end_line    = _decl_end_line(m.captures["proc_decl"], line),
                 start_col   = int(pt.column),
                 end_col     = int(ts_node_end_point(name_node).column),
                 return_type = rt)
+            if decl, has_decl := m.captures["proc_decl"]; has_decl && proc_id >= 0 {
+                own := ownership_analyze(decl, lines)
+                graph_record_ownership(db, proc_id, own.free_calls, own.sites[:])
+            }
             continue
         }
         // struct / bit_field -> "struct", union -> "union"
@@ -627,30 +633,84 @@ _pass3_tag_memory_roles :: proc(db: ^GraphDB) {
     }
 }
 
+// _infer_role guesses what a procedure does with memory. It prefers the facts the
+// ownership analysis recorded (allocation sites and what became of them) and falls back to
+// the names of the procedures it calls, for code whose allocation is hidden behind helpers.
+//
+//   allocator    hands memory on: a site is returned, stored or passed, or is left unfreed
+//                from the default or a parameter allocator (temp and arena memory owes nothing)
+//   borrower     allocates and frees within itself
+//   deallocator  frees but allocates nothing
+//   neutral      none of the above
 @(private)
 _infer_role :: proc(db: ^GraphDB, node_id: i64) -> string {
-    alloc_names := []string{"make", "new", "alloc", "create"}
-    free_names  := []string{"free", "delete", "destroy", "release"}
+    sites, free_calls := 0, 0
+    escaping, contained := 0, 0
+    st, st_ok := sq.db_prepare(db.conn,
+        `SELECT COALESCE(o.alloc_sites,0), COALESCE(o.free_calls,0) FROM nodes n
+         LEFT JOIN odin_proc_ownership o ON o.proc_id = n.id WHERE n.rowid=?;`)
+    if st_ok {
+        sq.stmt_bind_i64(&st, 1, node_id)
+        if sq.stmt_step(&st) {
+            sites      = sq.stmt_col_int(&st, 0)
+            free_calls = sq.stmt_col_int(&st, 1)
+        }
+        sq.stmt_finalize(&st)
+    }
+    if sites > 0 {
+        ss, ss_ok := sq.db_prepare(db.conn,
+            `SELECT a.allocator_kind, a.disposition FROM odin_alloc_site a
+             JOIN nodes n ON n.id = a.proc_id WHERE n.rowid=?;`)
+        if ss_ok {
+            sq.stmt_bind_i64(&ss, 1, node_id)
+            for sq.stmt_step(&ss) {
+                kind := sq.stmt_col_text(&ss, 0)
+                disp := sq.stmt_col_text(&ss, 1)
+                switch {
+                case disp == "freed" || disp == "freed_deferred":
+                    contained += 1
+                case kind == "temp":
+                    // released wholesale: nothing is owed
+                case disp == "unfreed" && kind == "custom":
+                    // an arena (or a reassigned context.allocator) releases it
+                case:
+                    escaping += 1
+                }
+                delete(kind); delete(disp)
+            }
+            sq.stmt_finalize(&ss)
+        }
+        if escaping  > 0 { return "allocator" }
+        if contained > 0 { return "borrower"  }
+    }
+    if sites == 0 && free_calls > 0 { return "deallocator" }
 
-    calls_alloc := false
-    calls_free  := false
-
+    // Fallback: the names of what this procedure calls, matched as whole words.
+    calls_alloc, calls_free := false, false
     s, ok := sq.db_prepare(db.conn,
-        `SELECT n.name FROM edges e JOIN nodes n ON e.target=n.id WHERE e.source=(SELECT id FROM nodes WHERE rowid=?) AND e.kind='calls';`)
+        `SELECT n.name FROM edges e JOIN nodes n ON e.target=n.id
+         WHERE e.source=(SELECT id FROM nodes WHERE rowid=?) AND e.kind='calls';`)
     if !ok { return "neutral" }
     defer sq.stmt_finalize(&s)
     sq.stmt_bind_i64(&s, 1, node_id)
-
     for sq.stmt_step(&s) {
         callee := sq.stmt_col_text(&s, 0)
         defer delete(callee)
-        for a in alloc_names { if strings.contains(callee, a) { calls_alloc = true } }
-        for f in free_names  { if strings.contains(callee, f) { calls_free  = true } }
+        switch callee {
+        case "delete_key", "delete_elem", "delete_at": continue
+        }
+        for tok in strings.split(callee, "_", context.temp_allocator) {
+            switch tok {
+            case "make", "new", "alloc", "create": calls_alloc = true
+            case "free", "delete", "destroy", "release": calls_free = true
+            }
+        }
     }
-
-    if calls_alloc && !calls_free  { return "allocator"   }
-    if calls_free  && !calls_alloc { return "deallocator" }
-    if calls_alloc &&  calls_free  { return "borrower"    }
+    if sites == 0 || escaping + contained == 0 {
+        if calls_alloc && !calls_free { return "allocator"   }
+        if calls_free  && !calls_alloc { return "deallocator" }
+        if calls_alloc &&  calls_free  { return "borrower"    }
+    }
     return "neutral"
 }
 

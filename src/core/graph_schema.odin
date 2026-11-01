@@ -40,6 +40,32 @@ CREATE TABLE IF NOT EXISTS odin_group_member (
     PRIMARY KEY (group_id, name, line, col)
 );
 
+-- Allocation sites (see ownership.odin): every make/new/new_clone and the stdlib calls that
+-- allocate, inside a procedure. allocator_kind says whether the memory must be freed by
+-- hand: default and param do, temp and custom (an arena, a reassigned context.allocator)
+-- are released by their allocator. disposition says where the memory went.
+CREATE TABLE IF NOT EXISTS odin_alloc_site (
+    proc_id        TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    line           INTEGER NOT NULL,
+    col            INTEGER NOT NULL,
+    api            TEXT    NOT NULL,   -- make | new | new_clone | mem.alloc | strings.clone | ...
+    elem_type      TEXT,               -- the type allocated, as written ('Foo', 'pkg.Foo'); NULL if unknown
+    allocator_kind TEXT    NOT NULL,   -- default | temp | param | custom
+    allocator_expr TEXT,
+    var_name       TEXT,               -- the local the result was bound to; NULL if none
+    disposition    TEXT    NOT NULL,   -- freed_deferred | freed | returned | stored | passed | unfreed
+    PRIMARY KEY (proc_id, line, col)
+);
+CREATE INDEX IF NOT EXISTS idx_odin_alloc_site_disp ON odin_alloc_site(disposition, allocator_kind);
+
+-- Per procedure: how many calls to a free-like procedure it makes, and how many allocation
+-- sites it contains (what the memory-role guess is built from).
+CREATE TABLE IF NOT EXISTS odin_proc_ownership (
+    proc_id     TEXT    PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
+    free_calls  INTEGER NOT NULL DEFAULT 0,
+    alloc_sites INTEGER NOT NULL DEFAULT 0
+);
+
 -- One row per file: the package it declares. A package is a directory, so (dir, name)
 -- is what an import's default name is matched against.
 CREATE TABLE IF NOT EXISTS odin_package (

@@ -275,6 +275,7 @@ Available MCP tools:
 | `get_impact_radius` | Transitive impact of changing a symbol |
 | `get_callers` / `get_callees` | Direct call graph neighbours |
 | `search_symbols` | Full-text symbol search |
+| `get_ownership` | Allocation sites: which allocator, and whether the memory is freed, returned, stored, passed on or leaked |
 | `rename_symbol` | Generate rename patches across the project |
 
 ### Code knowledge graph
@@ -293,12 +294,34 @@ vendored unmodified in `ffi/codegraph/` (refresh with `scripts/update_codegraph_
 
 - **nodes** — `file`, `function`, `struct`, `union`, `enum`, `enum_member`, `constant`, `variable` and `import`, each with its
   start and end position, signature, return type and visibility; qualified names are `package::name`
-- **edges** — `contains` (file → declaration, enum → member) and `calls`
+- **edges** — `contains` (file → declaration, enum → member), `calls`, `references` (procedure group → member) and `instantiates` (procedure → the type it allocates, with the ownership facts as JSON `metadata`)
 - **unresolved_refs** — calls whose target is outside the project (`fmt::println`) or is a value (`a.b.f`)
 - **files**, **nodes_fts** (full-text search), **project_metadata**, **schema_versions**
 
 olt's own data lives beside them in `odin_*` tables, which CodeGraph never touches: `odin_node_info` (memory role and lint
-findings per node), `odin_package` (the package each file declares) and `odin_import` (what each file's qualifiers refer to).
+findings per node), `odin_package` (the package each file declares), `odin_import` (what each file's qualifiers refer to),
+`odin_alloc_site` and `odin_proc_ownership` (see below).
+
+#### Ownership
+
+Odin has no garbage collector, so who frees what is the question that matters. For every allocation inside a procedure
+(`make`, `new`, `new_clone`, and the allocating calls in `mem`, `strings`, `fmt`, `os` and `slice`) the graph records
+
+- **which allocator** it comes from: `default` (`context.allocator`; the caller owes a free), `param` (an `allocator`
+  parameter, so the caller of *this* procedure owns the result), `temp` (`context.temp_allocator`, released wholesale) or
+  `custom` (an arena, or a reassigned `context.allocator`);
+- **what became of it**: `freed_deferred`, `returned`, `stored` (a field, a global, a map key, `append(&list, x)`),
+  `freed`, `passed` (given to another procedure) or `unfreed`.
+
+Most Odin code allocates from the temp allocator or an arena on purpose, so "never freed" only means something for the default and
+parameter allocators; the `get_ownership` tool flags exactly those as `leak_candidate`. A procedure that allocates and returns or
+stores the memory is tagged `allocator`, one that allocates and frees it `borrower`, one that only frees `deallocator`.
+The `instantiates` edges carry the same facts, so any query over the edges table can ask which procedures create a `Thing`, and
+under which ownership.
+
+This is a syntactic, per-procedure analysis: it follows the *name* an allocation is bound to through the procedure body. It does not
+follow aliases (`q := p`), values passed into composite literals, or ownership across procedure boundaries, and it cannot see an
+arena installed by a caller. So `leak_candidate` is a pointer to read, not a verdict; on `ols` it flags 5 of 632 sites.
 
 Once exported, this enables C202 switch exhaustiveness checking and the `get_*` / `search_symbols` MCP tools.
 

@@ -1,0 +1,22 @@
+thing_create	15	new	Thing	param	t	returned
+thing_create	16	strings.clone		param		stored
+roundtrip	22	make	byte	default	buf	freed_deferred
+conditional	29	new	Thing	default	t	returned
+leaks	39	make	int	default	buf	unfreed
+scratch	46	make	int	temp	tmp	unfreed
+with_arena	53	new	Node	custom	n	unfreed
+register	59	new	Thing	default	t	stored
+register	61	make	int	default		stored
+passes	66	new	Node	default	n	passed
+with_param	85	make	int	param		returned
+read_all	92	new	int	default	other	freed
+read_all	92	new	int	default	other2	unfreed
+with_context	101	make	int	custom	x	unfreed
+inner	108	new	int	default	z	unfreed
+outer	111	new	int	default	y	freed
+init_global	119	new	Thing	default		stored
+index_key	124	strings.clone		default		stored
+named_result	129	make	int	default		returned
+into_struct	135	make	byte	default	bytes	passed
+read_only	144	make	int	default	xs	unfreed
+wrapped	150	mem.alloc		param	res	freed

@@ -1,7 +1,7 @@
 // mcp/tool_graph.odin — codegraph_* MCP tools for code-knowledge graph queries.
 // Exposes get_dna_context, get_impact_radius, find_allocators, find_all_references,
 // rename_symbol, run_lint_denoise, get_symbol, export_symbols, get_callers,
-// get_callees, and search_symbols to AI agents.
+// get_callees, search_symbols and get_ownership to AI agents.
 package mcp_server
 
 import "core:encoding/json"
@@ -718,4 +718,61 @@ _free_nodes :: proc(nodes: []core.GraphNodeInfo) {
         delete(n.memory_role); delete(n.lint_violations); delete(n.signature)
         delete(n.return_type)
     }
+}
+
+// =============================================================================
+// get_ownership
+// =============================================================================
+
+make_get_ownership_tool :: proc() -> mcp.Tool {
+    return mcp.Tool{
+        defn = mcp.ToolDefinition{
+            name        = "get_ownership",
+            description = "Return allocation sites (make/new/new_clone and allocating stdlib calls) with the allocator they use (default|temp|param|custom) and what became of the memory (freed_deferred|freed|returned|stored|passed|unfreed). leak_candidate is true for memory from the default or a parameter allocator that is never freed, returned, stored or passed on. Filter by proc_name, disposition, allocator_kind.",
+            input_schema = `{
+                "type": "object",
+                "properties": {
+                    "proc_name":      {"type": "string"},
+                    "disposition":    {"type": "string", "enum": ["freed_deferred","freed","returned","stored","passed","unfreed"]},
+                    "allocator_kind": {"type": "string", "enum": ["default","temp","param","custom"]},
+                    "limit":          {"type": "integer", "description": "Max sites (default 100)"},
+                    "db_path":        {"type": "string"}
+                }
+            }`,
+        },
+        simple_handler = _get_ownership_handler,
+    }
+}
+
+@(private="file")
+_get_ownership_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
+    db_path        := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
+    proc_name      := _graph_opt_string(params, "proc_name", "")
+    disposition    := _graph_opt_string(params, "disposition", "")
+    allocator_kind := _graph_opt_string(params, "allocator_kind", "")
+    limit          := _graph_opt_int(params, "limit", 100)
+
+    db, ok := core.graph_open_existing(db_path)
+    if !ok {
+        return mcp.tool_error(.Not_Found,
+            fmt.aprintf("graph db not found at %s — run --export-symbols first", db_path, allocator = allocator),
+            allocator)
+    }
+    defer core.graph_close(db)
+
+    sites := core.graph_list_alloc_sites(db, proc_name, disposition, allocator_kind, limit)
+    defer { for a in sites { core.graph_free_alloc_site(a) }; delete(sites) }
+
+    sb := strings.builder_make(context.temp_allocator)
+    strings.write_string(&sb, `{"sites":[`)
+    for a, idx in sites {
+        if idx > 0 { strings.write_string(&sb, ",") }
+        leak := a.disposition == "unfreed" && (a.allocator_kind == "default" || a.allocator_kind == "param")
+        fmt.sbprintf(&sb,
+            `{{"proc":%s,"file":%s,"line":%d,"api":%s,"type":%s,"allocator":%s,"var":%s,"disposition":%s,"leak_candidate":%v}`,
+            _gj(a.proc_name), _gj(a.file), a.line, _gj(a.api), _gj(a.elem_type),
+            _gj(a.allocator_kind), _gj(a.var_name), _gj(a.disposition), leak)
+    }
+    strings.write_string(&sb, `]}`)
+    return mcp.tool_ok(strings.clone(strings.to_string(sb), allocator), allocator)
 }

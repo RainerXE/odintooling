@@ -143,6 +143,8 @@ graph_clear :: proc(db: ^GraphDB) {
     sq.db_exec(db.conn, "DELETE FROM unresolved_refs;")
     sq.db_exec(db.conn, "DELETE FROM edges;")
     sq.db_exec(db.conn, "DELETE FROM odin_node_info;")
+    sq.db_exec(db.conn, "DELETE FROM odin_alloc_site;")
+    sq.db_exec(db.conn, "DELETE FROM odin_proc_ownership;")
     sq.db_exec(db.conn, "DELETE FROM nodes;")
     sq.db_exec(db.conn, "DELETE FROM files;")
 }
@@ -494,23 +496,171 @@ graph_resolve_group_members :: proc(db: ^GraphDB) {
     }
 }
 
+// graph_find_type_in_package is graph_find_node_in_package restricted to type declarations.
+graph_find_type_in_package :: proc(db: ^GraphDB, name: string, dir: string) -> i64 {
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT rowid FROM nodes
+         WHERE name=?1 AND kind IN ('struct','union','enum','type_alias')
+           AND CASE WHEN ?2 = '' THEN instr(file_path, '/') = 0
+                    ELSE substr(file_path, 1, length(?2)+1) = ?2 || '/'
+                         AND instr(substr(file_path, length(?2)+2), '/') = 0 END
+         LIMIT 1;`)
+    if !ok { return -1 }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, name)
+    sq.stmt_bind_text(&s, 2, dir)
+    if sq.stmt_step(&s) { return sq.stmt_col_i64(&s, 0) }
+    return -1
+}
+
+// graph_record_ownership stores a procedure's allocation sites and its free-call count.
+graph_record_ownership :: proc(db: ^GraphDB, proc_node: i64, free_calls: int, sites: []AllocSite) {
+    for site in sites {
+        s, ok := sq.db_prepare(db.conn,
+            `INSERT OR REPLACE INTO odin_alloc_site(
+                proc_id, line, col, api, elem_type, allocator_kind, allocator_expr, var_name, disposition)
+             SELECT id, ?, ?, ?, NULLIF(?,''), ?, NULLIF(?,''), NULLIF(?,''), ? FROM nodes WHERE rowid=?;`)
+        if !ok { continue }
+        sq.stmt_bind_int(&s,  1, site.line)
+        sq.stmt_bind_int(&s,  2, site.col)
+        sq.stmt_bind_text(&s, 3, site.api)
+        sq.stmt_bind_text(&s, 4, site.elem_type)
+        sq.stmt_bind_text(&s, 5, site.allocator_kind)
+        sq.stmt_bind_text(&s, 6, site.allocator_expr)
+        sq.stmt_bind_text(&s, 7, site.var_name)
+        sq.stmt_bind_text(&s, 8, site.disposition)
+        sq.stmt_bind_i64(&s,  9, proc_node)
+        sq.stmt_exec(&s)
+        sq.stmt_finalize(&s)
+    }
+    st, st_ok := sq.db_prepare(db.conn,
+        `INSERT OR REPLACE INTO odin_proc_ownership(proc_id, free_calls, alloc_sites)
+         SELECT id, ?, ? FROM nodes WHERE rowid=?;`)
+    if !st_ok { return }
+    defer sq.stmt_finalize(&st)
+    sq.stmt_bind_int(&st, 1, free_calls)
+    sq.stmt_bind_int(&st, 2, len(sites))
+    sq.stmt_bind_i64(&st, 3, proc_node)
+    sq.stmt_exec(&st)
+}
+
+// graph_resolve_alloc_types links each procedure to the project types it allocates with an
+// `instantiates` edge (CodeGraph's edge kind for "creates an instance of"), carrying the
+// ownership facts in the edge's JSON metadata. It re-reads every site, so it can run after
+// any export, whichever files changed.
+graph_resolve_alloc_types :: proc(db: ^GraphDB) {
+    Row :: struct { proc_node: i64, file, elem, api, kind, disp: string, line, col: int }
+    rows := make([dynamic]Row)
+    defer {
+        for r in rows { delete(r.file); delete(r.elem); delete(r.api); delete(r.kind); delete(r.disp) }
+        delete(rows)
+    }
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT p.rowid, p.file_path, a.elem_type, a.api, a.allocator_kind, a.disposition, a.line, a.col
+         FROM odin_alloc_site a JOIN nodes p ON p.id = a.proc_id WHERE a.elem_type IS NOT NULL;`)
+    if !ok { return }
+    for sq.stmt_step(&s) {
+        append(&rows, Row{
+            proc_node = sq.stmt_col_i64(&s, 0),
+            file      = sq.stmt_col_text(&s, 1),
+            elem      = sq.stmt_col_text(&s, 2),
+            api       = sq.stmt_col_text(&s, 3),
+            kind      = sq.stmt_col_text(&s, 4),
+            disp      = sq.stmt_col_text(&s, 5),
+            line      = sq.stmt_col_int(&s, 6),
+            col       = sq.stmt_col_int(&s, 7),
+        })
+    }
+    sq.stmt_finalize(&s)
+
+    for r in rows {
+        target: i64 = -1
+        if dot := strings.index_byte(r.elem, '.'); dot > 0 {
+            abs := graph_abs(db, r.file)
+            dir, internal, found := graph_resolve_qualifier(db, abs, r.elem[:dot])
+            delete(abs)
+            if found && internal {
+                target = graph_find_type_in_package(db, r.elem[dot+1:], dir)
+                delete(dir)
+            }
+        } else {
+            target = graph_find_type_in_package(db, r.elem, graph_dir_of(r.file))
+        }
+        if target < 0 { continue }
+        meta := strings.concatenate({`{"ownership":"`, r.disp, `","allocator":"`, r.kind, `","api":"`, r.api, `"}`}, context.temp_allocator)
+        graph_insert_edge(db, r.proc_node, target, "instantiates", r.line, r.col, meta)
+    }
+}
+
+AllocSiteInfo :: struct {
+    proc_name:      string,
+    file:           string,   // absolute
+    line:           int,
+    api:            string,
+    elem_type:      string,
+    allocator_kind: string,
+    var_name:       string,
+    disposition:    string,
+}
+
+// graph_list_alloc_sites returns allocation sites, optionally narrowed to one procedure, one
+// disposition or one allocator kind ("" = any). Strings are heap-allocated; free each with
+// graph_free_alloc_site.
+graph_list_alloc_sites :: proc(db: ^GraphDB, proc_name, disposition, allocator_kind: string, limit: int) -> [dynamic]AllocSiteInfo {
+    result := make([dynamic]AllocSiteInfo)
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT p.name, p.file_path, a.line, a.api, COALESCE(a.elem_type,''), a.allocator_kind,
+                COALESCE(a.var_name,''), a.disposition
+         FROM odin_alloc_site a JOIN nodes p ON p.id = a.proc_id
+         WHERE (?1 = '' OR p.name = ?1) AND (?2 = '' OR a.disposition = ?2) AND (?3 = '' OR a.allocator_kind = ?3)
+         ORDER BY p.file_path, a.line, a.col LIMIT ?4;`)
+    if !ok { return result }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, proc_name)
+    sq.stmt_bind_text(&s, 2, disposition)
+    sq.stmt_bind_text(&s, 3, allocator_kind)
+    sq.stmt_bind_int(&s,  4, limit if limit > 0 else 100)
+    for sq.stmt_step(&s) {
+        rel := sq.stmt_col_text(&s, 1)
+        append(&result, AllocSiteInfo{
+            proc_name      = sq.stmt_col_text(&s, 0),
+            file           = graph_abs(db, rel),
+            line           = sq.stmt_col_int(&s, 2),
+            api            = sq.stmt_col_text(&s, 3),
+            elem_type      = sq.stmt_col_text(&s, 4),
+            allocator_kind = sq.stmt_col_text(&s, 5),
+            var_name       = sq.stmt_col_text(&s, 6),
+            disposition    = sq.stmt_col_text(&s, 7),
+        })
+        delete(rel)
+    }
+    return result
+}
+
+graph_free_alloc_site :: proc(a: AllocSiteInfo) {
+    delete(a.proc_name); delete(a.file); delete(a.api); delete(a.elem_type)
+    delete(a.allocator_kind); delete(a.var_name); delete(a.disposition)
+}
+
 // graph_file_node returns the handle of a file's `file` node (-1 if the file is unknown).
 graph_file_node :: proc(db: ^GraphDB, file: string) -> i64 {
     return _handle_of(db, _file_node_id(graph_rel(db, file)))
 }
 
 // graph_insert_edge inserts a directed edge between two nodes (by handle).
-graph_insert_edge :: proc(db: ^GraphDB, source_id, target_id: i64, kind: string, line: int, col: int = 0) {
+// metadata is CodeGraph's free-form JSON column on edges ("" stores NULL).
+graph_insert_edge :: proc(db: ^GraphDB, source_id, target_id: i64, kind: string, line: int, col: int = 0, metadata: string = "") {
     s, ok := sq.db_prepare(db.conn,
-        `INSERT OR IGNORE INTO edges(source, target, kind, line, col)
-         SELECT s.id, t.id, ?, ?, ? FROM nodes s, nodes t WHERE s.rowid=? AND t.rowid=?;`)
+        `INSERT OR IGNORE INTO edges(source, target, kind, line, col, metadata)
+         SELECT s.id, t.id, ?, ?, ?, NULLIF(?,'') FROM nodes s, nodes t WHERE s.rowid=? AND t.rowid=?;`)
     if !ok { return }
     defer sq.stmt_finalize(&s)
     sq.stmt_bind_text(&s, 1, kind)
     sq.stmt_bind_int(&s,  2, line)
     sq.stmt_bind_int(&s,  3, col)
-    sq.stmt_bind_i64(&s,  4, source_id)
-    sq.stmt_bind_i64(&s,  5, target_id)
+    sq.stmt_bind_text(&s, 4, metadata)
+    sq.stmt_bind_i64(&s,  5, source_id)
+    sq.stmt_bind_i64(&s,  6, target_id)
     sq.stmt_exec(&s)
 }
 
