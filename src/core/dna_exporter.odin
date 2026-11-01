@@ -8,6 +8,7 @@ import "core:hash"
 import "core:os"
 import "core:strings"
 import "core:time"
+import "base:runtime"
 import sq "../../vendor/odin-sqlite3"
 
 // Default output location relative to the project root.
@@ -158,9 +159,6 @@ export_symbols :: proc(
 
     // Procedure groups link to their members, which may live in any file.
     graph_resolve_group_members(db)
-    // Procedures link to the types they allocate (needs every file's types and imports).
-    graph_resolve_alloc_types(db)
-
     for file_path in files {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
         if err != nil { continue }
@@ -178,6 +176,14 @@ export_symbols :: proc(
         delete(lines)
         delete(content)
     }
+
+    // -----------------------------------------------------------------------
+    // Pass 2b — Ownership across procedure boundaries: now that calls are resolved, read
+    // allocation through the procedures that return it and through those that free it.
+    // -----------------------------------------------------------------------
+    _pass2b_cross_ownership(db, ts_parser)
+    // Procedures link to the types they allocate (needs every file's types and imports).
+    graph_resolve_alloc_types(db)
 
     // -----------------------------------------------------------------------
     // Pass 3 — Tag memory roles via heuristic analysis.
@@ -337,7 +343,7 @@ _pass1_index_declarations :: proc(
                 return_type = rt)
             if decl, has_decl := m.captures["proc_decl"]; has_decl && proc_id >= 0 {
                 own := ownership_analyze(decl, lines)
-                graph_record_ownership(db, proc_id, own.free_calls, own.sites[:])
+                graph_record_ownership(db, proc_id, own.free_calls, own.sites[:], own.sinks[:], own.defaults[:])
             }
             continue
         }
@@ -604,6 +610,118 @@ _find_enclosing_proc :: proc(db: ^GraphDB, file: string, line: int) -> i64 {
 }
 
 // =============================================================================
+// Pass 2b — Ownership across procedure boundaries
+// =============================================================================
+
+// _cross_signature summarises which procedures are factories or sinks, to see when a round
+// of re-analysis has found nothing new.
+@(private)
+_cross_signature :: proc(f: map[i64]FactoryRow, s: map[i64]u64) -> u64 {
+    sig := u64(len(f)) * 1_000_003 + u64(len(s))
+    for h, _ in f { sig += u64(h) * 31 }
+    for h, mask in s { sig += u64(h) * 17 + mask * 7 }
+    return sig
+}
+
+@(private)
+_collect_proc_decls :: proc(n: TSNode, out: ^[dynamic]TSNode) {
+    if string(ts_node_type(n)) == "procedure_declaration" { append(out, n) }
+    for i in 0 ..< int(ts_node_child_count(n)) {
+        _collect_proc_decls(ts_node_child(n, u32(i)), out)
+    }
+}
+
+// _pass2b_cross_ownership re-reads the procedures that call a factory (a procedure that
+// returns memory it allocated) or a sink (one that frees a parameter), so that
+//   t := make_thing()      is an allocation owned by the caller, and
+//   consume(n)             frees n when consume frees its parameter.
+// What a procedure returns or frees can itself depend on such a call (a wrapper around a
+// factory is a factory), so it repeats until the sets stop growing.
+@(private)
+_pass2b_cross_ownership :: proc(db: ^GraphDB, ts_parser: ^TreeSitterASTParser) {
+    prev: u64
+    for round in 0 ..< 6 {
+        factories := graph_load_factories(db)
+        sinks     := graph_load_sinks(db)
+        sig       := _cross_signature(factories, sinks)
+        if round > 0 && sig == prev {
+            graph_free_factories(factories); delete(sinks)
+            return
+        }
+        prev = sig
+
+        rows  := graph_load_call_rows(db)
+        infos := make(map[string]CrossInfo)
+        for r in rows {
+            fac, is_fac := factories[r.callee]
+            mask := sinks[r.callee]
+            if !is_fac && mask == 0 { continue }
+            info, has := infos[r.file]
+            if !has { info = CrossInfo{ calls = make(map[[2]int]CrossCall) } }
+            cc := CrossCall{ sink_mask = mask }
+            if is_fac {
+                cc.name = fac.name; cc.factory = true; cc.factory_kind = fac.kind; cc.elem_type = fac.elem_type; cc.default_kind = fac.default_kind
+            }
+            info.calls[{r.line, r.col}] = cc
+            infos[r.file] = info
+        }
+        // files that held call-based sites before must be re-read even if nothing calls a factory now
+        stale := graph_files_with_call_sites(db)
+        for f in stale { if !(f in infos) { infos[strings.clone(f)] = CrossInfo{ calls = make(map[[2]int]CrossCall) } } }
+
+        for file, &info in infos {
+            _reanalyze_file(db, ts_parser, file, &info)
+        }
+
+        for r in rows { delete(r.file) }
+        delete(rows)
+        for f in stale { delete(f) }
+        delete(stale)
+        for f, info in infos { delete(info.calls); _ = f }
+        delete(infos)
+        graph_free_factories(factories); delete(sinks)
+    }
+}
+
+@(private)
+_reanalyze_file :: proc(db: ^GraphDB, ts_parser: ^TreeSitterASTParser, rel_file: string, info: ^CrossInfo) {
+    abs := graph_abs(db, rel_file)
+    defer delete(abs)
+    content, err := os.read_entire_file_from_path(abs, context.allocator)
+    if err != nil { return }
+    defer delete(content)
+    lines := strings.split(string(content), "\n")
+    defer delete(lines)
+
+    tree, ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+    if !ok { return }
+    defer ts_tree_delete(tree)
+    root := getRootNode(tree)
+    if ts_node_is_null(root) { return }
+
+    decls := make([dynamic]TSNode)
+    defer delete(decls)
+    _collect_proc_decls(root, &decls)
+
+    for decl in decls {
+        guard := runtime.default_temp_allocator_temp_begin()
+        defer runtime.default_temp_allocator_temp_end(guard)
+
+        name_pt: TSPoint
+        found := false
+        for i in 0 ..< int(ts_node_child_count(decl)) {
+            c := ts_node_child(decl, u32(i))
+            if string(ts_node_type(c)) == "identifier" { name_pt = ts_node_start_point(c); found = true; break }
+        }
+        if !found { continue }
+        id := graph_find_function_at(db, abs, int(name_pt.row) + 1, int(name_pt.column))
+        if id < 0 { continue }
+        own := ownership_analyze(decl, lines, info)
+        graph_record_ownership(db, id, own.free_calls, own.sites[:], own.sinks[:], own.defaults[:])
+    }
+}
+
+// =============================================================================
 // Pass 3 — Memory role tagging
 // =============================================================================
 
@@ -647,8 +765,9 @@ _infer_role :: proc(db: ^GraphDB, node_id: i64) -> string {
     sites, free_calls := 0, 0
     escaping, contained := 0, 0
     st, st_ok := sq.db_prepare(db.conn,
-        `SELECT COALESCE(o.alloc_sites,0), COALESCE(o.free_calls,0) FROM nodes n
-         LEFT JOIN odin_proc_ownership o ON o.proc_id = n.id WHERE n.rowid=?;`)
+        `SELECT COALESCE(o.alloc_sites,0),
+                COALESCE(o.free_calls,0) + (SELECT COUNT(*) FROM odin_param_sink k WHERE k.proc_id = n.id)
+         FROM nodes n LEFT JOIN odin_proc_ownership o ON o.proc_id = n.id WHERE n.rowid=?;`)
     if st_ok {
         sq.stmt_bind_i64(&st, 1, node_id)
         if sq.stmt_step(&st) {
@@ -659,13 +778,14 @@ _infer_role :: proc(db: ^GraphDB, node_id: i64) -> string {
     }
     if sites > 0 {
         ss, ss_ok := sq.db_prepare(db.conn,
-            `SELECT a.allocator_kind, a.disposition FROM odin_alloc_site a
-             JOIN nodes n ON n.id = a.proc_id WHERE n.rowid=?;`)
+            `SELECT a.allocator_kind, a.disposition, ` + SQL_UNPROVEN_FACTORY_CALL + `
+             FROM odin_alloc_site a JOIN nodes n ON n.id = a.proc_id WHERE n.rowid=?;`)
         if ss_ok {
             sq.stmt_bind_i64(&ss, 1, node_id)
             for sq.stmt_step(&ss) {
                 kind := sq.stmt_col_text(&ss, 0)
                 disp := sq.stmt_col_text(&ss, 1)
+                unproven := sq.stmt_col_int(&ss, 2) != 0
                 switch {
                 case disp == "freed" || disp == "freed_deferred":
                     contained += 1
@@ -673,6 +793,8 @@ _infer_role :: proc(db: ^GraphDB, node_id: i64) -> string {
                     // released wholesale: nothing is owed
                 case disp == "unfreed" && kind == "custom":
                     // an arena (or a reassigned context.allocator) releases it
+                case disp == "unfreed" && unproven:
+                    // nobody releases what that factory returns: the project does not, by convention
                 case:
                     escaping += 1
                 }
@@ -706,7 +828,7 @@ _infer_role :: proc(db: ^GraphDB, node_id: i64) -> string {
             }
         }
     }
-    if sites == 0 || escaping + contained == 0 {
+    if sites == 0 {
         if calls_alloc && !calls_free { return "allocator"   }
         if calls_free  && !calls_alloc { return "deallocator" }
         if calls_alloc &&  calls_free  { return "borrower"    }

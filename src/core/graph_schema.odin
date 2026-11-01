@@ -66,6 +66,24 @@ CREATE TABLE IF NOT EXISTS odin_proc_ownership (
     alloc_sites INTEGER NOT NULL DEFAULT 0
 );
 
+-- Parameters a procedure frees (it takes ownership of the argument): odin_param_sink(proc, 0)
+-- says the first parameter of that procedure is released inside it. A caller that passes an
+-- allocation there has handed it over, not leaked it.
+CREATE TABLE IF NOT EXISTS odin_param_sink (
+    proc_id TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    idx     INTEGER NOT NULL,   -- 0-based position among the parameter names
+    PRIMARY KEY (proc_id, idx)
+);
+
+-- The allocator parameters of a procedure and what each defaults to: when a caller passes none,
+-- that default is what its result is allocated from ('temp' for allocator := context.temp_allocator).
+CREATE TABLE IF NOT EXISTS odin_alloc_param (
+    proc_id      TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    default_kind TEXT NOT NULL,   -- default | temp | custom | none (no default value)
+    PRIMARY KEY (proc_id, name)
+);
+
 -- One row per file: the package it declares. A package is a directory, so (dir, name)
 -- is what an import's default name is matched against.
 CREATE TABLE IF NOT EXISTS odin_package (

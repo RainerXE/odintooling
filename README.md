@@ -300,7 +300,7 @@ vendored unmodified in `ffi/codegraph/` (refresh with `scripts/update_codegraph_
 
 olt's own data lives beside them in `odin_*` tables, which CodeGraph never touches: `odin_node_info` (memory role and lint
 findings per node), `odin_package` (the package each file declares), `odin_import` (what each file's qualifiers refer to),
-`odin_alloc_site` and `odin_proc_ownership` (see below).
+`odin_alloc_site`, `odin_proc_ownership`, `odin_param_sink` and `odin_alloc_param` (see below).
 
 #### Ownership
 
@@ -319,9 +319,22 @@ stores the memory is tagged `allocator`, one that allocates and frees it `borrow
 The `instantiates` edges carry the same facts, so any query over the edges table can ask which procedures create a `Thing`, and
 under which ownership.
 
-This is a syntactic, per-procedure analysis: it follows the *name* an allocation is bound to through the procedure body. It does not
-follow aliases (`q := p`), values passed into composite literals, or ownership across procedure boundaries, and it cannot see an
-arena installed by a caller. So `leak_candidate` is a pointer to read, not a verdict; on `ols` it flags 5 of 632 sites.
+Ownership is followed across procedure boundaries in two ways:
+
+- **Factories.** A procedure that returns memory it allocated from the default or a parameter allocator is a factory, and so is a
+  wrapper that returns a factory's result. A call to one is an allocation site of its caller (`api` is `name()`), with the
+  allocator the caller chose, or the factory's own default when it passed none: `read_slice(f, n)` with `allocator :=
+  context.temp_allocator` owes nothing.
+- **Sinks.** A procedure that frees one of its parameters takes ownership of it; passing an allocation to it counts as freeing it, and
+  so does passing it on to a procedure that does.
+
+A caller that does not free a factory's result is only a `leak_candidate` when other callers of that factory do. If nobody ever frees
+what `label_init` returns, the project's convention is not to (an arena, a parent that owns its children), and flagging every caller
+would be noise: on `todool` that rule removes 109 such sites, on `ols` 70.
+
+The analysis is otherwise syntactic and per procedure: it follows the *name* an allocation is bound to through the procedure body. It
+does not follow aliases (`q := p`) or values passed into composite literals, and it cannot see an arena installed by a caller. So
+`leak_candidate` is a pointer to read, not a verdict; on `ols` it flags 5 of 2,205 sites.
 
 Once exported, this enables C202 switch exhaustiveness checking and the `get_*` / `search_symbols` MCP tools.
 

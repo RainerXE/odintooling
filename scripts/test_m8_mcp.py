@@ -270,15 +270,21 @@ def test_get_ownership(client: MCPClient):
     import tempfile
     olt = os.path.join(os.path.dirname(SERVER_BIN), "olt")
     with tempfile.TemporaryDirectory() as tmp:
-        db = os.path.join(tmp, "own.db")
-        subprocess.run([olt, "--export-symbols", "--db", db, os.path.join(REPO_ROOT, "tests", "OWNERSHIP")],
+        import shutil
+        proj = os.path.join(tmp, "proj")   # exported from inside the project, as a user would
+        db = os.path.join(proj, ".codegraph", "g.db")
+        shutil.copytree(os.path.join(REPO_ROOT, "tests", "OWNERSHIP"), proj, ignore=shutil.ignore_patterns("expected"))
+        subprocess.run([olt, "--export-symbols", "--db", os.path.join(proj, ".codegraph", "g.db"), "."], cwd=proj,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
         everything = client.tool("get_ownership", {"db_path": db, "limit": 500}).get("sites", [])
         check("get_ownership returns the fixture's allocation sites", len(everything) >= 15, f"got {len(everything)}")
         leaks = client.tool("get_ownership", {"db_path": db, "disposition": "unfreed"}).get("sites", [])
         flagged = sorted(x["proc"] for x in leaks if x["leak_candidate"])
         check("leak_candidate is set only for default/param memory that is never freed",
-              flagged == ["inner", "leaks", "read_all", "read_only"], f"flagged: {flagged}")
+              flagged == ["inner", "leaks", "read_all", "read_only", "slab_leak", "wrapper_leak"], f"flagged: {flagged}")
+        widgets = [x for x in leaks if x["proc"] in ("widget_a", "widget_b")]
+        check("a factory's result is a leak candidate only where its other callers do free it",
+              len(widgets) == 2 and not any(x["leak_candidate"] for x in widgets), f"widgets: {widgets}")
         check("temp and arena memory is never a leak candidate",
               not any(x["leak_candidate"] for x in leaks if x["allocator"] in ("temp", "custom")))
         one = client.tool("get_ownership", {"db_path": db, "proc_name": "thing_create"}).get("sites", [])

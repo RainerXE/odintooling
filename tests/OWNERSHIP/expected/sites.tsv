@@ -1,3 +1,19 @@
+slab_ok	7	slab_new()	pool.Slab	default	s	freed_deferred
+slab_leak	13	slab_new()	pool.Slab	default	s	unfreed
+slab_temp	19	slab_new()	pool.Slab	temp	s	unfreed
+wrapper	25	thing_create()	Thing	default		returned
+wrapper_leak	30	wrapper()	Thing	default	t	unfreed
+wrapper_ok	35	wrapper()	Thing	default	t	freed_deferred
+hand_over	41	new	Node	default	n	freed
+hand_over_twice	50	new	Node	default	n	freed
+keeps	56	wrapper()	Thing	default	t	stored
+widget_new	64	new	Widget	default		returned
+widget_a	67	widget_new()	Widget	default	w	unfreed
+widget_b	71	widget_new()	Widget	default	w	unfreed
+scratch_default	77	slab_scratch()	pool.Slab	temp	s	unfreed
+scratch_explicit	82	slab_scratch()	pool.Slab	default	s	unfreed
+slab_new	7	new	Slab	param	s	returned
+slab_scratch	19	new	Slab	param		returned
 thing_create	15	new	Thing	param	t	returned
 thing_create	16	strings.clone		param		stored
 roundtrip	22	make	byte	default	buf	freed_deferred
@@ -7,7 +23,8 @@ scratch	46	make	int	temp	tmp	unfreed
 with_arena	53	new	Node	custom	n	unfreed
 register	59	new	Thing	default	t	stored
 register	61	make	int	default		stored
-passes	66	new	Node	default	n	passed
+passes	66	new	Node	default	n	freed
+cleanup	74	thing_create()	Thing	default	t	freed_deferred
 with_param	85	make	int	param		returned
 read_all	92	new	int	default	other	freed
 read_all	92	new	int	default	other2	unfreed

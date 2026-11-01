@@ -41,7 +41,31 @@ AllocSite :: struct {
 
 ProcOwnership :: struct {
     sites:      [dynamic]AllocSite,
-    free_calls: int,   // calls to a free-like procedure (delete, free, *_destroy, ...)
+    free_calls: int,         // calls to a free-like procedure (delete, free, *_destroy, ...)
+    sinks:      [dynamic]int, // parameters (0-based) this procedure frees: it takes ownership of them
+    defaults:   [dynamic]ParamDefault, // its allocator parameters and what each defaults to
+}
+
+ParamDefault :: struct {
+    name: string,
+    kind: string,   // default | temp | custom | none
+}
+
+// CrossCall is what is known about the procedure a call resolves to. It lets a caller see
+// through the call: a factory's result is an allocation owned by the caller, and a sink frees
+// the argument it is given.
+CrossCall :: struct {
+    name:         string,
+    factory:      bool,
+    factory_kind: string,   // default | param: whose allocator the factory's result comes from
+    elem_type:    string,   // the type the factory allocates, as written in its own package
+    default_kind: string,   // what the allocator parameter falls back to when the caller passes none
+    sink_mask:    u64,      // bit i set: the callee frees its i-th argument
+}
+
+// CrossInfo maps the position of a call's callee name (line, column) to what it resolves to.
+CrossInfo :: struct {
+    calls: map[[2]int]CrossCall,
 }
 
 // Everything below allocates from the temp allocator: results are consumed immediately by
@@ -271,6 +295,36 @@ _param_allocators :: proc(params: TSNode, lines: []string) -> map[string]bool {
     return out
 }
 
+// _param_default_kinds records, for each allocator parameter, what it defaults to.
+@(private="file")
+_param_default_kinds :: proc(params: TSNode, lines: []string, param_allocs: map[string]bool, out: ^[dynamic]ParamDefault) {
+    if ts_node_is_null(params) { return }
+    for par in _named(params) {
+        kind := _ntype(par)
+        if kind != "parameter" && kind != "default_parameter" { continue }
+        names := make([dynamic]string, context.temp_allocator)
+        value := ""
+        for k in _named(par) {
+            switch _ntype(k) {
+            case "identifier": append(&names, _text(k, lines))
+            case "type":
+            case:              value = _text(k, lines)
+            }
+        }
+        for n in names {
+            if !param_allocs[n] { continue }
+            dk := "none"
+            switch {
+            case value == "":                                  dk = "none"
+            case strings.contains(value, "temp_allocator"):    dk = "temp"
+            case strings.contains(value, "context.allocator"): dk = "default"
+            case:                                              dk = "custom"
+            }
+            append(out, ParamDefault{ name = n, kind = dk })
+        }
+    }
+}
+
 // _named_results collects the names of a procedure's named results: -> (result: T, err: E).
 @(private="file")
 _named_results :: proc(decl: TSNode, lines: []string, out: ^map[string]bool) {
@@ -370,7 +424,7 @@ _under_defer :: proc(n: TSNode) -> bool {
 // _classify_use says what a use of a value does with it, by looking at where the use sits.
 // "" means "not an ownership event" (a left-hand side, a field or element read, a length).
 @(private="file")
-_classify_use :: proc(node: TSNode, lines: []string) -> string {
+_classify_use :: proc(node: TSNode, lines: []string, x: ^CrossInfo) -> string {
     cur := node
     as_key := false   // the value sits in an index position: m[strings.clone(k)] = v
     for {
@@ -380,9 +434,20 @@ _classify_use :: proc(node: TSNode, lines: []string) -> string {
         case "call_expression":
             kids := _named(p)
             if len(kids) > 0 && _same(kids[0], cur) { return "" }   // the callee, not an argument
-            qual, name, _, ok := _call_parts(p, lines)
+            qual, name, fn, ok := _call_parts(p, lines)
             if !ok { return "passed" }
             if _is_free_name(name) { return "freed_deferred" if _under_defer(p) else "freed" }
+            if x != nil {
+                // a procedure that frees the argument it is given (found by an earlier round)
+                fp := ts_node_start_point(fn)
+                if info, has := x.calls[{int(fp.row) + 1, int(fp.column)}]; has && info.sink_mask != 0 {
+                    for k, idx in kids {
+                        if idx > 0 && _same(k, cur) && idx - 1 < 64 && info.sink_mask & (u64(1) << u64(idx - 1)) != 0 {
+                            return "freed_deferred" if _under_defer(p) else "freed"
+                        }
+                    }
+                }
+            }
             if _stores_arg(name) {
                 if len(kids) > 1 && _same(kids[1], cur) { return "" }   // appending TO the value, not storing it
                 return "stored"
@@ -499,8 +564,12 @@ _allocator_of :: proc(call: TSNode, lines: []string, param_allocs: map[string]bo
 // =============================================================================
 
 // ownership_analyze reads one procedure_declaration and returns its allocation sites.
-ownership_analyze :: proc(decl: TSNode, lines: []string) -> ProcOwnership {
-    out := ProcOwnership{ sites = make([dynamic]AllocSite, context.temp_allocator) }
+ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) -> ProcOwnership {
+    out := ProcOwnership{
+        sites = make([dynamic]AllocSite, context.temp_allocator),
+        sinks = make([dynamic]int, context.temp_allocator),
+        defaults = make([dynamic]ParamDefault, context.temp_allocator),
+    }
     body, params := _proc_parts(decl)
     if ts_node_is_null(body) { return out }   // a foreign declaration has no body
 
@@ -513,6 +582,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string) -> ProcOwnership {
     _collect(body, &c)
 
     param_allocs := _param_allocators(params, lines)
+    _param_default_kinds(params, lines, param_allocs, &out.defaults)
     ctx_override := false
     for a in c.assigns {
         k := _named(a)
@@ -565,6 +635,18 @@ ownership_analyze :: proc(decl: TSNode, lines: []string) -> ProcOwnership {
         if !ok { continue }
         if _is_free_name(name) { out.free_calls += 1 }
         api, is_alloc := _alloc_api(qual, name)
+        cc: CrossCall
+        via_call := false
+        if !is_alloc && x != nil {
+            // a call to a project procedure that returns memory it allocated (found by an earlier round)
+            fp := ts_node_start_point(fn)
+            if info, has := x.calls[{int(fp.row) + 1, int(fp.column)}]; has && info.factory {
+                cc = info
+                via_call = true
+                is_alloc = true
+                api = strings.concatenate({name, "()"}, context.temp_allocator)
+            }
+        }
         if !is_alloc { continue }
 
         raw := call
@@ -577,10 +659,31 @@ ownership_analyze :: proc(decl: TSNode, lines: []string) -> ProcOwnership {
             line      = int(pt.row) + 1,
             col       = int(pt.column),
         }
-        _ = fn
-        site.allocator_kind, site.allocator_expr = _allocator_of(call, lines, param_allocs, locals, ctx_override)
-        if kids := _named(call); len(kids) >= 2 && (api == "make" || api == "new" || api == "mem.new") {
-            site.elem_type = _type_name(kids[1], lines)
+        if via_call {
+            if cc.factory_kind == "param" {
+                site.allocator_kind, site.allocator_expr = _allocator_of(call, lines, param_allocs, locals, ctx_override)
+                if site.allocator_expr == "" {
+                    // nothing passed: the factory's own default decides (temp_allocator for read_slice)
+                    switch cc.default_kind {
+                    case "temp":   site.allocator_kind = "temp"
+                    case "custom": site.allocator_kind = "custom"
+                    }
+                }
+            } else {
+                site.allocator_kind = "custom" if ctx_override else "default"
+            }
+            // the type is named in the factory's package; from here it is reached through the same qualifier
+            switch {
+            case cc.elem_type == "":
+            case strings.contains(cc.elem_type, "."):
+            case qual != "":  site.elem_type = strings.concatenate({qual, ".", cc.elem_type}, context.temp_allocator)
+            case:             site.elem_type = cc.elem_type
+            }
+        } else {
+            site.allocator_kind, site.allocator_expr = _allocator_of(call, lines, param_allocs, locals, ctx_override)
+            if kids := _named(call); len(kids) >= 2 && (api == "make" || api == "new" || api == "mem.new") {
+                site.elem_type = _type_name(kids[1], lines)
+            }
         }
 
         // How is the result bound? `x := make(...)` binds a name; anything else is decided at once.
@@ -609,7 +712,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string) -> ProcOwnership {
             }
         }
         if site.var_name == "" && site.disposition == "" {
-            site.disposition = _classify_use(expr, lines)
+            site.disposition = _classify_use(expr, lines, x)
             if site.disposition == "" { site.disposition = "unfreed" }   // a result that is dropped
         }
         append(&out.sites, site)
@@ -631,10 +734,31 @@ ownership_analyze :: proc(decl: TSNode, lines: []string) -> ProcOwnership {
             if _text(id, lines) != site.var_name { continue }
             sb := u32(ts_node_start_byte(id))
             if sb < ends[i] || sb >= limit { continue }
-            d := _classify_use(id, lines)
+            d := _classify_use(id, lines, x)
             if r := _rank(d); r > best { best = r; disp = d }
         }
         site.disposition = disp if best > 0 else "unfreed"
+    }
+
+    // Parameters this procedure frees: it takes ownership of what it is given.
+    if !ts_node_is_null(params) {
+        idx := 0
+        for par in _named(params) {
+            kind := _ntype(par)
+            if kind != "parameter" && kind != "default_parameter" { continue }
+            for k in _named(par) {
+                if _ntype(k) != "identifier" { continue }
+                pname := _text(k, lines)
+                freed := false
+                for id in c.idents {
+                    if _text(id, lines) != pname { continue }
+                    d := _classify_use(id, lines, x)
+                    if d == "freed" || d == "freed_deferred" { freed = true; break }
+                }
+                if freed { append(&out.sinks, idx) }
+                idx += 1
+            }
+        }
     }
     return out
 }

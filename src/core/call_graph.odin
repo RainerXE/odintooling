@@ -145,6 +145,8 @@ graph_clear :: proc(db: ^GraphDB) {
     sq.db_exec(db.conn, "DELETE FROM odin_node_info;")
     sq.db_exec(db.conn, "DELETE FROM odin_alloc_site;")
     sq.db_exec(db.conn, "DELETE FROM odin_proc_ownership;")
+    sq.db_exec(db.conn, "DELETE FROM odin_param_sink;")
+    sq.db_exec(db.conn, "DELETE FROM odin_alloc_param;")
     sq.db_exec(db.conn, "DELETE FROM nodes;")
     sq.db_exec(db.conn, "DELETE FROM files;")
 }
@@ -514,7 +516,37 @@ graph_find_type_in_package :: proc(db: ^GraphDB, name: string, dir: string) -> i
 }
 
 // graph_record_ownership stores a procedure's allocation sites and its free-call count.
-graph_record_ownership :: proc(db: ^GraphDB, proc_node: i64, free_calls: int, sites: []AllocSite) {
+graph_record_ownership :: proc(db: ^GraphDB, proc_node: i64, free_calls: int, sites: []AllocSite, sinks: []int = nil, defaults: []ParamDefault = nil) {
+    for q in ([]string{
+        `DELETE FROM odin_alloc_param WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
+        `DELETE FROM odin_alloc_site WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
+        `DELETE FROM odin_param_sink WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
+    }) {
+        d, d_ok := sq.db_prepare(db.conn, q)
+        if !d_ok { continue }
+        sq.stmt_bind_i64(&d, 1, proc_node)
+        sq.stmt_exec(&d)
+        sq.stmt_finalize(&d)
+    }
+    for d in defaults {
+        k, k_ok := sq.db_prepare(db.conn,
+            `INSERT OR REPLACE INTO odin_alloc_param(proc_id, name, default_kind) SELECT id, ?, ? FROM nodes WHERE rowid=?;`)
+        if !k_ok { continue }
+        sq.stmt_bind_text(&k, 1, d.name)
+        sq.stmt_bind_text(&k, 2, d.kind)
+        sq.stmt_bind_i64(&k, 3, proc_node)
+        sq.stmt_exec(&k)
+        sq.stmt_finalize(&k)
+    }
+    for idx in sinks {
+        k, k_ok := sq.db_prepare(db.conn,
+            `INSERT OR IGNORE INTO odin_param_sink(proc_id, idx) SELECT id, ? FROM nodes WHERE rowid=?;`)
+        if !k_ok { continue }
+        sq.stmt_bind_int(&k, 1, idx)
+        sq.stmt_bind_i64(&k, 2, proc_node)
+        sq.stmt_exec(&k)
+        sq.stmt_finalize(&k)
+    }
     for site in sites {
         s, ok := sq.db_prepare(db.conn,
             `INSERT OR REPLACE INTO odin_alloc_site(
@@ -549,6 +581,9 @@ graph_record_ownership :: proc(db: ^GraphDB, proc_node: i64, free_calls: int, si
 // ownership facts in the edge's JSON metadata. It re-reads every site, so it can run after
 // any export, whichever files changed.
 graph_resolve_alloc_types :: proc(db: ^GraphDB) {
+    // Rebuilt from scratch so an edge never keeps the facts of an earlier analysis. Only edges
+    // carrying ownership metadata are olt's; any other instantiates edge is left alone.
+    sq.db_exec(db.conn, `DELETE FROM edges WHERE kind='instantiates' AND json_extract(metadata,'$.ownership') IS NOT NULL;`)
     Row :: struct { proc_node: i64, file, elem, api, kind, disp: string, line, col: int }
     rows := make([dynamic]Row)
     defer {
@@ -592,7 +627,120 @@ graph_resolve_alloc_types :: proc(db: ^GraphDB) {
     }
 }
 
+// FactoryRow is a procedure that returns memory it allocated (for its caller to free).
+FactoryRow :: struct {
+    kind:         string,   // default | param
+    elem_type:    string,
+    name:         string,
+    default_kind: string,   // for a param factory: what its allocator parameter falls back to
+}
+
+// graph_load_factories returns, by node handle, the procedures with a site whose memory is
+// returned from the default or a parameter allocator. Strings are heap-allocated.
+graph_load_factories :: proc(db: ^GraphDB) -> map[i64]FactoryRow {
+    out := make(map[i64]FactoryRow)
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT n.rowid, n.name, a.allocator_kind, COALESCE(a.elem_type,''), COALESCE(p.default_kind,'default')
+         FROM odin_alloc_site a JOIN nodes n ON n.id = a.proc_id
+         LEFT JOIN odin_alloc_param p ON p.proc_id = a.proc_id AND p.name = a.allocator_expr
+         WHERE a.disposition='returned' AND a.allocator_kind IN ('default','param')
+         ORDER BY n.rowid, CASE a.allocator_kind WHEN 'param' THEN 0 ELSE 1 END, a.line, a.col;`)
+    if !ok { return out }
+    defer sq.stmt_finalize(&s)
+    for sq.stmt_step(&s) {
+        h := sq.stmt_col_i64(&s, 0)
+        name, kind, elem, dk := sq.stmt_col_text(&s, 1), sq.stmt_col_text(&s, 2), sq.stmt_col_text(&s, 3), sq.stmt_col_text(&s, 4)
+        if h in out { delete(name); delete(kind); delete(elem); delete(dk); continue }   // first (best) row wins
+        out[h] = FactoryRow{kind = kind, elem_type = elem, name = name, default_kind = dk}
+    }
+    return out
+}
+
+graph_free_factories :: proc(m: map[i64]FactoryRow) {
+    for _, f in m { delete(f.kind); delete(f.elem_type); delete(f.name); delete(f.default_kind) }
+    delete(m)
+}
+
+// graph_load_sinks returns, by node handle, a bit mask of the parameters each procedure frees.
+graph_load_sinks :: proc(db: ^GraphDB) -> map[i64]u64 {
+    out := make(map[i64]u64)
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT n.rowid, k.idx FROM odin_param_sink k JOIN nodes n ON n.id = k.proc_id;`)
+    if !ok { return out }
+    defer sq.stmt_finalize(&s)
+    for sq.stmt_step(&s) {
+        idx := sq.stmt_col_int(&s, 1)
+        if idx < 0 || idx >= 64 { continue }
+        h := sq.stmt_col_i64(&s, 0)
+        out[h] = out[h] | (u64(1) << u64(idx))
+    }
+    return out
+}
+
+// CallRow is one resolved call edge.
+CallRow :: struct {
+    file:   string,   // project-relative file of the call
+    line:   int,
+    col:    int,
+    callee: i64,
+}
+
+// graph_load_call_rows returns every resolved call, with the file it sits in.
+graph_load_call_rows :: proc(db: ^GraphDB) -> [dynamic]CallRow {
+    out := make([dynamic]CallRow)
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT src.file_path, e.line, e.col, t.rowid
+         FROM edges e JOIN nodes src ON src.id = e.source JOIN nodes t ON t.id = e.target
+         WHERE e.kind='calls' AND e.line IS NOT NULL;`)
+    if !ok { return out }
+    defer sq.stmt_finalize(&s)
+    for sq.stmt_step(&s) {
+        append(&out, CallRow{
+            file   = sq.stmt_col_text(&s, 0),
+            line   = sq.stmt_col_int(&s, 1),
+            col    = sq.stmt_col_int(&s, 2),
+            callee = sq.stmt_col_i64(&s, 3),
+        })
+    }
+    return out
+}
+
+// graph_files_with_call_sites lists the files whose procedures hold sites found through a
+// call (api "name()"): they must be re-read when what those calls resolve to changes.
+graph_files_with_call_sites :: proc(db: ^GraphDB) -> [dynamic]string {
+    out := make([dynamic]string)
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT DISTINCT n.file_path FROM odin_alloc_site a JOIN nodes n ON n.id = a.proc_id WHERE a.api LIKE '%()';`)
+    if !ok { return out }
+    defer sq.stmt_finalize(&s)
+    for sq.stmt_step(&s) { append(&out, sq.stmt_col_text(&s, 0)) }
+    return out
+}
+
+// graph_find_function_at returns the handle of the function whose name sits at (line, col).
+graph_find_function_at :: proc(db: ^GraphDB, file: string, line, col: int) -> i64 {
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT rowid FROM nodes WHERE file_path=? AND kind='function' AND start_line=? AND start_column=? LIMIT 1;`)
+    if !ok { return -1 }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, graph_rel(db, file))
+    sq.stmt_bind_int(&s,  2, line)
+    sq.stmt_bind_int(&s,  3, col)
+    if sq.stmt_step(&s) { return sq.stmt_col_i64(&s, 0) }
+    return -1
+}
+
+// SQL_UNPROVEN_FACTORY_CALL is true for a site found through a call (api "name()") when no other
+// site of the same factory is ever freed. If nobody releases what that factory returns, the
+// project's convention is not to (an arena, a parent that owns its children), so failing to
+// free it is not evidence of a leak; a caller is only suspect when its peers do free.
+SQL_UNPROVEN_FACTORY_CALL :: `(a.api LIKE '%()' AND NOT EXISTS (
+    SELECT 1 FROM odin_alloc_site b
+    WHERE b.api = a.api AND COALESCE(b.elem_type,'') = COALESCE(a.elem_type,'')
+      AND b.disposition IN ('freed','freed_deferred')))`
+
 AllocSiteInfo :: struct {
+    unproven:       bool,     // see SQL_UNPROVEN_FACTORY_CALL
     proc_name:      string,
     file:           string,   // absolute
     line:           int,
@@ -610,7 +758,7 @@ graph_list_alloc_sites :: proc(db: ^GraphDB, proc_name, disposition, allocator_k
     result := make([dynamic]AllocSiteInfo)
     s, ok := sq.db_prepare(db.conn,
         `SELECT p.name, p.file_path, a.line, a.api, COALESCE(a.elem_type,''), a.allocator_kind,
-                COALESCE(a.var_name,''), a.disposition
+                COALESCE(a.var_name,''), a.disposition, ` + SQL_UNPROVEN_FACTORY_CALL + `
          FROM odin_alloc_site a JOIN nodes p ON p.id = a.proc_id
          WHERE (?1 = '' OR p.name = ?1) AND (?2 = '' OR a.disposition = ?2) AND (?3 = '' OR a.allocator_kind = ?3)
          ORDER BY p.file_path, a.line, a.col LIMIT ?4;`)
@@ -631,6 +779,7 @@ graph_list_alloc_sites :: proc(db: ^GraphDB, proc_name, disposition, allocator_k
             allocator_kind = sq.stmt_col_text(&s, 5),
             var_name       = sq.stmt_col_text(&s, 6),
             disposition    = sq.stmt_col_text(&s, 7),
+            unproven       = sq.stmt_col_int(&s, 8) != 0,
         })
         delete(rel)
     }

@@ -728,7 +728,7 @@ make_get_ownership_tool :: proc() -> mcp.Tool {
     return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "get_ownership",
-            description = "Return allocation sites (make/new/new_clone and allocating stdlib calls) with the allocator they use (default|temp|param|custom) and what became of the memory (freed_deferred|freed|returned|stored|passed|unfreed). leak_candidate is true for memory from the default or a parameter allocator that is never freed, returned, stored or passed on. Filter by proc_name, disposition, allocator_kind.",
+            description = "Return allocation sites (make/new/new_clone and allocating stdlib calls) with the allocator they use (default|temp|param|custom) and what became of the memory (freed_deferred|freed|returned|stored|passed|unfreed). leak_candidate is true for memory from the default or a parameter allocator that is never freed, returned, stored or passed on; for the result of a call to a project procedure (api ends in \"()\") only when other callers of that procedure do free it. Filter by proc_name, disposition, allocator_kind.",
             input_schema = `{
                 "type": "object",
                 "properties": {
@@ -767,7 +767,9 @@ _get_ownership_handler :: proc(params: json.Value, allocator: runtime.Allocator)
     strings.write_string(&sb, `{"sites":[`)
     for a, idx in sites {
         if idx > 0 { strings.write_string(&sb, ",") }
-        leak := a.disposition == "unfreed" && (a.allocator_kind == "default" || a.allocator_kind == "param")
+        // memory from the default or a parameter allocator that nothing releases -- and, for the result of a
+        // factory call, only where other callers of that factory do release it
+        leak := a.disposition == "unfreed" && (a.allocator_kind == "default" || a.allocator_kind == "param") && !a.unproven
         fmt.sbprintf(&sb,
             `{{"proc":%s,"file":%s,"line":%d,"api":%s,"type":%s,"allocator":%s,"var":%s,"disposition":%s,"leak_candidate":%v}`,
             _gj(a.proc_name), _gj(a.file), a.line, _gj(a.api), _gj(a.elem_type),
