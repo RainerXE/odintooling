@@ -50,6 +50,7 @@ plans/ruishin_check_c001.md
 
 # ── Developer notes (not for public repo) ────────────────────────────────────
 CLAUDE.md
+AGENTS.md
 SKILL.md
 agents.md
 # plans is a symlink to a folder outside this repository, so the pattern has NO trailing slash
