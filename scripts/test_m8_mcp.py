@@ -249,9 +249,25 @@ def test_schema_version_in_symbols_json(client: MCPClient):
     check("old 'schema' key is gone",  "schema" not in symbols)
 
 
+def test_impact_radius_follows_callers(client: MCPClient):
+    section("get_impact_radius — what a change affects (callers, not callees)")
+    DB_PATH = os.path.join(REPO_ROOT, ".codegraph", "olt.db")
+    for proc_name in ["dedupDiagnostics", "emit_or_collect", "run_query"]:
+        callers = client.tool("get_callers", {"proc_name": proc_name, "db_path": DB_PATH})
+        if not callers.get("callers"):
+            continue
+        impact = client.tool("get_impact_radius", {"proc_name": proc_name, "depth": 1, "db_path": DB_PATH})
+        names = {a["name"] for a in impact.get("affected", [])}
+        wanted = {c["name"] for c in callers["callers"]}
+        check(f"get_impact_radius({proc_name}, depth=1) contains every direct caller",
+              wanted <= names, f"missing {sorted(wanted - names)[:5]}")
+        return
+    check("get_impact_radius: found a known proc with callers", False)
+
+
 def test_get_callers_callees(client: MCPClient):
     section("LSP parity — get_callers / get_callees")
-    DB_PATH = os.path.join(REPO_ROOT, ".codegraph", "odin_lint_graph.db")
+    DB_PATH = os.path.join(REPO_ROOT, ".codegraph", "olt.db")
 
     # Confirm get_symbol works first (simpler lookup, same DB path)
     sym = client.tool("get_symbol", {"symbol": "dedupDiagnostics", "db_path": DB_PATH})
@@ -382,6 +398,7 @@ def main():
         test_list_rules(client)
         test_schema_version_in_symbols_json(client)
         test_get_callers_callees(client)
+        test_impact_radius_follows_callers(client)
         test_run_odin_check(client)
     finally:
         client.close()

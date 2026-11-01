@@ -187,21 +187,20 @@ FIX
 @(private)
 C009_DOCS :: `
 =============================================================================
-C009 — Deprecated import: core:os/old
+C009 — Import of core:os/old (no longer exists)
 Tier: correctness
 =============================================================================
 
 WHAT IT DETECTS
-  Import declarations that reference 'core:os/old', which was removed in
-  the Odin dev-2026-04 release.
+  Import declarations that reference 'core:os/old', the legacy OS package.
 
 WHY IT MATTERS
-  'core:os/old' no longer exists. Code importing it will fail to compile
-  on current Odin builds.
+  'core:os/old' is not part of current Odin (it is absent from the dev-2026-10
+  source tree). Code importing it fails to compile on current builds.
 
 FIRES:
 
-    import "core:os/old"        // C009: deprecated package
+    import "core:os/old"        // C009: package no longer exists
 
 SILENT:
 
@@ -215,18 +214,18 @@ FIX
 @(private)
 C010_DOCS :: `
 =============================================================================
-C010 — Small_Array superseded by [dynamic; N]T
+C010 — Small_Array can be replaced by [dynamic; N]T
 Tier: correctness
 =============================================================================
 
 WHAT IT DETECTS
-  Usage of 'core:container/small_array.Small_Array(N, T)', which is
-  superseded by the built-in fixed-capacity dynamic array syntax '[dynamic; N]T'
-  introduced in Odin dev-2026-04.
+  Usage of 'core:container/small_array.Small_Array(N, T)', which the built-in
+  fixed-capacity dynamic array syntax '[dynamic; N]T' (Odin dev-2026-04) can replace.
 
 WHY IT MATTERS
-  Small_Array is no longer maintained. The built-in '[dynamic; N]T' syntax
-  is first-class, more composable, and avoids an external import.
+  Small_Array still ships (core:container/small_array exists in dev-2026-10), so
+  this is a suggestion, not a breakage. The built-in '[dynamic; N]T' is
+  first-class, composes with the rest of the language, and avoids an import.
 
 FIRES:
 

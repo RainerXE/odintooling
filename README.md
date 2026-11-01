@@ -1,7 +1,12 @@
 # olt — Odin Language Tools
 
-A [Clippy](https://github.com/rust-lang/rust-clippy)-inspired static analyser for the [Odin programming language](https://odin-lang.org).
-Catches memory leaks, double-frees, naming violations, unchecked errors, and more — before the compiler or runtime does.
+**A code graph and static analyser built for [Odin](https://odin-lang.org).**
+olt indexes your project into a SQLite graph, serves it to AI coding agents over MCP, and lints it with
+[Clippy](https://github.com/rust-lang/rust-clippy)-style rules — memory leaks, double-frees, unchecked errors, naming — using
+what only an Odin-aware tool knows: a package is a directory, who allocates and who frees, what `defer` pairs with.
+
+It is an Odin-specific **alternative to [CodeGraph](https://github.com/colbymchenry/codegraph)**, and a compatible one:
+olt's graph database *is* a CodeGraph database (see [olt and CodeGraph](#olt-and-codegraph)).
 
 ```
 $ olt src/
@@ -10,6 +15,30 @@ Fix: Add 'defer delete(buf)' immediately after the allocation
 🔴 src/api/handlers.odin:18:9: C201 [correctness] error return of 'os.open' is discarded
 1 violation(s) in 2 file(s)
 ```
+
+---
+
+## olt and CodeGraph
+
+[CodeGraph](https://github.com/colbymchenry/codegraph) is a general code-intelligence MCP server for many languages. olt does
+the same job for one language, and adds what that language lets a tool know.
+
+| | olt | CodeGraph |
+|---|---|---|
+| Languages | Odin | many |
+| Database | `.codegraph/olt.db` — CodeGraph's own schema (v16, vendored unmodified) plus olt tables | `.codegraph/codegraph.db` |
+| Odin specifics | a bare call resolves only inside its package (a directory); `pkg.fn()` resolves through the file's imports (alias, declared package name, relative path, `src:`-style collections); memory role per procedure (allocator / deallocator / borrower); lint findings attached to the procedure they are in; enum exhaustiveness; FFI resource-safety checks; opt-in dead-code detection | general extraction — Odin support has been proposed upstream ([#3091](https://github.com/colbymchenry/codegraph/pull/3091)) |
+| Also does | linting (22 rules, `--list-rules`), `--fix`, an LSP proxy that merges olt diagnostics into OLS, `rename_symbol`, `run_odin_check` | `explore`/`node`/`context` tools, agent hooks, live file watching |
+| Runtime | one native binary, no Node | Node 22.5+ (the installers bundle it) |
+
+**How close is the graph?** Measured against the Odin index that the CodeGraph proposal above produces, on the same
+checkouts, olt has 95% of its distinct call edges on [odin-http](https://github.com/laytan/odin-http) and 96% on
+[ols](https://github.com/DanielGavin/ols) (cross-package calls included). That compares edges, not agent answers: whether either graph
+makes an agent faster is not something this README claims.
+
+**Which to use.** Odin-only project, or you want linting and ownership-aware answers from the same index: olt. A repository that
+mixes languages, or you want CodeGraph's explore tools and viewer: CodeGraph. Both is fine, because they speak the same schema:
+`olt --codegraph-init .` writes the database where CodeGraph looks for it, for a CodeGraph that does not index Odin itself yet.
 
 ---
 
@@ -71,6 +100,7 @@ Config paths resolve correctly on macOS, Linux, and Windows. If a tool's config 
 ```bash
 olt src/                      # lint a directory (recursive)
 olt file.odin                 # lint a single file
+olt src/ --no-gitignore       # also scan files .gitignore excludes (default: skip them)
 olt src/ --fix                # apply safe auto-fixes in-place
 olt src/ --format json        # machine-readable output (json or sarif)
 olt src/ --rule C001,C201     # run specific rules only
@@ -100,8 +130,8 @@ olt lsp                       # start LSP proxy (editor interface)
 |------|----------------|
 | C001 | Heap allocation (`make`/`new`) without `defer delete`/`defer free` |
 | C002 | Double-free or use-after-free |
-| C009 | Deprecated `core:os/old` import — use `core:os` |
-| C010 | `Small_Array` superseded by `[dynamic; N]T` |
+| C009 | Import of `core:os/old`, which no longer exists in current Odin — use `core:os` |
+| C010 | `Small_Array` can be replaced by the built-in `[dynamic; N]T` |
 | C011 | FFI C resource (`ts_*_new`) without matching `defer ts_*_delete` |
 | C101 | `context.allocator` reassigned without defer restore |
 | C201 | Error return value discarded (unchecked result) |
@@ -255,51 +285,47 @@ Build a semantic graph of your project for deeper analysis:
 olt src/ --export-symbols
 ```
 
-By default this writes to `.codegraph/odin_lint_graph.db` and `.codegraph/symbols.json`. Pass a custom path via `--db=<path>` or the MCP `export_symbols` tool.
+This writes `.codegraph/olt.db` and `.codegraph/symbols.json`; pass another path with `--db=<path>` or the MCP `export_symbols` tool.
+Add `.codegraph/` to your `.gitignore` to keep generated files out of version control.
 
-Add `.codegraph/` to your `.gitignore` to keep generated graph files out of version control:
-```
-.codegraph/
-```
+The database is a [CodeGraph](https://github.com/colbymchenry/codegraph) database. Its core tables come from CodeGraph's schema,
+vendored unmodified in `ffi/codegraph/` (refresh with `scripts/update_codegraph_schema.sh`):
 
-Once exported, this enables:
-- C202 switch exhaustiveness checking
-- All `get_*` / `search_symbols` MCP tools for AI-assisted refactoring
+- **nodes** — `file`, `function`, `struct`, `union`, `enum`, `enum_member`, `constant`, `variable` and `import`, each with its
+  start and end position, signature, return type and visibility; qualified names are `package::name`
+- **edges** — `contains` (file → declaration, enum → member) and `calls`
+- **unresolved_refs** — calls whose target is outside the project (`fmt::println`) or is a value (`a.b.f`)
+- **files**, **nodes_fts** (full-text search), **project_metadata**, **schema_versions**
+
+olt's own data lives beside them in `odin_*` tables, which CodeGraph never touches: `odin_node_info` (memory role and lint
+findings per node), `odin_package` (the package each file declares) and `odin_import` (what each file's qualifiers refer to).
+
+Once exported, this enables C202 switch exhaustiveness checking and the `get_*` / `search_symbols` MCP tools.
 
 ### CodeGraph integration
 
-[CodeGraph](https://github.com/colbymchenry/codegraph) is a code intelligence MCP server that gives AI agents fast symbol search, call graphs, and impact analysis across 19+ languages. olt can write a CodeGraph-compatible database so Odin projects work with it too.
-
-**First-time setup** (run once per project):
-
-```bash
-olt --codegraph-init .        # index current directory
-olt --codegraph-init src/     # or a specific subdirectory
-```
-
-A target directory is required — `olt --codegraph-init` without one will exit with an error. Use `.` to index the current directory. This does a full index and writes `.codegraph/codegraph.db` in the schema CodeGraph expects. It also writes `.codegraph/.gitignore` so the database is not committed. No `codegraph init` needed — olt handles everything.
-
-**Keeping it updated** (run after code changes):
+Because the graph is a CodeGraph database, CodeGraph's tools can read it. If your CodeGraph does not index Odin itself (it skips
+`.odin` files; Odin support is proposed in [colbymchenry/codegraph#3091](https://github.com/colbymchenry/codegraph/pull/3091)),
+let olt write the database it reads:
 
 ```bash
-olt --codegraph-sync .        # sync current directory
-olt --codegraph-sync src/     # or a specific subdirectory
+olt --codegraph-init .        # full index into .codegraph/codegraph.db
+olt --codegraph-sync .        # after code changes: incremental
 ```
 
-A target directory is required here too. Incremental — only re-indexes changed files. Prints a clear error if `--codegraph-init` has not been run yet.
+A target directory is required. This is the ordinary export, written to `.codegraph/codegraph.db` (plus a `.gitignore` there), so
+`codegraph status`, `codegraph callers`, `codegraph query` and the MCP tools work on your Odin code.
 
-Once the database is in place, all CodeGraph MCP tools work on your Odin codebase:
+**One writer per database.** Once your CodeGraph indexes Odin, let it own `codegraph.db` and keep olt's graph in
+`.codegraph/olt.db` (`olt --export-symbols`). A CodeGraph reindex rewrites the nodes, which drops olt's `odin_*` rows; olt adds
+them back on its next run.
 
-| Tool | What it does |
-|------|-------------|
-| `codegraph_search` | Find symbols by name |
-| `codegraph_context` | Get code context relevant to a task |
-| `codegraph_callers` | What calls a function |
-| `codegraph_callees` | What a function calls |
-| `codegraph_impact` | Transitive impact of changing a symbol |
-| `codegraph_node` | Full details + source for a symbol |
+The compatibility is tested, not assumed: `scripts/test_codegraph_contract.sh` builds a graph with olt and drives a real CodeGraph
+over it (status, queries, and the `sync` that used to fail with `duplicate column name`). Run it against the CodeGraph you target:
 
-> **Note**: Do not run `codegraph init` on an Odin project. CodeGraph does not support Odin and will hang trying to pre-load its WASM grammars. `olt --codegraph-init` is the correct entry point.
+```bash
+CODEGRAPH_BIN="codegraph" ./scripts/test_codegraph_contract.sh
+```
 
 ---
 
@@ -369,6 +395,7 @@ Run the full test suite before submitting:
 
 ## License
 
-[MIT](https://en.wikipedia.org/wiki/MIT_License)
+olt is released under the zlib-style licence in [`LICENSE`](LICENSE). Third-party components keep their own
+(permissive) licences; see [`NOTICE.md`](NOTICE.md).
 
 > "The miracle is this: The more we share the more we have." — Leonard Nimoy

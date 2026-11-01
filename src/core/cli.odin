@@ -23,12 +23,14 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 
 OLT_VERSION          :: "0.97.3"
 ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
-ODIN_GRAMMAR_VERSION :: "dev-2026-07"
+ODIN_TESTED_VERSION  :: "dev-2026-10"                // the Odin release the rule suites last passed on (Linux and macOS)
+ODIN_GRAMMAR_VERSION :: "tree-sitter-odin v1.3.0"     // the pinned grammar tag (ffi/tree_sitter/tree-sitter-odin)
 
 LintOptions :: struct {
     targets:          [dynamic]string,
     recursive:        bool,            // default true
     include_vendor:   bool,            // default false
+    no_gitignore:     bool,            // --no-gitignore: scan files git ignores too
     rule_filter:      [dynamic]string, // empty = all rules
     tier_filter:      string,          // "" = all tiers
     c012_enabled:     bool,
@@ -72,6 +74,8 @@ parse_args :: proc(args: []string) -> (LintOptions, bool) {
             opts.recursive = false
         case arg == "--include-vendor":
             opts.include_vendor = true
+        case arg == "--no-gitignore":
+            opts.no_gitignore = true
         case arg == "--enable-c012":
             opts.c012_enabled = true
         case arg == "--fix":
@@ -178,7 +182,7 @@ rule_enabled :: proc(rule_id: string, tier: string, opts: LintOptions) -> bool {
 
 print_version :: proc() {
     fmt.printfln("olt %s", ODIN_LINT_VERSION)
-    fmt.printfln("supports Odin %s (grammar: %s)", ODIN_GRAMMAR_VERSION, ODIN_GRAMMAR_VERSION)
+    fmt.printfln("tested with Odin %s (grammar: %s)", ODIN_TESTED_VERSION, ODIN_GRAMMAR_VERSION)
 }
 
 print_help :: proc() {
@@ -232,6 +236,7 @@ print_help :: proc() {
     fmt.println("  --format text|json|sarif  Output format (default: text)")
     fmt.println("  --non-recursive        Scan directories without recursing into subdirectories")
     fmt.println("  --include-vendor       Include vendor/ directories in scan")
+    fmt.println("  --no-gitignore         Also scan files that .gitignore excludes (default: skip them)")
     fmt.println("  --enable-c012          Enable C012 semantic ownership naming hints")
     fmt.println("  --export-symbols       Build code graph + symbols.json (enables C202, C012-T3, C014, C015)")
     fmt.println("  --codegraph-init       First-time setup: full rebuild + emit .codegraph/codegraph.db")

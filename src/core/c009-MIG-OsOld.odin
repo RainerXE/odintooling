@@ -1,4 +1,4 @@
-// c009-MIG-OsOld.odin — C009: deprecated core:os/old import detection.
+// c009-MIG-OsOld.odin — C009: import of core:os/old, which Odin no longer ships.
 // SCM query flags any import of the old os package and suggests the current
 // core:os equivalent, enabling automated migration with --unsafe-fix.
 package core
@@ -6,10 +6,10 @@ package core
 import "core:fmt"
 
 // =============================================================================
-// C009: Flag import "core:os/old" — deprecated legacy OS API
+// C009: Flag import "core:os/old" — the legacy OS API
 // =============================================================================
-// core:os2 migration completed Q1 2026. The new API is core:os.
-// core:os/old will be removed Q3 2026.
+// core:os2 migration completed Q1 2026; the new API is core:os. core:os/old is not
+// in the Odin source tree as of dev-2026-10, so the import no longer compiles there.
 // Category: CORRECTNESS
 // =============================================================================
 
@@ -24,7 +24,7 @@ c009_rule :: proc() -> Rule {
     }
 }
 
-c009_message  :: proc() -> string { return "Import of deprecated core:os/old" }
+c009_message  :: proc() -> string { return "Import of core:os/old, which no longer exists in current Odin" }
 c009_fix_hint :: proc() -> string { return "Replace 'core:os/old' with 'core:os' (the new API requires explicit allocator parameters)" }
 
 c009_scm_run :: proc(
@@ -52,7 +52,7 @@ c009_scm_run :: proc(
             column    = int(pt.column) + 1,
             rule_id   = "C009",
             tier      = "correctness",
-            message   = fmt.aprintf("Import of deprecated 'core:os/old' — will be removed Q3 2026"),
+            message   = fmt.aprintf("Import of 'core:os/old', which no longer exists in current Odin (not present in dev-2026-10)"),
             has_fix   = true,
             fix       = "Replace with 'core:os' (new unified OS API since Q1 2026)",
             diag_type = .VIOLATION,

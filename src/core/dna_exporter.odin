@@ -11,7 +11,7 @@ import "core:time"
 import sq "../../vendor/odin-sqlite3"
 
 // Default output location relative to the project root.
-GRAPH_DB_PATH     :: ".codegraph/odin_lint_graph.db"
+GRAPH_DB_PATH     :: ".codegraph/olt.db"
 SYMBOLS_JSON_PATH :: ".codegraph/symbols.json"
 
 // ExportResult summarises what the exporter produced.
@@ -36,6 +36,7 @@ export_symbols :: proc(
     ts_parser: ^TreeSitterASTParser,
     db_path:   string = GRAPH_DB_PATH,
     cfg:       OdinLintConfig = {},
+    respect_gitignore: bool = true,
 ) -> ExportResult {
     symbols_path := _symbols_path_for(db_path)
     result := ExportResult{db_path = db_path, symbols_path = symbols_path}
@@ -52,7 +53,7 @@ export_symbols :: proc(
     }
     defer graph_close(db)
 
-    files := collect_odin_files(paths, true, false)
+    files := collect_odin_files(paths, true, false, nil, respect_gitignore)
     defer {
         for f in files { delete(f) }
         delete(files)
@@ -122,11 +123,11 @@ export_symbols :: proc(
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
         if err != nil { continue }
 
-        if h, ok2 := file_hashes[file_path]; ok2 {
-            graph_insert_file(db, file_path, h, now_ts)
-        }
-
         lines := strings.split(string(content), "\n")
+
+        if h, ok2 := file_hashes[file_path]; ok2 {
+            graph_insert_file(db, file_path, h, now_ts, len(content), len(lines))
+        }
 
         tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
         if tree_ok {
@@ -150,6 +151,13 @@ export_symbols :: proc(
         return result
     }
     defer unload_query(&ref_q)
+
+    // Pass 2 re-walks every file, so it re-emits every unresolved reference:
+    // drop the old ones first or each incremental run would duplicate them.
+    sq.db_exec(db.conn, "DELETE FROM unresolved_refs;")
+
+    // Procedure groups link to their members, which may live in any file.
+    graph_resolve_group_members(db)
 
     for file_path in files {
         content, err := os.read_entire_file_from_path(file_path, context.allocator)
@@ -206,9 +214,10 @@ export_symbols :: proc(
     }
 
     // -----------------------------------------------------------------------
-    // Pass 6 — Rebuild FTS5 index for fast symbol search.
+    // Pass 6 — Per-file counts and project metadata. (CodeGraph's triggers
+    // keep the FTS5 index current on every insert.)
     // -----------------------------------------------------------------------
-    graph_rebuild_fts(db)
+    graph_finalize(db, OLT_VERSION)
 
     // -----------------------------------------------------------------------
     // Pass 7 — Write symbols.json.
@@ -236,6 +245,53 @@ _symbols_path_for :: proc(db_path: string) -> string {
 // Pass 1 — Declarations
 // =============================================================================
 
+// _index_proc_group indexes `name :: proc { a, b }`: one function node for the group, and
+// a record of each member name (linked to its procedure by graph_resolve_group_members).
+// The declaration's identifier children are the name first, then the members.
+@(private)
+_index_proc_group :: proc(db: ^GraphDB, file_path: string, group: TSNode, pkg: string, lines: []string) {
+    name_node: TSNode
+    members := make([dynamic]TSNode, context.temp_allocator)
+    for i: u32 = 0; i < ts_node_child_count(group); i += 1 {
+        c := ts_node_child(group, i)
+        if string(ts_node_type(c)) != "identifier" { continue }
+        if ts_node_is_null(name_node) { name_node = c } else { append(&members, c) }
+    }
+    if ts_node_is_null(name_node) { return }
+    name := naming_extract_text(name_node, lines)
+    if name == "" { return }
+
+    pt   := ts_node_start_point(name_node)
+    line := int(pt.row) + 1
+    sig  := strings.builder_make(context.temp_allocator)
+    strings.write_string(&sig, "proc { ")
+    for m, i in members {
+        if i > 0 { strings.write_string(&sig, ", ") }
+        strings.write_string(&sig, naming_extract_text(m, lines))
+    }
+    strings.write_string(&sig, " }")
+
+    node_id := graph_insert_node(db, name, fmt.tprintf("%s::%s", pkg, name), "function", file_path, line,
+        strings.to_string(sig), !proc_node_is_private(name_node, lines),
+        end_line  = _decl_end_line(group, line),
+        start_col = int(pt.column),
+        end_col   = int(ts_node_end_point(name_node).column))
+    if node_id < 0 { return }
+
+    for m in members {
+        member_name := naming_extract_text(m, lines)
+        if member_name == "" { continue }
+        mp := ts_node_start_point(m)
+        graph_add_group_member(db, node_id, member_name, int(mp.row) + 1, int(mp.column))
+    }
+}
+
+@(private)
+_decl_end_line :: proc(decl: TSNode, fallback: int) -> int {
+    if ts_node_is_null(decl) { return fallback }
+    return int(ts_node_end_point(decl).row) + 1
+}
+
 @(private)
 _pass1_index_declarations :: proc(
     db:        ^GraphDB,
@@ -247,29 +303,54 @@ _pass1_index_declarations :: proc(
     matches := run_query(q, root, lines)
     defer free_query_results(matches)
 
+    // An Odin package is a directory; qualified names are "<package>::<name>".
+    pkg := _package_from_path(file_path)   // until the file's `package` line says otherwise
+
     for &m in matches {
+        if pkg_node, has_pkg := m.captures["package_name"]; has_pkg {
+            pkg_name := naming_extract_text(pkg_node, lines)
+            if pkg_name != "" {
+                graph_set_package(db, file_path, pkg_name)
+                pkg = pkg_name   // qualified names use the declared name, not the directory's
+            }
+            continue
+        }
+        if group, has_group := m.captures["group_decl"]; has_group {
+            _index_proc_group(db, file_path, group, pkg, lines)
+            continue
+        }
         if name_node, has_proc := m.captures["proc_name"]; has_proc {
             name := naming_extract_text(name_node, lines)
             if name == "" { continue }
             pt          := ts_node_start_point(name_node)
             line        := int(pt.row) + 1
-            qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
+            qualified   := fmt.tprintf("%s::%s", pkg, name)
             is_exported := !proc_node_is_private(name_node, lines)
             sig         := _extract_proc_signature(name_node, lines)
             rt          := _extract_return_type(sig)
-            node_id     := graph_insert_node(db, name, qualified, "proc", file_path, line, sig, is_exported)
-            if node_id >= 0 && rt != "" {
-                graph_update_return_type(db, node_id, rt)
-            }
+            graph_insert_node(db, name, qualified, "function", file_path, line, sig, is_exported,
+                end_line    = _decl_end_line(m.captures["proc_decl"], line),
+                start_col   = int(pt.column),
+                end_col     = int(ts_node_end_point(name_node).column),
+                return_type = rt)
             continue
         }
-        if name_node, has_struct := m.captures["struct_name"]; has_struct {
-            name := naming_extract_text(name_node, lines)
+        // struct / bit_field -> "struct", union -> "union"
+        type_kind := ""
+        type_node: TSNode
+        if n, has := m.captures["struct_name"]; has { type_kind = "struct"; type_node = n }
+        if n, has := m.captures["bitfield_name"]; has { type_kind = "struct"; type_node = n }
+        if n, has := m.captures["union_name"]; has { type_kind = "union"; type_node = n }
+        if type_kind != "" {
+            name := naming_extract_text(type_node, lines)
             if name == "" { continue }
-            pt        := ts_node_start_point(name_node)
+            pt        := ts_node_start_point(type_node)
             line      := int(pt.row) + 1
-            qualified := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
-            graph_insert_node(db, name, qualified, "type", file_path, line, "", true)
+            qualified := fmt.tprintf("%s::%s", pkg, name)
+            graph_insert_node(db, name, qualified, type_kind, file_path, line, "", true,
+                end_line  = _decl_end_line(m.captures["type_decl"], line),
+                start_col = int(pt.column),
+                end_col   = int(ts_node_end_point(type_node).column))
             continue
         }
         if name_node, has_enum := m.captures["enum_name"]; has_enum {
@@ -288,8 +369,11 @@ _pass1_index_declarations :: proc(
             }
             if !is_type_name { continue } // skip member captures
 
-            qualified := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
-            node_id   := graph_insert_node(db, name, qualified, "type", file_path, line, "", true)
+            qualified := fmt.tprintf("%s::%s", pkg, name)
+            node_id   := graph_insert_node(db, name, qualified, "enum", file_path, line, "", true,
+                end_line  = _decl_end_line(m.captures["type_decl"], line),
+                start_col = int(pt.column),
+                end_col   = int(ts_node_end_point(name_node).column))
             if node_id >= 0 {
                 _extract_enum_members(db, node_id, name_node, lines)
             }
@@ -300,7 +384,22 @@ _pass1_index_declarations :: proc(
             if path_raw == "" { continue }
             pt   := ts_node_start_point(path_node)
             line := int(pt.row) + 1
-            graph_insert_node(db, path_raw, path_raw, "import", file_path, line, "", false)
+            graph_insert_node(db, path_raw, path_raw, "import", file_path, line, "", false,
+                end_line  = _decl_end_line(m.captures["import_decl"], line),
+                start_col = int(pt.column))
+
+            // `import alias "path"`: an identifier directly under the declaration is the alias.
+            alias := ""
+            if decl, has_decl := m.captures["import_decl"]; has_decl {
+                for i: u32 = 0; i < ts_node_child_count(decl); i += 1 {
+                    c := ts_node_child(decl, i)
+                    if string(ts_node_type(c)) == "identifier" {
+                        alias = naming_extract_text(c, lines)
+                        break
+                    }
+                }
+            }
+            graph_add_import(db, file_path, path_raw, alias, line)
             continue
         }
         if name_node, has_const := m.captures["const_name"]; has_const {
@@ -315,9 +414,12 @@ _pass1_index_declarations :: proc(
                 if dc < 0 || int(end.column) > dc { continue }
             }
             line        := int(pt.row) + 1
-            qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
+            qualified   := fmt.tprintf("%s::%s", pkg, name)
             is_exported := !decl_node_is_private(name_node, lines)
-            graph_insert_node(db, name, qualified, "constant", file_path, line, "", is_exported)
+            graph_insert_node(db, name, qualified, "constant", file_path, line, "", is_exported,
+                end_line  = _decl_end_line(m.captures["const_decl"], line),
+                start_col = int(pt.column),
+                end_col   = int(end.column))
             continue
         }
         if name_node, has_var := m.captures["var_name"]; has_var {
@@ -332,9 +434,12 @@ _pass1_index_declarations :: proc(
                 if colon < 0 || int(end.column) > colon { continue }
             }
             line        := int(pt.row) + 1
-            qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
+            qualified   := fmt.tprintf("%s::%s", pkg, name)
             is_exported := !decl_node_is_private(name_node, lines)
-            node_id     := graph_insert_node(db, name, qualified, "variable", file_path, line, "", is_exported)
+            node_id     := graph_insert_node(db, name, qualified, "variable", file_path, line, "", is_exported,
+                end_line  = _decl_end_line(m.captures["var_decl"], line),
+                start_col = int(pt.column),
+                end_col   = int(end.column))
             // Tag explicit allocator-typed package variables (e.g. "scratch: mem.Allocator")
             if node_id >= 0 && int(pt.row) < len(lines) {
                 src_line := lines[pt.row]
@@ -358,9 +463,12 @@ _pass1_index_declarations :: proc(
                 if dc < 0 || int(end.column) > dc { continue }
             }
             line        := int(pt.row) + 1
-            qualified   := fmt.tprintf("%s.%s", _package_from_path(file_path), name)
+            qualified   := fmt.tprintf("%s::%s", pkg, name)
             is_exported := !decl_node_is_private(name_node, lines)
-            graph_insert_node(db, name, qualified, "variable", file_path, line, "", is_exported)
+            graph_insert_node(db, name, qualified, "variable", file_path, line, "", is_exported,
+                end_line  = _decl_end_line(m.captures["pkg_var_decl"], line),
+                start_col = int(pt.column),
+                end_col   = int(end.column))
             continue
         }
     }
@@ -369,6 +477,43 @@ _pass1_index_declarations :: proc(
 // =============================================================================
 // Pass 2 — Call resolution
 // =============================================================================
+
+// CallShape is how a call names its target.
+@(private)
+CallShape :: enum {
+    Bare,       // f(x)            a name in the caller's own package
+    Qualified,  // pkg.f(x)        `pkg` names an import, or else it is a value (a member call)
+    Member,     // a.b.f(x)        a call through some value
+    Selector,   // obj->f(x)       a procedure field called with obj as its receiver
+}
+
+// _classify_call looks at where a call sits. The grammar parses `pkg.f(x)` as a
+// member_expression whose last child is the call, so the callee identifier alone
+// cannot tell `f(x)` from `pkg.f(x)`: only the parent can.
+@(private)
+_classify_call :: proc(callee: TSNode, lines: []string) -> (shape: CallShape, qualifier: string) {
+    call := ts_node_parent(callee)
+    if ts_node_is_null(call) { return .Bare, "" }
+    parent := ts_node_parent(call)
+    if ts_node_is_null(parent) { return .Bare, "" }
+    n := ts_node_child_count(parent)
+    if n < 2 { return .Bare, "" }
+    first := ts_node_child(parent, 0)
+    last  := ts_node_child(parent, n - 1)
+    // The call must be the trailing operand (`a.f()`), not merely a part (`f().a`).
+    if ts_node_start_byte(last) != ts_node_start_byte(call) { return .Bare, "" }
+
+    switch string(ts_node_type(parent)) {
+    case "member_expression":
+        if string(ts_node_type(first)) == "identifier" {
+            return .Qualified, naming_extract_text(first, lines)
+        }
+        return .Member, naming_extract_text(first, lines)
+    case "selector_call_expression":
+        return .Selector, naming_extract_text(first, lines)
+    }
+    return .Bare, ""
+}
 
 @(private)
 _pass2_resolve_calls :: proc(
@@ -381,36 +526,72 @@ _pass2_resolve_calls :: proc(
     matches := run_query(q, root, lines)
     defer free_query_results(matches)
 
+    // A bare name in Odin can only refer to something in the caller's own
+    // package, and a package is a directory.
+    pkg_dir   := graph_dir_of(graph_rel(db, file_path))
+    file_node := graph_file_node(db, file_path)
+
     for &m in matches {
         callee_node, has_callee := m.captures["callee"]
         if !has_callee { continue }
 
         callee_name := naming_extract_text(callee_node, lines)
-        if callee_name == "" || _is_builtin(callee_name) { continue }
+        if callee_name == "" { continue }
+
+        shape, qualifier := _classify_call(callee_node, lines)
+        // Builtins (make, len, ...) are only builtins as bare names.
+        if shape == .Bare && _is_builtin(callee_name) { continue }
 
         call_pt   := ts_node_start_point(callee_node)
         call_line := int(call_pt.row) + 1
+        call_col  := int(call_pt.column)
 
-        callee_id := graph_find_node(db, callee_name)
+        // Innermost procedure that contains the call; a call outside every
+        // procedure (a package-level initialiser) belongs to the file.
         caller_id := _find_enclosing_proc(db, file_path, call_line)
-
-        if callee_id < 0 {
-            graph_insert_unresolved(db, caller_id, callee_name, "calls", file_path, call_line)
-            continue
-        }
+        if caller_id < 0 { caller_id = file_node }
         if caller_id < 0 { continue }
 
-        graph_insert_edge(db, caller_id, callee_id, "calls", call_line)
+        callee_id: i64 = -1
+        unresolved_name := callee_name
+        switch shape {
+        case .Bare:
+            callee_id = graph_find_node_in_package(db, callee_name, pkg_dir)
+        case .Qualified:
+            dir, internal, found := graph_resolve_qualifier(db, file_path, qualifier)
+            if found && internal {
+                callee_id = graph_find_node_in_package(db, callee_name, dir)
+                delete(dir)
+            }
+            // An import we cannot see into (core:fmt) or a package that lacks the
+            // name stays "pkg::name"; a qualifier that is no import is a value.
+            unresolved_name = fmt.tprintf("%s::%s" if found else "%s.%s", qualifier, callee_name)
+        case .Member:
+            unresolved_name = fmt.tprintf("%s.%s", qualifier, callee_name)
+        case .Selector:
+            unresolved_name = fmt.tprintf("%s->%s", qualifier, callee_name)
+        }
+
+        if callee_id < 0 {
+            graph_insert_unresolved(db, caller_id, unresolved_name, "calls", file_path, call_line, call_col)
+            continue
+        }
+        graph_insert_edge(db, caller_id, callee_id, "calls", call_line, call_col)
     }
 }
 
+// _find_enclosing_proc returns the handle of the innermost procedure whose
+// span contains line, or -1. (The span check matters: "the last procedure that
+// started before this line" mis-attributes every call after a nested procedure ends.)
 @(private)
 _find_enclosing_proc :: proc(db: ^GraphDB, file: string, line: int) -> i64 {
     s, ok := sq.db_prepare(db.conn,
-        `SELECT id FROM nodes WHERE file=? AND kind='proc' AND line<=? ORDER BY line DESC LIMIT 1;`)
+        `SELECT rowid FROM nodes
+         WHERE file_path=?1 AND kind='function' AND start_line<=?2 AND end_line>=?2
+         ORDER BY start_line DESC, start_column DESC LIMIT 1;`)
     if !ok { return -1 }
     defer sq.stmt_finalize(&s)
-    sq.stmt_bind_text(&s, 1, file)
+    sq.stmt_bind_text(&s, 1, graph_rel(db, file))
     sq.stmt_bind_int(&s, 2, line)
     if sq.stmt_step(&s) { return sq.stmt_col_i64(&s, 0) }
     return -1
@@ -422,7 +603,7 @@ _find_enclosing_proc :: proc(db: ^GraphDB, file: string, line: int) -> i64 {
 
 @(private)
 _pass3_tag_memory_roles :: proc(db: ^GraphDB) {
-    s, ok := sq.db_prepare(db.conn, `SELECT id, return_type FROM nodes WHERE kind='proc';`)
+    s, ok := sq.db_prepare(db.conn, `SELECT rowid, COALESCE(return_type,'') FROM nodes WHERE kind='function';`)
     if !ok { return }
     defer sq.stmt_finalize(&s)
 
@@ -455,7 +636,7 @@ _infer_role :: proc(db: ^GraphDB, node_id: i64) -> string {
     calls_free  := false
 
     s, ok := sq.db_prepare(db.conn,
-        `SELECT n.name FROM edges e JOIN nodes n ON e.target_id=n.id WHERE e.source_id=? AND e.kind='calls';`)
+        `SELECT n.name FROM edges e JOIN nodes n ON e.target=n.id WHERE e.source=(SELECT id FROM nodes WHERE rowid=?) AND e.kind='calls';`)
     if !ok { return "neutral" }
     defer sq.stmt_finalize(&s)
     sq.stmt_bind_i64(&s, 1, node_id)
@@ -572,12 +753,14 @@ _pass4_attach_violations :: proc(
             node_id := _find_enclosing_proc(db, file_path, d.line)
             if node_id < 0 { continue }
 
-            vs, vok := sq.db_prepare(db.conn, `SELECT lint_violations FROM nodes WHERE id=?;`)
+            vs, vok := sq.db_prepare(db.conn,
+                `SELECT COALESCE(lint_violations,'') FROM odin_node_info
+                 WHERE node_id=(SELECT id FROM nodes WHERE rowid=?);`)
             if !vok { continue }
-            defer sq.stmt_finalize(&vs)
             sq.stmt_bind_i64(&vs, 1, node_id)
             existing := ""
             if sq.stmt_step(&vs) { existing = sq.stmt_col_text(&vs, 0) }
+            sq.stmt_finalize(&vs)
 
             new_json: string
             if existing == "" || existing == "null" {
@@ -605,7 +788,11 @@ _pass5_write_symbols_json :: proc(db: ^GraphDB, out_path: string) {
     strings.write_string(&sb, `{"schema_version":"odin-lint-symbols/1.1","procedures":[`)
 
     s, ok := sq.db_prepare(db.conn,
-        `SELECT id,name,file,line,memory_role,lint_violations,signature,return_type FROM nodes WHERE kind='proc';`)
+        `SELECT n.rowid, n.name, n.file_path, n.start_line,
+                COALESCE(i.memory_role,''), COALESCE(i.lint_violations,''),
+                COALESCE(n.signature,''), COALESCE(n.return_type,'')
+         FROM nodes n LEFT JOIN odin_node_info i ON i.node_id = n.id
+         WHERE n.kind='function' ORDER BY n.file_path, n.start_line;`)
     if !ok { return }
     defer sq.stmt_finalize(&s)
 
@@ -614,7 +801,9 @@ _pass5_write_symbols_json :: proc(db: ^GraphDB, out_path: string) {
 
         id   := sq.stmt_col_i64(&s, 0)
         name := sq.stmt_col_text(&s, 1)
-        file := sq.stmt_col_text(&s, 2)
+        file_rel := sq.stmt_col_text(&s, 2)
+        file     := graph_abs(db, file_rel)
+        delete(file_rel)
         line := sq.stmt_col_int(&s, 3)
         role_raw := sq.stmt_col_text(&s, 4)
         violations_raw := sq.stmt_col_text(&s, 5)
@@ -824,7 +1013,7 @@ _extract_enum_members :: proc(db: ^GraphDB, enum_node_id: i64, name_node: TSNode
             if int(cpt.row) == name_row && int(cpt.column) == name_col { continue }
             member_name := naming_extract_text(child, lines)
             if member_name != "" {
-                graph_insert_enum_member(db, enum_node_id, member_name, member_idx)
+                graph_insert_enum_member(db, enum_node_id, member_name, member_idx, int(cpt.row) + 1)
                 member_idx += 1
             }
         case "binary_expression":
@@ -834,7 +1023,7 @@ _extract_enum_members :: proc(db: ^GraphDB, enum_node_id: i64, name_node: TSNode
                 if !ts_node_is_null(first) && string(ts_node_type(first)) == "identifier" {
                     member_name := naming_extract_text(first, lines)
                     if member_name != "" {
-                        graph_insert_enum_member(db, enum_node_id, member_name, member_idx)
+                        graph_insert_enum_member(db, enum_node_id, member_name, member_idx, int(ts_node_start_point(first).row) + 1)
                         member_idx += 1
                     }
                 }

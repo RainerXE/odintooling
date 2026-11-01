@@ -6,17 +6,30 @@
 ; Note: overloaded_procedure_declaration wraps a proc group (multiple bodies
 ; under one name). Capture the group name as a proc node too.
 
+; The package a file declares
+(package_declaration
+  (identifier) @package_name) @package_decl
+
 ; Procedure declarations
 (procedure_declaration
   (identifier) @proc_name) @proc_decl
 
-; Overloaded proc groups (proc { ... })
-(overloaded_procedure_declaration
-  (identifier) @proc_name) @proc_decl
+; Overloaded proc groups (proc { a, b }). The declaration's identifiers are the group's
+; name followed by its members; Pass 1 reads them off the declaration node, because
+; matching each identifier here would index every member a second time as a procedure.
+(overloaded_procedure_declaration) @group_decl
 
 ; Struct type declarations
 (struct_declaration
   (identifier) @struct_name) @type_decl
+
+; Union type declarations
+(union_declaration
+  (identifier) @union_name) @type_decl
+
+; Bit field type declarations
+(bit_field_declaration
+  (identifier) @bitfield_name) @type_decl
 
 ; Enum type declarations
 (enum_declaration

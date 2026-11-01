@@ -27,21 +27,23 @@ c014_query_dead_procs :: proc(db: ^GraphDB) -> []Diagnostic {
     diags := make([dynamic]Diagnostic)
 
     s, ok := sq.db_prepare(db.conn, `
-        SELECT n.name, n.file, n.line
+        SELECT n.name, n.file_path, n.start_line
         FROM nodes n
-        WHERE n.kind = 'proc'
+        WHERE n.kind = 'function'
           AND n.is_exported = 0
           AND NOT EXISTS (
               SELECT 1 FROM edges e
-              WHERE e.target_id = n.id AND e.kind = 'calls'
+              WHERE e.target = n.id AND e.kind = 'calls'
           )
-        ORDER BY n.file, n.line;`)
+        ORDER BY n.file_path, n.start_line;`)
     if !ok { return diags[:] }
     defer sq.stmt_finalize(&s)
 
     for sq.stmt_step(&s) {
         name := strings.clone(sq.stmt_col_text(&s, 0))
-        file := strings.clone(sq.stmt_col_text(&s, 1))
+        file_rel := sq.stmt_col_text(&s, 1)
+        file     := graph_abs(db, file_rel)
+        delete(file_rel)
         line := sq.stmt_col_int(&s, 2)
 
         append(&diags, Diagnostic{
