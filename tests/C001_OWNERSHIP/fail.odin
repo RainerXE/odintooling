@@ -21,3 +21,23 @@ mixed :: proc() {
 	a := make([]int, 2)
 	_ = a
 }
+
+// `return len(xs)` is not a return of xs
+return_len :: proc() -> int {
+	xs := make([]int, 4)
+	return len(xs)
+}
+
+// a parameter allocator is the caller's, not an arena: freeing is still owed
+param_allocator :: proc(allocator := context.allocator) -> int {
+	buf := make([]int, 4, allocator)
+	buf[0] = 1
+	return 0
+}
+
+// a split declaration that leaks is reported at its first line
+split_leak :: proc() {
+	buf :=
+		make([]int, 4)
+	buf[0] = 1
+}

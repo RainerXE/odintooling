@@ -665,7 +665,7 @@ _pass2b_cross_ownership :: proc(db: ^GraphDB, ts_parser: ^TreeSitterASTParser) {
             if !has { info = CrossInfo{ calls = make(map[[2]int]CrossCall) } }
             cc := CrossCall{ sink_mask = mask }
             if is_fac {
-                cc.name = fac.name; cc.factory = true; cc.factory_kind = fac.kind; cc.elem_type = fac.elem_type; cc.default_kind = fac.default_kind
+                cc.name = fac.name; cc.callee = r.callee; cc.factory = true; cc.factory_kind = fac.kind; cc.elem_type = fac.elem_type; cc.default_kind = fac.default_kind
             }
             info.calls[{r.line, r.col}] = cc
             infos[r.file] = info

@@ -73,23 +73,45 @@ c001_ownership_free :: proc(o: ^C001Ownership) {
     free(o)
 }
 
-// c001_handled_elsewhere says whether the analysis shows the allocation at `line` bound to `var_name`
-// is already taken care of: released, returned, stored somewhere that outlives the call, or drawn from
-// an allocator that is released wholesale (temp, an arena). "Passed to another procedure" is not
-// enough: whether the callee frees it is exactly what C001 cannot tell.
-c001_handled_elsewhere :: proc(o: ^C001Ownership, line: int, var_name: string) -> bool {
-    if o == nil { return false }
-    list, has := o.by_line[line]
-    if !has { return false }
-    pick := -1
-    for v, i in list {
-        if v.var_name == var_name { pick = i; break }
+// c001_verdict_for finds the verdict for the allocation C001 sees at lines start..end bound to var_name.
+// The range matters: `buf := \n    make(...)` starts on one line and its make on another.
+c001_verdict_for :: proc(o: ^C001Ownership, start, end: int, var_name: string) -> (v: C001Verdict, ok: bool) {
+    if o == nil { return }
+    last := min(max(end, start), start + 40)
+    candidates := 0
+    only: C001Verdict
+    for line in start ..= last {
+        list, has := o.by_line[line]
+        if !has { continue }
+        for c in list {
+            if c.var_name == var_name { return c, true }
+            if c.var_name == "" { candidates += 1; only = c }
+        }
     }
-    if pick < 0 && len(list) == 1 && list[0].var_name == "" { pick = 0 }
-    if pick < 0 { return false }
-    v := list[pick]
+    if candidates == 1 { return only, true }
+    return
+}
+
+// c001_handled_elsewhere says whether the analysis shows the allocation is already taken care of:
+// released, returned, stored somewhere that outlives the call, or drawn from an allocator that is
+// released wholesale (temp, an arena). "Passed to another procedure" is not enough: whether the callee
+// frees it is exactly what C001 cannot tell.
+c001_handled_elsewhere :: proc(o: ^C001Ownership, start, end: int, var_name: string) -> bool {
+    v, ok := c001_verdict_for(o, start, end, var_name)
+    if !ok { return false }
     switch v.disposition {
     case "freed_deferred", "freed", "returned", "stored": return true
     }
     return v.allocator_kind == "temp" || v.allocator_kind == "custom"
+}
+
+// c001_confirmed_leak says whether the analysis found nothing at all done with the allocation: memory
+// from the default or a parameter allocator that is never freed, returned, stored or passed on. That is
+// stronger than anything C001's own heuristics can establish, so it overrides the two of them that are
+// known to be loose: "the variable appears in a return statement" (`return len(xs)` is not a return of
+// xs) and "an argument mentions allocator" (a parameter allocator is the caller's, not an arena).
+c001_confirmed_leak :: proc(o: ^C001Ownership, start, end: int, var_name: string) -> bool {
+    v, ok := c001_verdict_for(o, start, end, var_name)
+    if !ok { return false }
+    return v.disposition == "unfreed" && (v.allocator_kind == "default" || v.allocator_kind == "param")
 }

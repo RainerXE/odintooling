@@ -12,8 +12,10 @@ widget_a	67	widget_new()	Widget	default	w	unfreed
 widget_b	71	widget_new()	Widget	default	w	unfreed
 scratch_default	77	slab_scratch()	pool.Slab	temp	s	unfreed
 scratch_explicit	82	slab_scratch()	pool.Slab	default	s	unfreed
+lib2_user	8	slab_new()	pool.Slab	default	s	unfreed
 slab_new	7	new	Slab	param	s	returned
 slab_scratch	19	new	Slab	param		returned
+slab_new	7	new	Slab	param		returned
 thing_create	15	new	Thing	param	t	returned
 thing_create	16	strings.clone		param		stored
 roundtrip	22	make	byte	default	buf	freed_deferred
@@ -43,3 +45,9 @@ alias_return	164	make	u8	default	buf	returned
 result_alias	168	make	u16	default	t	returned
 registered	175	new		default		passed
 printed	178	new	int	default		unfreed
+alias_freed	183	new	int	default	p	freed
+alias_returned	188	new	int	default	p	returned
+alias_leak	193	new	int	default	p	unfreed
+literal_returned	200	make	int	default	cache	returned
+addr_returned	206	make	int	default	xs	returned
+index_read	210	make	int	default	xs	unfreed

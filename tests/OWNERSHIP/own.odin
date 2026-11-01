@@ -177,3 +177,36 @@ registered :: proc() {
 printed :: proc() {
 	fmt.println(new(int))
 }
+
+// a local copy is the same memory
+alias_freed :: proc() {
+	p := new(int)
+	q := p
+	free(q)
+}
+alias_returned :: proc() -> ^int {
+	p := new(int)
+	q := p
+	return q
+}
+alias_leak :: proc() {
+	p := new(int)
+	q := p
+	_ = q
+}
+
+// a composite carries the memory to wherever the composite goes
+literal_returned :: proc() -> Registry {
+	cache := make([]int, 4)
+	return Registry{cache = cache}
+}
+
+// &xs[0] points into the allocation; xs[0] only reads it
+addr_returned :: proc() -> ^int {
+	xs := make([]int, 4)
+	return &xs[0]
+}
+index_read :: proc() -> int {
+	xs := make([]int, 4)
+	return xs[0]
+}

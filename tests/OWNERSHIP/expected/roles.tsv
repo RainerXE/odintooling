@@ -13,9 +13,11 @@ widget_a	neutral
 widget_b	neutral
 scratch_default	neutral
 scratch_explicit	neutral
+lib2_user	neutral
 slab_new	allocator
 slab_release	deallocator
 slab_scratch	allocator
+slab_new	allocator
 thing_create	allocator
 roundtrip	borrower
 conditional	allocator
@@ -44,3 +46,9 @@ alias_return	allocator
 result_alias	allocator
 registered	allocator
 printed	allocator
+alias_freed	borrower
+alias_returned	allocator
+alias_leak	allocator
+literal_returned	allocator
+addr_returned	allocator
+index_read	allocator

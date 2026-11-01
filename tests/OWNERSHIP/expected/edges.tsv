@@ -12,8 +12,10 @@ widget_a	Widget	unfreed	default	widget_new()
 widget_b	Widget	unfreed	default	widget_new()
 scratch_default	Slab	unfreed	temp	slab_scratch()
 scratch_explicit	Slab	unfreed	default	slab_scratch()
+lib2_user	Slab	unfreed	default	slab_new()
 slab_new	Slab	returned	param	new
 slab_scratch	Slab	returned	param	new
+slab_new	Slab	returned	param	new
 thing_create	Thing	returned	param	new
 conditional	Thing	returned	default	new
 with_arena	Node	unfreed	custom	new

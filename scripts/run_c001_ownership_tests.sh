@@ -20,8 +20,8 @@ else ok "allocations that are returned, stored, released or arena-backed are not
 
 out="$("$OLT_BINARY" --rule C001 "$T/fail.odin" 2>&1)"
 lines="$(echo "$out" | grep "C001 \[" | sed -E 's/.*odin:([0-9]+):.*/\1/' | sort -n | tr '\n' ' ')"
-if [ "$lines" = "7 13 21 " ]; then ok "allocations that leak are still reported (lines 7, 13, 21)"
-else bad "expected reports at lines 7 13 21, got: $lines"; echo "$out" | sed 's/^/      /'; fi
+if [ "$lines" = "7 13 21 27 33 40 " ]; then ok "allocations that leak are still reported (lines 7, 13, 21, 27, 33, 40)"
+else bad "expected reports at lines 7 13 21 27 33 40, got: $lines"; echo "$out" | sed 's/^/      /'; fi
 
 echo "c001 ownership: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

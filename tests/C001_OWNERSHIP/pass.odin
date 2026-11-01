@@ -82,3 +82,29 @@ as_cstring :: proc() -> cstring {
 	buf := make([]u8, 8)
 	return cstring(raw_data(buf))
 }
+
+// a split declaration is still stored
+multi_stored :: proc(t: ^Thing) {
+	items :=
+		make([dynamic]int, 0, 4)
+	t.items = items
+}
+
+// a local copy that is returned
+alias_returned :: proc() -> ^int {
+	p := new(int)
+	q := p
+	return q
+}
+
+// a composite that is returned
+literal_returned :: proc() -> Registry {
+	cache := make([]int, 4)
+	return Registry{cache = cache}
+}
+
+// the address of an element is the allocation
+addr_returned :: proc() -> ^int {
+	xs := make([]int, 4)
+	return &xs[0]
+}

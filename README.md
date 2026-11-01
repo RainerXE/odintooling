@@ -332,9 +332,11 @@ A caller that does not free a factory's result is only a `leak_candidate` when o
 what `label_init` returns, the project's convention is not to (an arena, a parent that owns its children), and flagging every caller
 would be noise: on `todool` that rule removes 109 such sites, on `ols` 70.
 
-The analysis is otherwise syntactic and per procedure: it follows the *name* an allocation is bound to through the procedure body. It
-does not follow aliases (`q := p`) or values passed into composite literals, and it cannot see an arena installed by a caller. So
-`leak_candidate` is a pointer to read, not a verdict; on `ols` it flags 5 of 2,205 sites.
+The analysis is otherwise syntactic and per procedure: it follows the *name* an allocation is bound to through the procedure body,
+including local copies (`q := p`), composite literals that carry it (`Registry{cache = buf}`) and pointers into it (`&xs[0]`). It
+cannot see an arena installed by a caller (`context.allocator` set further up the call chain), and what a procedure does with a value
+it receives is only known for procedures in the project. So `leak_candidate` is a pointer to read, not a verdict; on `ols` it flags 5
+of 2,205 sites.
 
 `scripts/crosscheck_c001.py <project dir>…` compares the C001 lint rule with the graph on a real project: where C001 flags an
 allocation the graph sees handed on, or the graph sees an unreleased one C001 is silent about, one of the two is wrong. When olt's

@@ -39,8 +39,12 @@ import "core:strings"
 //   9. The whole-procedure ownership analysis (c001_ownership.odin, the one behind the graph) shows
 //      the allocation released, returned (inside a tuple, as a slice, as a named result), stored into
 //      a field, a list or a global, or drawn from an arena or the temp allocator. It only ever
-//      suppresses: where it is unsure (the value is passed to another procedure, or never used) the
-//      rule reports as before.
+//      suppresses here: where it is unsure (the value is passed to another procedure) the rule
+//      reports as before.
+//  The same analysis also CONFIRMS leaks: when it finds nothing at all done with the memory (never
+//  freed, returned, stored or passed on) the rule reports even though one of its own heuristics would
+//  have stayed quiet -- "the variable appears in a return statement" (`return len(xs)`) and "an
+//  argument mentions allocator" (a parameter allocator belongs to the caller; it is no arena).
 //
 // SUPPRESSION — add to the allocation line or the line before:
 //   buf := make([]u8, n)  // olt:ignore C001 caller owns this
@@ -71,6 +75,7 @@ C001ScopeContext :: struct {
 AllocationInfo :: struct {
     var_name: string,
     line:     int,
+    end_line: int,
     col:      int,
 }
 
@@ -205,7 +210,10 @@ check_block :: proc(
 
             // Skip if a non-default allocator is passed to make/new.
             call := find_direct_call_expression(&child)
-            if call != nil && uses_non_default_allocator(call, file_lines) do continue
+            if call != nil && uses_non_default_allocator(call, file_lines) &&
+               !c001_confirmed_leak(ownership, child.start_line, child.end_line, var_name) {
+                continue
+            }
 
             // Skip if a manual cleanup exists anywhere in this block.
             if has_manual_cleanup(var_name, block) do continue
@@ -213,6 +221,7 @@ check_block :: proc(
             append(&ctx.allocations, AllocationInfo{
                 var_name = var_name,
                 line     = child.start_line,
+                end_line = child.end_line,
                 col      = child.start_column,
             })
         }
@@ -263,10 +272,13 @@ check_block :: proc(
         // Suppression: comment on the same line or the line immediately before.
         if is_suppressed("C001", alloc.line, suppressions) do continue
 
-        if alloc.var_name in ctx.returns_var do continue
+        if alloc.var_name in ctx.returns_var &&
+           !c001_confirmed_leak(ownership, alloc.line, alloc.end_line, alloc.var_name) {
+            continue
+        }
         if alloc.var_name in defer_frees     do continue
         // The whole-procedure analysis sees it released, returned, stored or drawn from an arena.
-        if c001_handled_elsewhere(ownership, alloc.line, alloc.var_name) do continue
+        if c001_handled_elsewhere(ownership, alloc.line, alloc.end_line, alloc.var_name) do continue
 
         msg  := "Allocation without matching defer free in same scope"
         fix  := "Add 'defer free()' or 'defer delete()' immediately after this allocation"

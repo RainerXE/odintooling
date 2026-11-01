@@ -37,6 +37,7 @@ AllocSite :: struct {
     var_name:       string,   // the local the result was bound to; "" if none
     disposition:    string,   // freed_deferred | freed | returned | stored | passed | unfreed
     line, col:      int,
+    via:            i64,      // for a site found through a call: the handle of the procedure called (0 otherwise)
 }
 
 ProcOwnership :: struct {
@@ -56,6 +57,7 @@ ParamDefault :: struct {
 // the argument it is given.
 CrossCall :: struct {
     name:         string,
+    callee:       i64,      // the handle of the procedure the call resolves to
     factory:      bool,
     factory_kind: string,   // default | param: whose allocator the factory's result comes from
     elem_type:    string,   // the type the factory allocates, as written in its own package
@@ -499,10 +501,20 @@ _classify_use :: proc(node: TSNode, lines: []string, x: ^CrossInfo, results: map
             return "stored"                                          // a field, an element, a global through a path
         case "member_expression", "index_expression":
             pk := _named(p)
-            if len(pk) > 0 && _same(pk[0], cur) { return "" }   // reading through the value: p.x, p[i]
+            if len(pk) > 0 && _same(pk[0], cur) {
+                // &xs[0] and &p.field point into the same memory; plain p.x and p[i] only read it
+                gp := ts_node_parent(p)
+                if !ts_node_is_null(gp) && _ntype(gp) == "unary_expression" && strings.has_prefix(_text(gp, lines), "&") {
+                    cur = p
+                    continue
+                }
+                return ""
+            }
             if _ntype(p) == "index_expression" { as_key = true }
         case "struct_field":
-            return "passed"   // kept in a composite value: an alias we do not follow
+            sk := _named(p)
+            if len(sk) >= 2 && _same(sk[0], cur) { return "" }   // the field's name, not its value
+            // the value now lives in a composite: follow the composite to wherever it goes
         case "var_declaration":
             vk := _named(p)
             if len(vk) > 1 && _same(vk[len(vk) - 1], cur) { return "passed" }   // buf: T = value
@@ -686,6 +698,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
             col       = int(pt.column),
         }
         if via_call {
+            site.via = cc.callee
             if cc.factory_kind == "param" {
                 site.allocator_kind, site.allocator_expr = _allocator_of(call, lines, param_allocs, locals, ctx_override)
                 if site.allocator_expr == "" {
@@ -754,12 +767,35 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
             if j == i || out.sites[j].var_name != site.var_name { continue }
             if ends[j] > ends[i] && ends[j] < limit { limit = ends[j] }
         }
+        // local copies (`q := p`) are the same memory: follow them
+        names := make(map[string]bool, context.temp_allocator)
+        names[site.var_name] = true
+        absorbed := make(map[u32]bool, context.temp_allocator)   // the right-hand sides of those copies
+        for _ in 0 ..< 3 {
+            changed := false
+            for a in c.assigns {
+                lhs, rhs := _assign_split(_named(a))
+                if len(lhs) != len(rhs) { continue }
+                for r, idx in rhs {
+                    if _ntype(r) != "identifier" || !(_text(r, lines) in names) { continue }
+                    sb := u32(ts_node_start_byte(r))
+                    if sb < ends[i] || sb >= limit || sb in absorbed { continue }
+                    if _ntype(lhs[idx]) != "identifier" { continue }
+                    copy_name := _text(lhs[idx], lines)
+                    if copy_name == "_" || copy_name in results || !(copy_name in declared) { continue }
+                    names[copy_name] = true
+                    absorbed[sb] = true
+                    changed = true
+                }
+            }
+            if !changed { break }
+        }
         best := 0
         disp := ""
         for id in c.idents {
-            if _text(id, lines) != site.var_name { continue }
+            if !(_text(id, lines) in names) { continue }
             sb := u32(ts_node_start_byte(id))
-            if sb < ends[i] || sb >= limit { continue }
+            if sb < ends[i] || sb >= limit || sb in absorbed { continue }
             d := _classify_use(id, lines, x, results)
             if r := _rank(d); r > best { best = r; disp = d }
         }

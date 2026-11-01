@@ -22,7 +22,7 @@ CODEGRAPH_SCHEMA_VERSION :: 16
 // roles, packages, imports). Exports are incremental, so a file whose content has not changed
 // keeps what an older analysis derived from it; when this number moves, an olt-written graph is
 // re-indexed in full instead. Raise it whenever a change alters what the analysis records.
-ODIN_ANALYSIS_VERSION :: 3
+ODIN_ANALYSIS_VERSION :: 4
 
 CODEGRAPH_SCHEMA_VERSION_NOTE :: "Initial schema includes all migrations"
 
@@ -79,6 +79,16 @@ CREATE TABLE IF NOT EXISTS odin_param_sink (
     proc_id TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
     idx     INTEGER NOT NULL,   -- 0-based position among the parameter names
     PRIMARY KEY (proc_id, idx)
+);
+
+-- Which procedure a call-based site (api "name()") called, by identity: two procedures with the same
+-- name in different packages are different factories.
+CREATE TABLE IF NOT EXISTS odin_site_via (
+    proc_id   TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    line      INTEGER NOT NULL,
+    col       INTEGER NOT NULL,
+    callee_id TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    PRIMARY KEY (proc_id, line, col)
 );
 
 -- The allocator parameters of a procedure and what each defaults to: when a caller passes none,

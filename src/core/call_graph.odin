@@ -147,6 +147,7 @@ graph_clear :: proc(db: ^GraphDB) {
     sq.db_exec(db.conn, "DELETE FROM odin_proc_ownership;")
     sq.db_exec(db.conn, "DELETE FROM odin_param_sink;")
     sq.db_exec(db.conn, "DELETE FROM odin_alloc_param;")
+    sq.db_exec(db.conn, "DELETE FROM odin_site_via;")
     sq.db_exec(db.conn, "DELETE FROM nodes;")
     sq.db_exec(db.conn, "DELETE FROM files;")
 }
@@ -519,6 +520,7 @@ graph_find_type_in_package :: proc(db: ^GraphDB, name: string, dir: string) -> i
 graph_record_ownership :: proc(db: ^GraphDB, proc_node: i64, free_calls: int, sites: []AllocSite, sinks: []int = nil, defaults: []ParamDefault = nil) {
     for q in ([]string{
         `DELETE FROM odin_alloc_param WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
+        `DELETE FROM odin_site_via WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
         `DELETE FROM odin_alloc_site WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
         `DELETE FROM odin_param_sink WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
     }) {
@@ -564,6 +566,19 @@ graph_record_ownership :: proc(db: ^GraphDB, proc_node: i64, free_calls: int, si
         sq.stmt_bind_i64(&s,  9, proc_node)
         sq.stmt_exec(&s)
         sq.stmt_finalize(&s)
+        if site.via > 0 {
+            v, v_ok := sq.db_prepare(db.conn,
+                `INSERT OR REPLACE INTO odin_site_via(proc_id, line, col, callee_id)
+                 SELECT p.id, ?, ?, c.id FROM nodes p, nodes c WHERE p.rowid=? AND c.rowid=?;`)
+            if v_ok {
+                sq.stmt_bind_int(&v, 1, site.line)
+                sq.stmt_bind_int(&v, 2, site.col)
+                sq.stmt_bind_i64(&v, 3, proc_node)
+                sq.stmt_bind_i64(&v, 4, site.via)
+                sq.stmt_exec(&v)
+                sq.stmt_finalize(&v)
+            }
+        }
     }
     st, st_ok := sq.db_prepare(db.conn,
         `INSERT OR REPLACE INTO odin_proc_ownership(proc_id, free_calls, alloc_sites)
@@ -735,8 +750,10 @@ graph_find_function_at :: proc(db: ^GraphDB, file: string, line, col: int) -> i6
 // project's convention is not to (an arena, a parent that owns its children), so failing to
 // free it is not evidence of a leak; a caller is only suspect when its peers do free.
 SQL_UNPROVEN_FACTORY_CALL :: `(a.api LIKE '%()' AND NOT EXISTS (
-    SELECT 1 FROM odin_alloc_site b
-    WHERE b.api = a.api AND COALESCE(b.elem_type,'') = COALESCE(a.elem_type,'')
+    SELECT 1 FROM odin_site_via va
+    JOIN odin_site_via vb ON vb.callee_id = va.callee_id
+    JOIN odin_alloc_site b ON b.proc_id = vb.proc_id AND b.line = vb.line AND b.col = vb.col
+    WHERE va.proc_id = a.proc_id AND va.line = a.line AND va.col = a.col
       AND b.disposition IN ('freed','freed_deferred')))`
 
 AllocSiteInfo :: struct {
