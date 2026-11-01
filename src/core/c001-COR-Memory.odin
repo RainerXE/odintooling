@@ -36,6 +36,11 @@ import "core:strings"
 //      init_, or is exactly "init" — these procs allocate module-lifetime
 //      state that is torn down at subsystem shutdown, not per-call.
 //   8. An inline suppression comment is present (see below)
+//   9. The whole-procedure ownership analysis (c001_ownership.odin, the one behind the graph) shows
+//      the allocation released, returned (inside a tuple, as a slice, as a named result), stored into
+//      a field, a list or a global, or drawn from an arena or the temp allocator. It only ever
+//      suppresses: where it is unsure (the value is passed to another procedure, or never used) the
+//      rule reports as before.
 //
 // SUPPRESSION — add to the allocation line or the line before:
 //   buf := make([]u8, n)  // olt:ignore C001 caller owns this
@@ -116,6 +121,7 @@ c001_matcher :: proc(
     node:                 ^ASTNode,
     file_lines:           []string,
     show_ownership_hints: bool = true,
+    ownership:            ^C001Ownership = nil,
 ) -> []Diagnostic {
     if should_exclude_file(file_path) do return {}
 
@@ -136,16 +142,24 @@ c001_matcher :: proc(
         delete(owned_content)
     }
 
+    // The first call for a file (the others are its recursion) asks the ownership analysis about the
+    // whole file once, and hands the answer down.
+    own := ownership
+    if own == nil {
+        own = c001_ownership_for(lines)
+    }
+    defer if ownership == nil { c001_ownership_free(own) }
+
     all_diags: [dynamic]Diagnostic
 
     if node.node_type == "block" {
-        for d in check_block(node, file_path, lines, show_ownership_hints) {
+        for d in check_block(node, file_path, lines, show_ownership_hints, own) {
             append(&all_diags, d)
         }
     }
 
     for &child in node.children {
-        for d in c001_matcher(file_path, &child, lines, show_ownership_hints) {
+        for d in c001_matcher(file_path, &child, lines, show_ownership_hints, own) {
             append(&all_diags, d)
         }
     }
@@ -163,6 +177,7 @@ check_block :: proc(
     file_path:            string,
     file_lines:           []string,
     show_ownership_hints: bool = true,
+    ownership:            ^C001Ownership = nil,
 ) -> []Diagnostic {
     // Tier 2: init-and-hold heuristic.
     // Procs named *_init, init_*, or init allocate module-lifetime state.
@@ -250,6 +265,8 @@ check_block :: proc(
 
         if alloc.var_name in ctx.returns_var do continue
         if alloc.var_name in defer_frees     do continue
+        // The whole-procedure analysis sees it released, returned, stored or drawn from an arena.
+        if c001_handled_elsewhere(ownership, alloc.line, alloc.var_name) do continue
 
         msg  := "Allocation without matching defer free in same scope"
         fix  := "Add 'defer free()' or 'defer delete()' immediately after this allocation"
