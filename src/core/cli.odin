@@ -23,7 +23,8 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 
 OLT_VERSION          :: "0.97.3"
 ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
-ODIN_GRAMMAR_VERSION :: "dev-2026-07"
+ODIN_TESTED_VERSION  :: "dev-2026-10"                // the Odin release the rule suites last passed on (Linux and macOS)
+ODIN_GRAMMAR_VERSION :: "tree-sitter-odin v1.3.0"     // the pinned grammar tag (ffi/tree_sitter/tree-sitter-odin)
 
 LintOptions :: struct {
     targets:          [dynamic]string,
@@ -181,7 +182,7 @@ rule_enabled :: proc(rule_id: string, tier: string, opts: LintOptions) -> bool {
 
 print_version :: proc() {
     fmt.printfln("olt %s", ODIN_LINT_VERSION)
-    fmt.printfln("supports Odin %s (grammar: %s)", ODIN_GRAMMAR_VERSION, ODIN_GRAMMAR_VERSION)
+    fmt.printfln("tested with Odin %s (grammar: %s)", ODIN_TESTED_VERSION, ODIN_GRAMMAR_VERSION)
 }
 
 print_help :: proc() {
