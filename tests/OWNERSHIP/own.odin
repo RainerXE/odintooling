@@ -150,3 +150,30 @@ wrapped :: proc(a: mem.Allocator) {
 	res := cast(^Thing)(mem.alloc(8, 8, a) or_else panic("OOM"))
 	free(res)
 }
+
+// several named results under one type are all results
+named_pair :: proc(n: int) -> (count: int, left, right: []int) {
+	count = n
+	left = make([]int, n)
+	right = make([]int, n)
+	return
+}
+
+// raw_data and conversions pass the memory through: returning them returns it
+alias_return :: proc() -> cstring {
+	buf := make([]u8, 8)
+	return cstring(raw_data(buf))
+}
+result_alias :: proc() -> (ws: rawptr) {
+	t := make([]u16, 2)
+	ws = cast(rawptr)raw_data(t)
+	return
+}
+
+// only the printing procedures of fmt just look at their arguments
+registered :: proc() {
+	fmt.set_user_formatters(new(map[typeid]int))
+}
+printed :: proc() {
+	fmt.println(new(int))
+}

@@ -336,6 +336,11 @@ The analysis is otherwise syntactic and per procedure: it follows the *name* an 
 does not follow aliases (`q := p`) or values passed into composite literals, and it cannot see an arena installed by a caller. So
 `leak_candidate` is a pointer to read, not a verdict; on `ols` it flags 5 of 2,205 sites.
 
+`scripts/crosscheck_c001.py <project dir>…` compares the C001 lint rule with the graph on a real project: where C001 flags an
+allocation the graph sees handed on, or the graph sees an unreleased one C001 is silent about, one of the two is wrong. When olt's
+analysis changes, a graph written by an older olt is re-indexed in full on the next export (its own `olt_analysis_version` marker),
+because an incremental export would otherwise leave unchanged files with the old results.
+
 Once exported, this enables C202 switch exhaustiveness checking and the `get_*` / `search_symbols` MCP tools.
 
 ### CodeGraph integration

@@ -64,5 +64,22 @@ for t in sites edges; do
   fi
 done
 
+# a graph written by an older analysis is re-indexed in full, even though no file changed
+python3 - <<'PY'
+import sqlite3
+c = sqlite3.connect(".codegraph/g.db")
+c.execute("UPDATE project_metadata SET value='1' WHERE key='olt_analysis_version'")
+c.execute("DELETE FROM odin_alloc_site")          # what an older analysis would have left wrong or missing
+c.commit()
+PY
+export_graph
+if diff <(dump sites) "$REPO/tests/OWNERSHIP/expected/sites.tsv" >/dev/null; then
+  ok "a graph from an older analysis is rebuilt on the next export"
+else
+  bad "a graph from an older analysis was not rebuilt (unchanged files kept stale data)"
+fi
+VER="$(python3 -c "import sqlite3;print(sqlite3.connect('.codegraph/g.db').execute(\"select value from project_metadata where key='olt_analysis_version'\").fetchone()[0])")"
+if [ "$VER" != "1" ]; then ok "the rebuilt graph records the current analysis version ($VER)"; else bad "analysis version still 1"; fi
+
 echo "ownership: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -910,13 +910,37 @@ graph_update_violations :: proc(db: ^GraphDB, node_id: i64, violations_json: str
     sq.stmt_exec(&s)
 }
 
+// graph_analysis_stale says whether the graph holds derived data from an older analysis than this
+// olt's, so unchanged files must be indexed again. A database olt never wrote to (a fresh one, or one
+// CodeGraph wrote) is never stale: there is nothing of ours in it to be out of date.
+graph_analysis_stale :: proc(db: ^GraphDB) -> bool {
+    recorded := ""
+    if s, ok := sq.db_prepare(db.conn, `SELECT value FROM project_metadata WHERE key='olt_analysis_version';`); ok {
+        if sq.stmt_step(&s) { recorded = sq.stmt_col_text(&s, 0) }
+        sq.stmt_finalize(&s)
+    }
+    defer delete(recorded)
+    if recorded == fmt.tprintf("%d", ODIN_ANALYSIS_VERSION) { return false }
+    if recorded != "" { return true }
+    // No version recorded: stale only if olt's tables hold something (a graph from before versions existed).
+    for q in ([]string{`SELECT 1 FROM odin_alloc_site LIMIT 1;`, `SELECT 1 FROM odin_node_info LIMIT 1;`}) {
+        s, ok := sq.db_prepare(db.conn, q)
+        if !ok { continue }
+        has := sq.stmt_step(&s)
+        sq.stmt_finalize(&s)
+        if has { return true }
+    }
+    return false
+}
+
 // graph_finalize runs once after an export: per-file node counts and the project
 // metadata CodeGraph shows in `status`.
 graph_finalize :: proc(db: ^GraphDB, indexer_version: string) {
     sq.db_exec(db.conn,
         `UPDATE files SET node_count=(SELECT COUNT(*) FROM nodes WHERE nodes.file_path=files.path);`)
     now := _now_ms()
-    for kv in ([][2]string{{"indexer", "olt"}, {"indexer_version", indexer_version}, {"language", "odin"}}) {
+    analysis := fmt.tprintf("%d", ODIN_ANALYSIS_VERSION)
+    for kv in ([][2]string{{"indexer", "olt"}, {"indexer_version", indexer_version}, {"language", "odin"}, {"olt_analysis_version", analysis}}) {
         s, ok := sq.db_prepare(db.conn,
             `INSERT OR REPLACE INTO project_metadata(key, value, updated_at) VALUES(?,?,?);`)
         if !ok { continue }

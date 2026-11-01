@@ -188,11 +188,25 @@ _stores_arg :: proc(name: string) -> bool {
 // _reads_only names the procedures that look at a value without keeping or releasing it.
 @(private="file")
 _reads_only :: proc(qual, name: string) -> bool {
-    if qual == "fmt" || qual == "log" { return true }
+    // fmt.println and friends look at their arguments; fmt.set_user_formatters keeps one
+    if qual == "fmt" { return strings.contains(name, "print") }
+    if qual == "log" { return true }
     switch name {
     case "len", "cap", "assert", "ensure", "panic", "print", "println", "printf", "printfln",
-         "eprint", "eprintln", "eprintf", "eprintfln", "raw_data", "size_of", "type_of":
+         "eprint", "eprintln", "eprintf", "eprintfln", "size_of", "type_of":
         return true
+    }
+    return false
+}
+
+// _transparent names the conversions that pass a value through as an alias of itself: the result
+// of raw_data(x) or wstring(raw_data(x)) is x's memory under another type, so what happens to the
+// result happens to x.
+@(private="file")
+_transparent :: proc(qual, name: string) -> bool {
+    if qual != "" { return false }
+    switch name {
+    case "raw_data", "cstring", "cstring16", "wstring", "string", "rawptr": return true
     }
     return false
 }
@@ -334,9 +348,19 @@ _named_results :: proc(decl: TSNode, lines: []string, out: ^map[string]bool) {
             if _ntype(p) != "type" { continue }
             for t in _named(p) {
                 if _ntype(t) != "tuple_type" { continue }
+                // `-> (n: int, a, b: []f32)`: the grammar reads `a` as a bare type node followed by the
+                // named_type `b: []f32`, so bare names count once a named_type follows them.
+                pending := make([dynamic]string, context.temp_allocator)
                 for nt in _named(t) {
-                    if _ntype(nt) != "named_type" { continue }
-                    for id in _named(nt) { if _ntype(id) == "identifier" { out[_text(id, lines)] = true; break } }
+                    switch _ntype(nt) {
+                    case "type":
+                        tk := _named(nt)
+                        if len(tk) == 1 && _ntype(tk[0]) == "identifier" { append(&pending, _text(tk[0], lines)) }
+                    case "named_type":
+                        for id in _named(nt) { if _ntype(id) == "identifier" { out[_text(id, lines)] = true; break } }
+                        for n in pending { out[n] = true }
+                        clear(&pending)
+                    }
                 }
             }
         }
@@ -424,7 +448,7 @@ _under_defer :: proc(n: TSNode) -> bool {
 // _classify_use says what a use of a value does with it, by looking at where the use sits.
 // "" means "not an ownership event" (a left-hand side, a field or element read, a length).
 @(private="file")
-_classify_use :: proc(node: TSNode, lines: []string, x: ^CrossInfo) -> string {
+_classify_use :: proc(node: TSNode, lines: []string, x: ^CrossInfo, results: map[string]bool) -> string {
     cur := node
     as_key := false   // the value sits in an index position: m[strings.clone(k)] = v
     for {
@@ -452,6 +476,7 @@ _classify_use :: proc(node: TSNode, lines: []string, x: ^CrossInfo) -> string {
                 if len(kids) > 1 && _same(kids[1], cur) { return "" }   // appending TO the value, not storing it
                 return "stored"
             }
+            if _transparent(qual, name) { cur = p; continue }   // an alias of the same memory: judge what happens to the result
             if name == "panic" { return "passed" }   // the process ends: nothing to leak
             if _reads_only(qual, name) { return "" }
             return "passed"
@@ -468,6 +493,7 @@ _classify_use :: proc(node: TSNode, lines: []string, x: ^CrossInfo) -> string {
             target := lhs[j] if len(lhs) == len(rhs) else lhs[0]
             if _ntype(target) == "identifier" {
                 if _text(target, lines) == "_" { return "" }   // `_ = x` discards the value
+                if _text(target, lines) in results { return "returned" }   // a named result
                 return "passed"                                  // copied into another local: alias, not tracked
             }
             return "stored"                                          // a field, an element, a global through a path
@@ -712,7 +738,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
             }
         }
         if site.var_name == "" && site.disposition == "" {
-            site.disposition = _classify_use(expr, lines, x)
+            site.disposition = _classify_use(expr, lines, x, results)
             if site.disposition == "" { site.disposition = "unfreed" }   // a result that is dropped
         }
         append(&out.sites, site)
@@ -734,7 +760,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
             if _text(id, lines) != site.var_name { continue }
             sb := u32(ts_node_start_byte(id))
             if sb < ends[i] || sb >= limit { continue }
-            d := _classify_use(id, lines, x)
+            d := _classify_use(id, lines, x, results)
             if r := _rank(d); r > best { best = r; disp = d }
         }
         site.disposition = disp if best > 0 else "unfreed"
@@ -752,7 +778,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
                 freed := false
                 for id in c.idents {
                     if _text(id, lines) != pname { continue }
-                    d := _classify_use(id, lines, x)
+                    d := _classify_use(id, lines, x, results)
                     if d == "freed" || d == "freed_deferred" { freed = true; break }
                 }
                 if freed { append(&out.sinks, idx) }

@@ -37,3 +37,9 @@ named_result	129	make	int	default		returned
 into_struct	135	make	byte	default	bytes	passed
 read_only	144	make	int	default	xs	unfreed
 wrapped	150	mem.alloc		param	res	freed
+named_pair	157	make	int	default		returned
+named_pair	158	make	int	default		returned
+alias_return	164	make	u8	default	buf	returned
+result_alias	168	make	u16	default	t	returned
+registered	175	new		default		passed
+printed	178	new	int	default		unfreed

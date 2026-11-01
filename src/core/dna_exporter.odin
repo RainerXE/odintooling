@@ -54,6 +54,11 @@ export_symbols :: proc(
     }
     defer graph_close(db)
 
+    // A graph filled by an older analysis is rebuilt, not trusted: unchanged files would keep its results.
+    if graph_analysis_stale(db) {
+        graph_clear(db)
+    }
+
     files := collect_odin_files(paths, true, false, nil, respect_gitignore)
     defer {
         for f in files { delete(f) }

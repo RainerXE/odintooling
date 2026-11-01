@@ -282,7 +282,7 @@ def test_get_ownership(client: MCPClient):
         leaks = client.tool("get_ownership", {"db_path": db, "disposition": "unfreed"}).get("sites", [])
         flagged = sorted(x["proc"] for x in leaks if x["leak_candidate"])
         check("leak_candidate is set only for default/param memory that is never freed",
-              flagged == ["inner", "leaks", "read_all", "read_only", "slab_leak", "wrapper_leak"], f"flagged: {flagged}")
+              flagged == ["inner", "leaks", "printed", "read_all", "read_only", "slab_leak", "wrapper_leak"], f"flagged: {flagged}")
         widgets = [x for x in leaks if x["proc"] in ("widget_a", "widget_b")]
         check("a factory's result is a leak candidate only where its other callers do free it",
               len(widgets) == 2 and not any(x["leak_candidate"] for x in widgets), f"widgets: {widgets}")

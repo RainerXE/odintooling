@@ -39,3 +39,8 @@ named_result	allocator
 into_struct	allocator
 read_only	allocator
 wrapped	borrower
+named_pair	allocator
+alias_return	allocator
+result_alias	allocator
+registered	allocator
+printed	allocator

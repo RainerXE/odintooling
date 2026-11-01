@@ -208,6 +208,19 @@ check_block :: proc(
             }
         }
 
+        // defer { delete(a); delete(b) }: every free inside a deferred block counts
+        if child.node_type == "defer_statement" {
+            for &d in child.children {
+                if d.node_type != "block" do continue
+                for &stmt in d.children {
+                    if stmt.node_type != "call_expression" do continue
+                    if freed := call_free_target(&stmt); freed != "" {
+                        append(&ctx.defers, DeferInfo{freed_var = freed})
+                    }
+                }
+            }
+        }
+
         if changes_context_allocator(&child, file_lines) do ctx.has_arena = true
 
         if is_return_statement(&child) {
@@ -457,6 +470,28 @@ is_defer_free :: proc(node: ^ASTNode) -> bool {
         }
     }
     return false
+}
+
+// call_free_target returns the variable a free(x) / delete(x) call releases, or "" when the call
+// is anything else.
+call_free_target :: proc(call: ^ASTNode) -> string {
+    found_callee := false
+    for &gc in call.children {
+        if gc.node_type == "argument_list" && found_callee {
+            for &arg in gc.children {
+                if arg.node_type == "identifier" do return arg.text
+            }
+        }
+        if gc.node_type == "identifier" {
+            if !found_callee {
+                if gc.text != "free" && gc.text != "delete" do return ""
+                found_callee = true
+                continue
+            }
+            return gc.text
+        }
+    }
+    return ""
 }
 
 // extract_freed_var_name returns the name of the variable passed to
