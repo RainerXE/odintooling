@@ -52,7 +52,11 @@ plans/ruishin_check_c001.md
 CLAUDE.md
 SKILL.md
 agents.md
-plans/
+# plans is a symlink to a folder outside this repository, so the pattern has NO trailing slash
+# ("plans/" only matches a real directory, not a symlink).
+plans
+# Per-checkout pin of the local ai-memory project; not shared.
+.ai-memory.toml
 
 # ── IDE / editor ──────────────────────────────────────────────────────────────
 .idea/
