@@ -9,4 +9,4 @@
 	url = https://github.com/RainerXE/odin-mcp.git
 [submodule "vendor/odin-sqlite3"]
 	path = vendor/odin-sqlite3
-	url = http://100.106.38.78:3000/Rainer/odin-sqlite.git
+	url = https://github.com/RainerXE/odin-sqlite.git

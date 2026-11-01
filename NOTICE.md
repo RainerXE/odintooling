@@ -13,16 +13,18 @@ binary distribution of olt.**
 - **tree-sitter API headers** — `ffi/tree_sitter/tree-sitter-api.h`, `ffi/tree_sitter/tree_sitter.h`,
   `ffi/tree_sitter/bindings/api.h`, from [tree-sitter](https://github.com/tree-sitter/tree-sitter).
   MIT License, Copyright (c) 2014 Max Brunsfeld.
-- **SQLite binding** — `vendor/odin-sqlite3`, adapted from
-  [saenai255/odin-sqlite3](https://github.com/saenai255/odin-sqlite3). MIT License; the original
-  copyright notice must stay in the files derived from it.
+- **SQLite binding** — the git submodule `vendor/odin-sqlite3`
+  ([RainerXE/odin-sqlite](https://github.com/RainerXE/odin-sqlite), zlib-style licence). Its declarations were
+  originally adapted from [saenai255/odin-sqlite3](https://github.com/saenai255/odin-sqlite3), MIT License,
+  Copyright 2025 Paul Cosma; its own `THIRD_PARTY_NOTICES.md` carries that notice and the SQLite one, and
+  travels with it.
 
 ## Built or linked into the olt binary
 
 - **tree-sitter** (git submodule `ffi/tree_sitter/tree-sitter-lib`) — MIT License, Copyright (c) 2014 Max Brunsfeld.
 - **tree-sitter-odin** (git submodule `ffi/tree_sitter/tree-sitter-odin`, tag `v1.3.0`) — MIT License,
   Copyright (c) 2023 Amaan Qureshi.
-- **SQLite** — in the public domain.
+- **SQLite** (the amalgamation inside `vendor/odin-sqlite3`) — in the public domain.
 - **The Odin standard library** (`core:`, `base:`, `vendor:`), compiled statically into the binary —
   BSD 3-Clause License, Copyright (c) 2016-2026 Ginger Bill. Its licence requires that binary
   distributions reproduce the copyright notice and conditions in the accompanying documentation or
