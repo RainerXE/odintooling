@@ -23,3 +23,7 @@ register	Thing	stored	default	new
 passes	Node	freed	default	new
 cleanup	Thing	freed_deferred	default	thing_create()
 init_global	Thing	stored	default	new
+make_a	Thing	returned	default	new
+make_b	Thing	returned	default	new
+group_leak	Thing	unfreed	default	make_any()
+group_ok	Thing	freed_deferred	default	make_any()

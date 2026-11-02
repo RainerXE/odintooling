@@ -271,7 +271,7 @@ Available MCP tools:
 | `run_odin_check` | Run `odin check` and return compiler diagnostics |
 | `get_symbol` | Look up a symbol in the code graph |
 | `export_symbols` | Build the code knowledge graph |
-| `get_dna_context` | Callers, callees, memory role for a proc |
+| `get_dna_context` | Callers, callees, memory role for a proc, and its ownership: allocations, factory or sink, leak candidates |
 | `get_impact_radius` | Transitive impact of changing a symbol |
 | `get_callers` / `get_callees` | Direct call graph neighbours |
 | `search_symbols` | Full-text symbol search |

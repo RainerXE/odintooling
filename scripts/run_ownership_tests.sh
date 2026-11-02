@@ -81,5 +81,39 @@ fi
 VER="$(python3 -c "import sqlite3;print(sqlite3.connect('.codegraph/g.db').execute(\"select value from project_metadata where key='olt_analysis_version'\").fetchone()[0])")"
 if [ "$VER" != "1" ]; then ok "the rebuilt graph records the current analysis version ($VER)"; else bad "analysis version still 1"; fi
 
+# --- the graph stays consistent when the code changes between exports -----------------------------------
+q() { python3 -c "import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute(sys.argv[2]).fetchone()[0])" "$1" "$2"; }
+P2="$WORK/proj2"; mkdir -p "$P2" && cp -r "$REPO/tests/OWNERSHIP"/. "$P2/" && rm -rf "$P2/expected"
+cd "$P2" || exit 2
+"$OLT_BINARY" --export-symbols --db .codegraph/g.db . >/dev/null 2>&1
+DB=.codegraph/g.db
+[ "$(q $DB "select count(*) from odin_alloc_site where api='slab_new()'")" = 4 ] && ok "before the edit: four callers see slab_new as a factory" || bad "baseline: expected 4 slab_new() sites"
+
+# a factory stops being one: the callers in OTHER, unchanged files must drop their call-based sites
+python3 - <<'PY'
+p="lib/pool.odin"; s=open(p).read()
+s=s.replace("\treturn s\n}", "\tfree(s)\n\treturn nil\n}", 1)
+open(p,"w").write(s)
+p="own.odin"; s=open(p).read()
+s=s.replace("consume :: proc(n: ^Node) { free(n) }", "consume :: proc(n: ^Node) { _ = n }", 1)
+open(p,"w").write(s)
+PY
+"$OLT_BINARY" --export-symbols --db $DB . >/dev/null 2>&1
+n="$(q $DB "select count(*) from odin_alloc_site where api='slab_new()'")"
+[ "$n" = 1 ] && ok "a procedure that stops being a factory takes its callers' call sites with it (left: only lib2's, $n)" || bad "stale call sites after a factory changed: $n slab_new() sites remain (want 1)"
+d="$(q $DB "select a.disposition from odin_alloc_site a join nodes p on p.id=a.proc_id where p.name='hand_over'")"
+[ "$d" = passed ] && ok "a procedure that stops freeing its parameter stops being a sink (hand_over: $d)" || bad "hand_over is '$d', want passed"
+
+# a file is deleted and another has syntax errors: the graph stays whole
+rm -rf lib2 cross2.odin
+printf 'package own\n\nbroken :: proc( {{{ make(\n  x := \n' > broken.odin
+"$OLT_BINARY" --export-symbols --db $DB . >/dev/null 2>&1; rc=$?
+[ "$rc" = 0 ] && ok "a file with syntax errors does not stop the export" || bad "export failed (rc=$rc) with a broken file present"
+[ "$(q $DB "select count(*) from odin_alloc_site where proc_id not in (select id from nodes)")" = 0 ] && \
+[ "$(q $DB "select count(*) from odin_site_via where callee_id not in (select id from nodes) or proc_id not in (select id from nodes)")" = 0 ] \
+  && ok "deleting files leaves no orphaned ownership rows" || bad "orphaned ownership rows after deleting files"
+[ "$(q $DB "select count(*) from odin_alloc_site a join nodes p on p.id=a.proc_id where p.name='lib2_user'")" = 0 ] && ok "a deleted procedure's sites are gone" || bad "lib2_user sites remain after deleting its file"
+[ "$(q $DB "select count(*) from odin_alloc_site")" -gt 40 ] && ok "the rest of the graph is intact" || bad "the graph lost its sites"
+
 echo "ownership: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

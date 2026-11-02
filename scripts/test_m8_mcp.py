@@ -282,7 +282,7 @@ def test_get_ownership(client: MCPClient):
         leaks = client.tool("get_ownership", {"db_path": db, "disposition": "unfreed"}).get("sites", [])
         flagged = sorted(x["proc"] for x in leaks if x["leak_candidate"])
         check("leak_candidate is set only for default/param memory that is never freed",
-              flagged == ["alias_leak", "index_read", "inner", "leaks", "printed", "read_all", "read_only", "slab_leak", "wrapper_leak"], f"flagged: {flagged}")
+              flagged == ["alias_leak", "branch_leak", "group_leak", "index_read", "inner", "leaks", "printed", "read_all", "read_only", "rebound", "shadow_inner_leak", "siblings", "slab_leak", "wrapper_leak"], f"flagged: {flagged}")
         lib2 = [x for x in leaks if x["proc"] == "lib2_user"]
         check("a same-named factory in another package does not lend its callers' evidence",
               len(lib2) == 1 and not lib2[0]["leak_candidate"], f"lib2_user: {lib2}")
@@ -291,6 +291,20 @@ def test_get_ownership(client: MCPClient):
               len(widgets) == 2 and not any(x["leak_candidate"] for x in widgets), f"widgets: {widgets}")
         check("temp and arena memory is never a leak candidate",
               not any(x["leak_candidate"] for x in leaks if x["allocator"] in ("temp", "custom")))
+        def own(name):
+            return client.tool("get_dna_context", {"proc_name": name, "db_path": db}).get("ownership", {})
+        o = own("slab_leak")
+        check("get_dna_context: a procedure with a leaked allocation reports it",
+              o.get("leak_candidates") == 1 and len(o.get("sites", [])) == 1 and o["sites"][0]["leak_candidate"], f"{o}")
+        o = own("wrapper")
+        check("get_dna_context: a wrapper around a factory is a factory",
+              o.get("factory") is True and o.get("factory_allocator") == "default", f"{o}")
+        o = own("consume")
+        check("get_dna_context: a procedure that frees its parameter says so",
+              o.get("frees_params") == [0] and o.get("sites") == [], f"{o}")
+        o = own("scratch")
+        check("get_dna_context: temp-allocator memory is no leak candidate",
+              o.get("leak_candidates") == 0 and [x["allocator"] for x in o.get("sites", [])] == ["temp"], f"{o}")
         one = client.tool("get_ownership", {"db_path": db, "proc_name": "thing_create"}).get("sites", [])
         check("proc_name filter narrows to that procedure",
               {x["proc"] for x in one} == {"thing_create"} and any(x["allocator"] == "param" for x in one),

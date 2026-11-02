@@ -52,3 +52,17 @@ alias_leak	allocator
 literal_returned	allocator
 addr_returned	allocator
 index_read	allocator
+shadow_outer	borrower
+shadow_inner_leak	allocator
+siblings	allocator
+with_closure	borrower
+if_init	borrower
+generic_new	allocator
+make_a	allocator
+make_b	allocator
+make_any	neutral
+group_leak	allocator
+group_ok	borrower
+branch_assign	borrower
+branch_leak	allocator
+rebound	allocator

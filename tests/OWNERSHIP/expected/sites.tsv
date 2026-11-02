@@ -51,3 +51,21 @@ alias_leak	193	new	int	default	p	unfreed
 literal_returned	200	make	int	default	cache	returned
 addr_returned	206	make	int	default	xs	returned
 index_read	210	make	int	default	xs	unfreed
+shadow_outer	216	make	int	default	x	freed
+shadow_outer	218	make	int	default	x	freed_deferred
+shadow_inner_leak	224	make	int	default	x	freed_deferred
+shadow_inner_leak	227	make	int	default	x	unfreed
+siblings	235	make	u8	default	buf	freed_deferred
+siblings	238	make	u8	default	buf	unfreed
+with_closure	246	new	int	default	z	freed
+if_init	254	make	int	default	buf	freed
+generic_new	261	new		default		returned
+make_a	265	new	Thing	default		returned
+make_b	266	new	Thing	default		returned
+group_leak	269	make_any()	Thing	default	t	unfreed
+group_ok	273	make_any()	Thing	default	t	freed_deferred
+branch_assign	281	make	int	default	name	freed
+branch_assign	283	make	int	default	name	freed
+branch_leak	292	make	int	default	name	unfreed
+rebound	300	make	int	default	name	unfreed
+rebound	301	make	int	default	name	freed

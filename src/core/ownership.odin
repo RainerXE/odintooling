@@ -433,6 +433,24 @@ _lift :: proc(n: TSNode, lines: []string) -> TSNode {
     }
 }
 
+// _enclosing_block_end is the end of the block a statement sits in: where a name declared by it stops existing.
+@(private="file")
+_enclosing_block_end :: proc(n: TSNode) -> u32 {
+    cur := ts_node_parent(n)
+    for !ts_node_is_null(cur) {
+        if _ntype(cur) == "block" { return u32(ts_node_end_byte(cur)) }
+        if _ntype(cur) == "procedure_declaration" { break }
+        cur = ts_node_parent(cur)
+    }
+    return ~u32(0)
+}
+
+@(private="file")
+_in_ranges :: proc(at: u32, ranges: [dynamic][2]u32) -> bool {
+    for r in ranges { if at >= r[0] && at < r[1] { return true } }
+    return false
+}
+
 // _under_defer reports whether a node sits inside a defer statement of its procedure.
 @(private="file")
 _under_defer :: proc(n: TSNode) -> bool {
@@ -668,6 +686,10 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
 
     // Pass 1: the allocation sites, with how the result is bound.
     ends := make([dynamic]u32, context.temp_allocator)   // end byte of each site's expression
+    scope_ends   := make([dynamic]u32, context.temp_allocator)   // where the name the site binds stops existing
+    stmt_starts  := make([dynamic]u32, context.temp_allocator)   // start of the declaring statement
+    is_decls     := make([dynamic]bool, context.temp_allocator)  // the name is declared there (`:=`), not assigned
+    block_ends   := make([dynamic]u32, context.temp_allocator)   // end of the block the binding statement sits in
     for call in c.calls {
         qual, name, fn, ok := _call_parts(call, lines)
         if !ok { continue }
@@ -727,6 +749,10 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
 
         // How is the result bound? `x := make(...)` binds a name; anything else is decided at once.
         site.disposition = ""
+        site_scope_end := ~u32(0)
+        site_stmt_start := u32(0)
+        site_is_decl := false
+        site_block_end := ~u32(0)
         par := ts_node_parent(expr)
         if !ts_node_is_null(par) && _ntype(par) == "assignment_statement" {
             lhs, rhs := _assign_split(_named(par))
@@ -742,30 +768,55 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
                     site.disposition = "stored"                   // a global or an outer variable
                 case:
                     site.var_name = _text(target, lines)
+                    site_block_end = _enclosing_block_end(par)
+                    if _is_decl_assign(lhs, rhs, lines) {
+                        site_is_decl = true
+                        site_scope_end = _enclosing_block_end(par)
+                        site_stmt_start = u32(ts_node_start_byte(par))
+                    }
                 }
             }
         } else if !ts_node_is_null(par) && _ntype(par) == "var_declaration" {
             vk := _named(par)
             if len(vk) > 1 && _same(vk[len(vk) - 1], expr) && _ntype(vk[0]) == "identifier" {
                 site.var_name = _text(vk[0], lines)
+                site_block_end = _enclosing_block_end(par)
+                site_is_decl = true
+                site_scope_end = _enclosing_block_end(par)
+                site_stmt_start = u32(ts_node_start_byte(par))
             }
         }
         if site.var_name == "" && site.disposition == "" {
             site.disposition = _classify_use(expr, lines, x, results)
             if site.disposition == "" { site.disposition = "unfreed" }   // a result that is dropped
         }
+        // `new(T)` in a generic procedure names a type parameter, not a type of the project
+        if site.elem_type != "" && site.elem_type in declared { site.elem_type = "" }
         append(&out.sites, site)
         append(&ends, ts_node_end_byte(expr))
+        append(&scope_ends, site_scope_end)
+        append(&stmt_starts, site_stmt_start)
+        append(&is_decls, site_is_decl)
+        append(&block_ends, site_block_end)
     }
 
     // Pass 2: for each bound name, the strongest thing that later happens to it.
     for &site, i in out.sites {
         if site.var_name == "" { continue }
-        // uses of this name stop at the next site that rebinds the same name
-        limit := ~u32(0)
+        // A use belongs to this site if it comes after it, inside the block the name was declared in, before
+        // the name is bound again in that block, and not inside a nested block that declares the name anew.
+        limit := scope_ends[i]
+        excl := make([dynamic][2]u32, context.temp_allocator)
         for j in 0 ..< len(out.sites) {
-            if j == i || out.sites[j].var_name != site.var_name { continue }
-            if ends[j] > ends[i] && ends[j] < limit { limit = ends[j] }
+            if j == i || out.sites[j].var_name != site.var_name || ends[j] <= ends[i] { continue }
+            if is_decls[j] && scope_ends[j] < scope_ends[i] {
+                append(&excl, [2]u32{stmt_starts[j], scope_ends[j]})
+            } else if !is_decls[j] && block_ends[j] != block_ends[i] {
+                // `name = ...` in a sibling or nested block (an if / else, a loop body) does not replace this
+                // one for the code after it: whichever ran, the later uses apply to both
+            } else if ends[j] < limit {
+                limit = ends[j]
+            }
         }
         // local copies (`q := p`) are the same memory: follow them
         names := make(map[string]bool, context.temp_allocator)
@@ -779,7 +830,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
                 for r, idx in rhs {
                     if _ntype(r) != "identifier" || !(_text(r, lines) in names) { continue }
                     sb := u32(ts_node_start_byte(r))
-                    if sb < ends[i] || sb >= limit || sb in absorbed { continue }
+                    if sb < ends[i] || sb >= limit || sb in absorbed || _in_ranges(sb, excl) { continue }
                     if _ntype(lhs[idx]) != "identifier" { continue }
                     copy_name := _text(lhs[idx], lines)
                     if copy_name == "_" || copy_name in results || !(copy_name in declared) { continue }
@@ -795,7 +846,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
         for id in c.idents {
             if !(_text(id, lines) in names) { continue }
             sb := u32(ts_node_start_byte(id))
-            if sb < ends[i] || sb >= limit || sb in absorbed { continue }
+            if sb < ends[i] || sb >= limit || sb in absorbed || _in_ranges(sb, excl) { continue }
             d := _classify_use(id, lines, x, results)
             if r := _rank(d); r > best { best = r; disp = d }
         }

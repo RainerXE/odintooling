@@ -210,3 +210,94 @@ index_read :: proc() -> int {
 	xs := make([]int, 4)
 	return xs[0]
 }
+
+// the same name in a nested block is a different allocation
+shadow_outer :: proc(flag: bool) {
+	x := make([]int, 2)
+	if flag {
+		x := make([]int, 3)
+		defer delete(x)
+	}
+	delete(x)
+}
+shadow_inner_leak :: proc(flag: bool) {
+	x := make([]int, 2)
+	defer delete(x)
+	if flag {
+		x := make([]int, 3)
+		x[0] = 1
+	}
+}
+
+// the same name in sibling branches: each is its own allocation
+siblings :: proc(flag: bool) {
+	if flag {
+		buf := make([]u8, 1)
+		defer delete(buf)
+	} else {
+		buf := make([]u8, 2)
+		buf[0] = 1
+	}
+}
+
+// a closure's allocation belongs to the closure's own scope, not the procedure's
+with_closure :: proc() {
+	f := proc() {
+		z := new(int)
+		free(z)
+	}
+	f()
+}
+
+// an if-initialiser allocation
+if_init :: proc() {
+	if buf := make([]int, 2); len(buf) > 0 {
+		delete(buf)
+	}
+}
+
+// a type parameter is not a type of the project
+generic_new :: proc($T: typeid) -> ^T {
+	return new(T)
+}
+
+// a procedure group of factories is a factory
+make_a :: proc() -> ^Thing { return new(Thing) }
+make_b :: proc(n: int) -> ^Thing { return new(Thing) }
+make_any :: proc{make_a, make_b}
+group_leak :: proc() {
+	t := make_any()
+	_ = t
+}
+group_ok :: proc() {
+	t := make_any(1)
+	defer free(t)
+}
+
+// assigned in both branches, freed once afterwards: both allocations are freed
+branch_assign :: proc(flag: bool) {
+	name: []int
+	if flag {
+		name = make([]int, 1)
+	} else {
+		name = make([]int, 2)
+	}
+	delete(name)
+}
+
+// assigned in a branch only, then dropped: still a leak
+branch_leak :: proc(flag: bool) {
+	name: []int
+	if flag {
+		name = make([]int, 1)
+	}
+	_ = name
+}
+
+// rebound in the same block: the first is replaced before it is freed, the second is freed
+rebound :: proc() {
+	name: []int
+	name = make([]int, 1)
+	name = make([]int, 2)
+	delete(name)
+}

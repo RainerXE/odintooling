@@ -21,7 +21,7 @@ make_get_dna_context_tool :: proc() -> mcp.Tool {
     return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "get_dna_context",
-            description = "Return callers, callees, memory role, return type, lint violations, and allocator-typed variables for a named Odin procedure.",
+            description = "Return callers, callees, memory role, return type, lint violations, allocator-typed variables and ownership (allocation sites with their allocator and what became of the memory, whether the procedure is a factory or frees a parameter, and which allocations are leak candidates) for a named Odin procedure.",
             input_schema = `{
                 "type": "object",
                 "properties": {
@@ -87,8 +87,42 @@ _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocato
         if idx > 0 { strings.write_string(&sb, ",") }
         fmt.sbprintf(&sb, `{{"name":%s,"line":%d}`, _gj(n.name), n.line)
     }
-    strings.write_string(&sb, `]}`)
+    strings.write_string(&sb, `]`)
+    _write_ownership(&sb, db, node.id)
+    strings.write_string(&sb, `}`)
     return mcp.tool_ok(strings.clone(strings.to_string(sb), allocator), allocator)
+}
+
+// _write_ownership appends `,"ownership":{...}`: what the procedure does with memory.
+@(private="file")
+_write_ownership :: proc(sb: ^strings.Builder, db: ^core.GraphDB, node: i64) {
+    own := core.graph_ownership_of(db, node)
+    defer core.graph_free_ownership_info(own)
+
+    leaks := 0
+    for a in own.sites { if _is_leak_candidate(a) { leaks += 1 } }
+
+    fmt.sbprintf(sb, `,"ownership":{{"factory":%v,"factory_allocator":%s,"frees_params":[`, own.is_factory, _gj(own.factory_kind))
+    for idx, i in own.frees_params {
+        if i > 0 { strings.write_string(sb, ",") }
+        fmt.sbprintf(sb, `%d`, idx)
+    }
+    fmt.sbprintf(sb, `],"free_calls":%d,"leak_candidates":%d,"sites":[`, own.free_calls, leaks)
+    for a, i in own.sites {
+        if i > 0 { strings.write_string(sb, ",") }
+        fmt.sbprintf(sb,
+            `{{"line":%d,"api":%s,"type":%s,"allocator":%s,"var":%s,"disposition":%s,"leak_candidate":%v}`,
+            a.line, _gj(a.api), _gj(a.elem_type), _gj(a.allocator_kind), _gj(a.var_name), _gj(a.disposition),
+            _is_leak_candidate(a))
+    }
+    strings.write_string(sb, `]}`)
+}
+
+// _is_leak_candidate: memory from the default or a parameter allocator that nothing frees, returns, stores
+// or passes on; for the result of a call, only where other callers of that procedure do free it.
+@(private="file")
+_is_leak_candidate :: proc(a: core.AllocSiteInfo) -> bool {
+    return a.disposition == "unfreed" && (a.allocator_kind == "default" || a.allocator_kind == "param") && !a.unproven
 }
 
 // =============================================================================
@@ -769,7 +803,7 @@ _get_ownership_handler :: proc(params: json.Value, allocator: runtime.Allocator)
         if idx > 0 { strings.write_string(&sb, ",") }
         // memory from the default or a parameter allocator that nothing releases -- and, for the result of a
         // factory call, only where other callers of that factory do release it
-        leak := a.disposition == "unfreed" && (a.allocator_kind == "default" || a.allocator_kind == "param") && !a.unproven
+        leak := _is_leak_candidate(a)
         fmt.sbprintf(&sb,
             `{{"proc":%s,"file":%s,"line":%d,"api":%s,"type":%s,"allocator":%s,"var":%s,"disposition":%s,"leak_candidate":%v}`,
             _gj(a.proc_name), _gj(a.file), a.line, _gj(a.api), _gj(a.elem_type),

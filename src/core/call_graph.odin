@@ -668,7 +668,49 @@ graph_load_factories :: proc(db: ^GraphDB) -> map[i64]FactoryRow {
         if h in out { delete(name); delete(kind); delete(elem); delete(dk); continue }   // first (best) row wins
         out[h] = FactoryRow{kind = kind, elem_type = elem, name = name, default_kind = dk}
     }
+    // A procedure group is a factory when every procedure it lists is: a call to it could be any of them.
+    groups := graph_group_members(db)
+    defer graph_free_group_members(groups)
+    for g, members in groups {
+        if len(members) == 0 || g in out { continue }
+        first, all := FactoryRow{}, true
+        for m, i in members {
+            row, has := out[m]
+            if !has { all = false; break }
+            if i == 0 { first = row }
+        }
+        if all {
+            out[g] = FactoryRow{
+                kind = strings.clone(first.kind), elem_type = strings.clone(first.elem_type),
+                name = strings.clone(first.name), default_kind = strings.clone(first.default_kind),
+            }
+        }
+    }
     return out
+}
+
+// graph_group_members returns, by handle, the procedures each procedure group lists.
+graph_group_members :: proc(db: ^GraphDB) -> map[i64][dynamic]i64 {
+    out := make(map[i64][dynamic]i64)
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT g.rowid, m.rowid FROM edges e
+         JOIN nodes g ON g.id = e.source JOIN nodes m ON m.id = e.target
+         WHERE e.kind='references' AND g.kind='function' AND m.kind='function'
+           AND EXISTS (SELECT 1 FROM odin_group_member gm WHERE gm.group_id = g.id);`)
+    if !ok { return out }
+    defer sq.stmt_finalize(&s)
+    for sq.stmt_step(&s) {
+        g := sq.stmt_col_i64(&s, 0)
+        list := out[g]
+        append(&list, sq.stmt_col_i64(&s, 1))
+        out[g] = list
+    }
+    return out
+}
+
+graph_free_group_members :: proc(m: map[i64][dynamic]i64) {
+    for _, l in m { delete(l) }
+    delete(m)
 }
 
 graph_free_factories :: proc(m: map[i64]FactoryRow) {
@@ -688,6 +730,15 @@ graph_load_sinks :: proc(db: ^GraphDB) -> map[i64]u64 {
         if idx < 0 || idx >= 64 { continue }
         h := sq.stmt_col_i64(&s, 0)
         out[h] = out[h] | (u64(1) << u64(idx))
+    }
+    // A procedure group frees a parameter only when every procedure it lists does.
+    groups := graph_group_members(db)
+    defer graph_free_group_members(groups)
+    for g, members in groups {
+        if len(members) == 0 || g in out { continue }
+        mask := ~u64(0)
+        for m in members { mask &= out[m] }
+        if mask != 0 { out[g] = mask }
     }
     return out
 }
@@ -801,6 +852,69 @@ graph_list_alloc_sites :: proc(db: ^GraphDB, proc_name, disposition, allocator_k
         delete(rel)
     }
     return result
+}
+
+// ProcOwnershipInfo is everything the graph knows about one procedure's handling of memory.
+ProcOwnershipInfo :: struct {
+    free_calls:   int,                    // calls it makes to a free-like procedure
+    frees_params: [dynamic]int,           // parameters (0-based) it frees: it takes ownership of them
+    sites:        [dynamic]AllocSiteInfo, // allocations inside it, in source order
+    is_factory:   bool,                   // it returns memory it allocated from the default or a parameter allocator
+    factory_kind: string,                 // default | param (static text)
+}
+
+// graph_ownership_of returns the ownership facts of the procedure with handle `node`.
+// Free it with graph_free_ownership_info.
+graph_ownership_of :: proc(db: ^GraphDB, node: i64) -> ProcOwnershipInfo {
+    out := ProcOwnershipInfo{ frees_params = make([dynamic]int), sites = make([dynamic]AllocSiteInfo) }
+
+    if s, ok := sq.db_prepare(db.conn,
+        `SELECT COALESCE(o.free_calls,0) FROM nodes n LEFT JOIN odin_proc_ownership o ON o.proc_id = n.id WHERE n.rowid=?;`); ok {
+        sq.stmt_bind_i64(&s, 1, node)
+        if sq.stmt_step(&s) { out.free_calls = sq.stmt_col_int(&s, 0) }
+        sq.stmt_finalize(&s)
+    }
+    if s, ok := sq.db_prepare(db.conn,
+        `SELECT k.idx FROM odin_param_sink k JOIN nodes n ON n.id = k.proc_id WHERE n.rowid=? ORDER BY k.idx;`); ok {
+        sq.stmt_bind_i64(&s, 1, node)
+        for sq.stmt_step(&s) { append(&out.frees_params, sq.stmt_col_int(&s, 0)) }
+        sq.stmt_finalize(&s)
+    }
+    if s, ok := sq.db_prepare(db.conn,
+        `SELECT p.name, p.file_path, a.line, a.api, COALESCE(a.elem_type,''), a.allocator_kind,
+                COALESCE(a.var_name,''), a.disposition, ` + SQL_UNPROVEN_FACTORY_CALL + `
+         FROM odin_alloc_site a JOIN nodes p ON p.id = a.proc_id
+         WHERE p.rowid=? ORDER BY a.line, a.col;`); ok {
+        sq.stmt_bind_i64(&s, 1, node)
+        for sq.stmt_step(&s) {
+            rel := sq.stmt_col_text(&s, 1)
+            info := AllocSiteInfo{
+                proc_name      = sq.stmt_col_text(&s, 0),
+                file           = graph_abs(db, rel),
+                line           = sq.stmt_col_int(&s, 2),
+                api            = sq.stmt_col_text(&s, 3),
+                elem_type      = sq.stmt_col_text(&s, 4),
+                allocator_kind = sq.stmt_col_text(&s, 5),
+                var_name       = sq.stmt_col_text(&s, 6),
+                disposition    = sq.stmt_col_text(&s, 7),
+                unproven       = sq.stmt_col_int(&s, 8) != 0,
+            }
+            delete(rel)
+            if info.disposition == "returned" && (info.allocator_kind == "default" || info.allocator_kind == "param") {
+                out.is_factory = true
+                if out.factory_kind != "param" { out.factory_kind = "param" if info.allocator_kind == "param" else "default" }
+            }
+            append(&out.sites, info)
+        }
+        sq.stmt_finalize(&s)
+    }
+    return out
+}
+
+graph_free_ownership_info :: proc(o: ProcOwnershipInfo) {
+    for a in o.sites { graph_free_alloc_site(a) }
+    delete(o.sites)
+    delete(o.frees_params)
 }
 
 graph_free_alloc_site :: proc(a: AllocSiteInfo) {
