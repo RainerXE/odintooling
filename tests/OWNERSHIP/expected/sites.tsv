@@ -69,3 +69,7 @@ branch_assign	283	make	int	default	name	freed
 branch_leak	292	make	int	default	name	unfreed
 rebound	300	make	int	default	name	unfreed
 rebound	301	make	int	default	name	freed
+give_to_keeper	318	new	Node	default	n	stored
+give_to_looker	322	new	Node	default	n	unfreed
+give_to_passer	326	new	Node	default	n	passed
+give_to_second	330	new	Node	default	n	freed

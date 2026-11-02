@@ -148,6 +148,7 @@ graph_clear :: proc(db: ^GraphDB) {
     sq.db_exec(db.conn, "DELETE FROM odin_param_sink;")
     sq.db_exec(db.conn, "DELETE FROM odin_alloc_param;")
     sq.db_exec(db.conn, "DELETE FROM odin_site_via;")
+    sq.db_exec(db.conn, "DELETE FROM odin_param_effect;")
     sq.db_exec(db.conn, "DELETE FROM nodes;")
     sq.db_exec(db.conn, "DELETE FROM files;")
 }
@@ -517,10 +518,11 @@ graph_find_type_in_package :: proc(db: ^GraphDB, name: string, dir: string) -> i
 }
 
 // graph_record_ownership stores a procedure's allocation sites and its free-call count.
-graph_record_ownership :: proc(db: ^GraphDB, proc_node: i64, free_calls: int, sites: []AllocSite, sinks: []int = nil, defaults: []ParamDefault = nil) {
+graph_record_ownership :: proc(db: ^GraphDB, proc_node: i64, free_calls: int, sites: []AllocSite, sinks: []int = nil, defaults: []ParamDefault = nil, effects: []ParamEffect = nil) {
     for q in ([]string{
         `DELETE FROM odin_alloc_param WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
         `DELETE FROM odin_site_via WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
+        `DELETE FROM odin_param_effect WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
         `DELETE FROM odin_alloc_site WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
         `DELETE FROM odin_param_sink WHERE proc_id=(SELECT id FROM nodes WHERE rowid=?);`,
     }) {
@@ -536,6 +538,16 @@ graph_record_ownership :: proc(db: ^GraphDB, proc_node: i64, free_calls: int, si
         if !k_ok { continue }
         sq.stmt_bind_text(&k, 1, d.name)
         sq.stmt_bind_text(&k, 2, d.kind)
+        sq.stmt_bind_i64(&k, 3, proc_node)
+        sq.stmt_exec(&k)
+        sq.stmt_finalize(&k)
+    }
+    for e in effects {
+        k, k_ok := sq.db_prepare(db.conn,
+            `INSERT OR REPLACE INTO odin_param_effect(proc_id, idx, effect) SELECT id, ?, ? FROM nodes WHERE rowid=?;`)
+        if !k_ok { continue }
+        sq.stmt_bind_int(&k, 1, e.idx)
+        sq.stmt_bind_text(&k, 2, e.effect)
         sq.stmt_bind_i64(&k, 3, proc_node)
         sq.stmt_exec(&k)
         sq.stmt_finalize(&k)
@@ -743,6 +755,37 @@ graph_load_sinks :: proc(db: ^GraphDB) -> map[i64]u64 {
     return out
 }
 
+// graph_load_param_effects returns, by node handle, bit masks of the parameters each procedure keeps and
+// of those it only reads. A procedure group has an effect on a parameter only when every procedure it
+// lists has the same one.
+graph_load_param_effects :: proc(db: ^GraphDB) -> (keeps, reads: map[i64]u64) {
+    keeps = make(map[i64]u64)
+    reads = make(map[i64]u64)
+    if s, ok := sq.db_prepare(db.conn,
+        `SELECT n.rowid, k.idx, k.effect FROM odin_param_effect k JOIN nodes n ON n.id = k.proc_id;`); ok {
+        for sq.stmt_step(&s) {
+            idx := sq.stmt_col_int(&s, 1)
+            if idx < 0 || idx >= 64 { continue }
+            h := sq.stmt_col_i64(&s, 0)
+            eff := sq.stmt_col_text(&s, 2)
+            bit := u64(1) << u64(idx)
+            if eff == "kept" { keeps[h] = keeps[h] | bit } else { reads[h] = reads[h] | bit }
+            delete(eff)
+        }
+        sq.stmt_finalize(&s)
+    }
+    groups := graph_group_members(db)
+    defer graph_free_group_members(groups)
+    for g, members in groups {
+        if len(members) == 0 || g in keeps || g in reads { continue }
+        k, r := ~u64(0), ~u64(0)
+        for m in members { k &= keeps[m]; r &= reads[m] }
+        if k != 0 { keeps[g] = k }
+        if r != 0 { reads[g] = r }
+    }
+    return
+}
+
 // CallRow is one resolved call edge.
 CallRow :: struct {
     file:   string,   // project-relative file of the call
@@ -858,6 +901,8 @@ graph_list_alloc_sites :: proc(db: ^GraphDB, proc_name, disposition, allocator_k
 ProcOwnershipInfo :: struct {
     free_calls:   int,                    // calls it makes to a free-like procedure
     frees_params: [dynamic]int,           // parameters (0-based) it frees: it takes ownership of them
+    keeps_params: [dynamic]int,           // parameters it stores or returns: the caller no longer owns them
+    reads_params: [dynamic]int,           // parameters it only reads: the caller still owns them
     sites:        [dynamic]AllocSiteInfo, // allocations inside it, in source order
     is_factory:   bool,                   // it returns memory it allocated from the default or a parameter allocator
     factory_kind: string,                 // default | param (static text)
@@ -866,7 +911,10 @@ ProcOwnershipInfo :: struct {
 // graph_ownership_of returns the ownership facts of the procedure with handle `node`.
 // Free it with graph_free_ownership_info.
 graph_ownership_of :: proc(db: ^GraphDB, node: i64) -> ProcOwnershipInfo {
-    out := ProcOwnershipInfo{ frees_params = make([dynamic]int), sites = make([dynamic]AllocSiteInfo) }
+    out := ProcOwnershipInfo{
+        frees_params = make([dynamic]int), keeps_params = make([dynamic]int), reads_params = make([dynamic]int),
+        sites = make([dynamic]AllocSiteInfo),
+    }
 
     if s, ok := sq.db_prepare(db.conn,
         `SELECT COALESCE(o.free_calls,0) FROM nodes n LEFT JOIN odin_proc_ownership o ON o.proc_id = n.id WHERE n.rowid=?;`); ok {
@@ -878,6 +926,16 @@ graph_ownership_of :: proc(db: ^GraphDB, node: i64) -> ProcOwnershipInfo {
         `SELECT k.idx FROM odin_param_sink k JOIN nodes n ON n.id = k.proc_id WHERE n.rowid=? ORDER BY k.idx;`); ok {
         sq.stmt_bind_i64(&s, 1, node)
         for sq.stmt_step(&s) { append(&out.frees_params, sq.stmt_col_int(&s, 0)) }
+        sq.stmt_finalize(&s)
+    }
+    if s, ok := sq.db_prepare(db.conn,
+        `SELECT k.idx, k.effect FROM odin_param_effect k JOIN nodes n ON n.id = k.proc_id WHERE n.rowid=? ORDER BY k.idx;`); ok {
+        sq.stmt_bind_i64(&s, 1, node)
+        for sq.stmt_step(&s) {
+            eff := sq.stmt_col_text(&s, 1)
+            append(&out.keeps_params if eff == "kept" else &out.reads_params, sq.stmt_col_int(&s, 0))
+            delete(eff)
+        }
         sq.stmt_finalize(&s)
     }
     if s, ok := sq.db_prepare(db.conn,
@@ -915,6 +973,8 @@ graph_free_ownership_info :: proc(o: ProcOwnershipInfo) {
     for a in o.sites { graph_free_alloc_site(a) }
     delete(o.sites)
     delete(o.frees_params)
+    delete(o.keeps_params)
+    delete(o.reads_params)
 }
 
 graph_free_alloc_site :: proc(a: AllocSiteInfo) {

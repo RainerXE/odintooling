@@ -22,7 +22,7 @@ CODEGRAPH_SCHEMA_VERSION :: 16
 // roles, packages, imports). Exports are incremental, so a file whose content has not changed
 // keeps what an older analysis derived from it; when this number moves, an olt-written graph is
 // re-indexed in full instead. Raise it whenever a change alters what the analysis records.
-ODIN_ANALYSIS_VERSION :: 6
+ODIN_ANALYSIS_VERSION :: 7
 
 CODEGRAPH_SCHEMA_VERSION_NOTE :: "Initial schema includes all migrations"
 
@@ -78,6 +78,16 @@ CREATE TABLE IF NOT EXISTS odin_proc_ownership (
 CREATE TABLE IF NOT EXISTS odin_param_sink (
     proc_id TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
     idx     INTEGER NOT NULL,   -- 0-based position among the parameter names
+    PRIMARY KEY (proc_id, idx)
+);
+
+-- What a procedure does with the parameters it does not free: it 'kept' one (stored it somewhere that
+-- outlives the call, or returned it, so the caller no longer owns it) or only 'read' it (the caller still
+-- does). A parameter handed on to something unseen has no row: nothing is claimed about it.
+CREATE TABLE IF NOT EXISTS odin_param_effect (
+    proc_id TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    idx     INTEGER NOT NULL,
+    effect  TEXT    NOT NULL,   -- kept | read
     PRIMARY KEY (proc_id, idx)
 );
 

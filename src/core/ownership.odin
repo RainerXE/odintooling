@@ -44,7 +44,14 @@ ProcOwnership :: struct {
     sites:      [dynamic]AllocSite,
     free_calls: int,         // calls to a free-like procedure (delete, free, *_destroy, ...)
     sinks:      [dynamic]int, // parameters (0-based) this procedure frees: it takes ownership of them
+    effects:    [dynamic]ParamEffect, // the parameters it keeps (stores or returns) or only reads
     defaults:   [dynamic]ParamDefault, // its allocator parameters and what each defaults to
+}
+
+// ParamEffect is what a procedure does with one of its parameters, besides freeing it (that is a sink).
+ParamEffect :: struct {
+    idx:    int,
+    effect: string,   // kept: stored or returned, so the caller no longer owns it | read: only looked at, the caller still does
 }
 
 ParamDefault :: struct {
@@ -63,6 +70,8 @@ CrossCall :: struct {
     elem_type:    string,   // the type the factory allocates, as written in its own package
     default_kind: string,   // what the allocator parameter falls back to when the caller passes none
     sink_mask:    u64,      // bit i set: the callee frees its i-th argument
+    keep_mask:    u64,      // bit i set: the callee stores or returns its i-th argument (the caller no longer owns it)
+    read_mask:    u64,      // bit i set: the callee only reads its i-th argument (the caller still owns it)
 }
 
 // CrossInfo maps the position of a call's callee name (line, column) to what it resolves to.
@@ -209,6 +218,15 @@ _transparent :: proc(qual, name: string) -> bool {
     if qual != "" { return false }
     switch name {
     case "raw_data", "cstring", "cstring16", "wstring", "string", "rawptr": return true
+    }
+    return false
+}
+
+// _has_named_args: a call with `name = value` arguments no longer lines up with the parameter list by position.
+@(private="file")
+_has_named_args :: proc(call: TSNode) -> bool {
+    for i in 0 ..< int(ts_node_child_count(call)) {
+        if _ntype(ts_node_child(call, u32(i))) == "=" { return true }
     }
     return false
 }
@@ -484,11 +502,13 @@ _classify_use :: proc(node: TSNode, lines: []string, x: ^CrossInfo, results: map
             if x != nil {
                 // a procedure that frees the argument it is given (found by an earlier round)
                 fp := ts_node_start_point(fn)
-                if info, has := x.calls[{int(fp.row) + 1, int(fp.column)}]; has && info.sink_mask != 0 {
+                if info, has := x.calls[{int(fp.row) + 1, int(fp.column)}]; has && !_has_named_args(p) {
                     for k, idx in kids {
-                        if idx > 0 && _same(k, cur) && idx - 1 < 64 && info.sink_mask & (u64(1) << u64(idx - 1)) != 0 {
-                            return "freed_deferred" if _under_defer(p) else "freed"
-                        }
+                        if idx == 0 || !_same(k, cur) || idx - 1 >= 64 { continue }
+                        bit := u64(1) << u64(idx - 1)
+                        if info.sink_mask & bit != 0 { return "freed_deferred" if _under_defer(p) else "freed" }
+                        if info.keep_mask & bit != 0 { return "stored" }   // the callee keeps it: no longer the caller's
+                        if info.read_mask & bit != 0 { return "" }         // the callee only looks: still the caller's
                     }
                 }
             }
@@ -624,6 +644,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
     out := ProcOwnership{
         sites = make([dynamic]AllocSite, context.temp_allocator),
         sinks = make([dynamic]int, context.temp_allocator),
+        effects = make([dynamic]ParamEffect, context.temp_allocator),
         defaults = make([dynamic]ParamDefault, context.temp_allocator),
     }
     body, params := _proc_parts(decl)
@@ -862,13 +883,21 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
             for k in _named(par) {
                 if _ntype(k) != "identifier" { continue }
                 pname := _text(k, lines)
-                freed := false
+                freed, kept, unknown := false, false, false
                 for id in c.idents {
                     if _text(id, lines) != pname { continue }
-                    d := _classify_use(id, lines, x, results)
-                    if d == "freed" || d == "freed_deferred" { freed = true; break }
+                    switch _classify_use(id, lines, x, results) {
+                    case "freed", "freed_deferred": freed = true
+                    case "returned", "stored":      kept = true
+                    case "passed":                  unknown = true
+                    }
                 }
-                if freed { append(&out.sinks, idx) }
+                switch {
+                case freed:   append(&out.sinks, idx)
+                case unknown: // handed on to something we cannot see into: no claim
+                case kept:    append(&out.effects, ParamEffect{ idx = idx, effect = "kept" })
+                case:         append(&out.effects, ParamEffect{ idx = idx, effect = "read" })
+                }
                 idx += 1
             }
         }

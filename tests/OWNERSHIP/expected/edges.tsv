@@ -27,3 +27,7 @@ make_a	Thing	returned	default	new
 make_b	Thing	returned	default	new
 group_leak	Thing	unfreed	default	make_any()
 group_ok	Thing	freed_deferred	default	make_any()
+give_to_keeper	Node	stored	default	new
+give_to_looker	Node	unfreed	default	new
+give_to_passer	Node	passed	default	new
+give_to_second	Node	freed	default	new

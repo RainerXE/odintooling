@@ -348,7 +348,7 @@ _pass1_index_declarations :: proc(
                 return_type = rt)
             if decl, has_decl := m.captures["proc_decl"]; has_decl && proc_id >= 0 {
                 own := ownership_analyze(decl, lines)
-                graph_record_ownership(db, proc_id, own.free_calls, own.sites[:], own.sinks[:], own.defaults[:])
+                graph_record_ownership(db, proc_id, own.free_calls, own.sites[:], own.sinks[:], own.defaults[:], own.effects[:])
             }
             continue
         }
@@ -621,10 +621,12 @@ _find_enclosing_proc :: proc(db: ^GraphDB, file: string, line: int) -> i64 {
 // _cross_signature summarises which procedures are factories or sinks, to see when a round
 // of re-analysis has found nothing new.
 @(private)
-_cross_signature :: proc(f: map[i64]FactoryRow, s: map[i64]u64) -> u64 {
-    sig := u64(len(f)) * 1_000_003 + u64(len(s))
+_cross_signature :: proc(f: map[i64]FactoryRow, s, keeps, reads: map[i64]u64) -> u64 {
+    sig := u64(len(f)) * 1_000_003 + u64(len(s)) + u64(len(keeps)) * 7_919 + u64(len(reads)) * 104_729
     for h, _ in f { sig += u64(h) * 31 }
     for h, mask in s { sig += u64(h) * 17 + mask * 7 }
+    for h, mask in keeps { sig += u64(h) * 13 + mask * 5 }
+    for h, mask in reads { sig += u64(h) * 11 + mask * 3 }
     return sig
 }
 
@@ -648,9 +650,10 @@ _pass2b_cross_ownership :: proc(db: ^GraphDB, ts_parser: ^TreeSitterASTParser) {
     for round in 0 ..< 6 {
         factories := graph_load_factories(db)
         sinks     := graph_load_sinks(db)
-        sig       := _cross_signature(factories, sinks)
+        keeps, reads := graph_load_param_effects(db)
+        sig       := _cross_signature(factories, sinks, keeps, reads)
         if round > 0 && sig == prev {
-            graph_free_factories(factories); delete(sinks)
+            graph_free_factories(factories); delete(sinks); delete(keeps); delete(reads)
             return
         }
         prev = sig
@@ -660,10 +663,11 @@ _pass2b_cross_ownership :: proc(db: ^GraphDB, ts_parser: ^TreeSitterASTParser) {
         for r in rows {
             fac, is_fac := factories[r.callee]
             mask := sinks[r.callee]
-            if !is_fac && mask == 0 { continue }
+            keep, read := keeps[r.callee], reads[r.callee]
+            if !is_fac && mask == 0 && keep == 0 && read == 0 { continue }
             info, has := infos[r.file]
             if !has { info = CrossInfo{ calls = make(map[[2]int]CrossCall) } }
-            cc := CrossCall{ sink_mask = mask }
+            cc := CrossCall{ sink_mask = mask, keep_mask = keep, read_mask = read }
             if is_fac {
                 cc.name = fac.name; cc.callee = r.callee; cc.factory = true; cc.factory_kind = fac.kind; cc.elem_type = fac.elem_type; cc.default_kind = fac.default_kind
             }
@@ -684,7 +688,7 @@ _pass2b_cross_ownership :: proc(db: ^GraphDB, ts_parser: ^TreeSitterASTParser) {
         delete(stale)
         for f, info in infos { delete(info.calls); _ = f }
         delete(infos)
-        graph_free_factories(factories); delete(sinks)
+        graph_free_factories(factories); delete(sinks); delete(keeps); delete(reads)
     }
 }
 
@@ -722,7 +726,7 @@ _reanalyze_file :: proc(db: ^GraphDB, ts_parser: ^TreeSitterASTParser, rel_file:
         id := graph_find_function_at(db, abs, int(name_pt.row) + 1, int(name_pt.column))
         if id < 0 { continue }
         own := ownership_analyze(decl, lines, info)
-        graph_record_ownership(db, id, own.free_calls, own.sites[:], own.sinks[:], own.defaults[:])
+        graph_record_ownership(db, id, own.free_calls, own.sites[:], own.sinks[:], own.defaults[:], own.effects[:])
     }
 }
 

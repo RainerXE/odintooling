@@ -325,8 +325,11 @@ Ownership is followed across procedure boundaries in two ways:
   wrapper that returns a factory's result. A call to one is an allocation site of its caller (`api` is `name()`), with the
   allocator the caller chose, or the factory's own default when it passed none: `read_slice(f, n)` with `allocator :=
   context.temp_allocator` owes nothing.
-- **Sinks.** A procedure that frees one of its parameters takes ownership of it; passing an allocation to it counts as freeing it, and
-  so does passing it on to a procedure that does.
+- **Parameters.** What a procedure does with each parameter decides what passing it there means. If it frees it (a sink), the caller's
+  allocation is freed; if it stores or returns it, the caller no longer owns it; if it only reads it, the caller still does, so an
+  allocation passed there and never freed is a leak. A parameter handed on to something the graph cannot see into (another
+  package, a closure, an FFI call) is left as "passed": nothing is claimed. On the 20 public projects I tried, most remaining
+  "passed" cases are of that kind.
 
 A caller that does not free a factory's result is only a `leak_candidate` when other callers of that factory do. If nobody ever frees
 what `label_init` returns, the project's convention is not to (an arena, a parent that owns its children), and flagging every caller

@@ -102,7 +102,9 @@ PY
 n="$(q $DB "select count(*) from odin_alloc_site where api='slab_new()'")"
 [ "$n" = 1 ] && ok "a procedure that stops being a factory takes its callers' call sites with it (left: only lib2's, $n)" || bad "stale call sites after a factory changed: $n slab_new() sites remain (want 1)"
 d="$(q $DB "select a.disposition from odin_alloc_site a join nodes p on p.id=a.proc_id where p.name='hand_over'")"
-[ "$d" = passed ] && ok "a procedure that stops freeing its parameter stops being a sink (hand_over: $d)" || bad "hand_over is '$d', want passed"
+# consume now only looks at its parameter, so handing it over no longer frees it AND does not transfer it:
+# the caller still owns the memory and nothing releases it
+[ "$d" = unfreed ] && ok "a procedure that stops freeing its parameter stops being a sink (hand_over: $d, the caller still owns it)" || bad "hand_over is '$d', want unfreed"
 
 # a file is deleted and another has syntax errors: the graph stays whole
 rm -rf lib2 cross2.odin

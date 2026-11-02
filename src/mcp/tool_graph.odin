@@ -107,6 +107,16 @@ _write_ownership :: proc(sb: ^strings.Builder, db: ^core.GraphDB, node: i64) {
         if i > 0 { strings.write_string(sb, ",") }
         fmt.sbprintf(sb, `%d`, idx)
     }
+    strings.write_string(sb, `],"keeps_params":[`)
+    for idx, i in own.keeps_params {
+        if i > 0 { strings.write_string(sb, ",") }
+        fmt.sbprintf(sb, `%d`, idx)
+    }
+    strings.write_string(sb, `],"reads_params":[`)
+    for idx, i in own.reads_params {
+        if i > 0 { strings.write_string(sb, ",") }
+        fmt.sbprintf(sb, `%d`, idx)
+    }
     fmt.sbprintf(sb, `],"free_calls":%d,"leak_candidates":%d,"sites":[`, own.free_calls, leaks)
     for a, i in own.sites {
         if i > 0 { strings.write_string(sb, ",") }

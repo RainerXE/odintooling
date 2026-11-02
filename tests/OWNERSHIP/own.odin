@@ -301,3 +301,32 @@ rebound :: proc() {
 	name = make([]int, 2)
 	delete(name)
 }
+
+// what a procedure does with a parameter decides what passing it there means
+Holder :: struct { kept: ^Node }
+holder: Holder
+
+keeper :: proc(n: ^Node) { holder.kept = n }                       // keeps it: the caller no longer owns it
+looker :: proc(n: ^Node) -> int {                                  // only reads it: the caller still does
+	if n == nil { return 0 }
+	return 1
+}
+passer :: proc(n: ^Node) { unknown_elsewhere(n) }                  // hands it to something unseen: no claim
+second :: proc(count: int, n: ^Node) { free(n) }                   // frees its SECOND parameter
+
+give_to_keeper :: proc() {
+	n := new(Node)
+	keeper(n)
+}
+give_to_looker :: proc() {
+	n := new(Node)
+	_ = looker(n)
+}
+give_to_passer :: proc() {
+	n := new(Node)
+	passer(n)
+}
+give_to_second :: proc() {
+	n := new(Node)
+	second(5, n)
+}

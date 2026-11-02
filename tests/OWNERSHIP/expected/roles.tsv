@@ -66,3 +66,11 @@ group_ok	borrower
 branch_assign	borrower
 branch_leak	allocator
 rebound	allocator
+keeper	neutral
+looker	neutral
+passer	neutral
+second	deallocator
+give_to_keeper	allocator
+give_to_looker	allocator
+give_to_passer	allocator
+give_to_second	borrower
