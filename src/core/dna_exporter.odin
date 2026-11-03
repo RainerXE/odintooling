@@ -623,7 +623,7 @@ _find_enclosing_proc :: proc(db: ^GraphDB, file: string, line: int) -> i64 {
 @(private)
 _cross_signature :: proc(f: map[i64]FactoryRow, s, keeps, reads: map[i64]u64) -> u64 {
     sig := u64(len(f)) * 1_000_003 + u64(len(s)) + u64(len(keeps)) * 7_919 + u64(len(reads)) * 104_729
-    for h, _ in f { sig += u64(h) * 31 }
+    for h in f { sig += u64(h) * 31 }
     for h, mask in s { sig += u64(h) * 17 + mask * 7 }
     for h, mask in keeps { sig += u64(h) * 13 + mask * 5 }
     for h, mask in reads { sig += u64(h) * 11 + mask * 3 }

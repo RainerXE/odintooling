@@ -675,7 +675,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
         }
     }
     _named_results(decl, lines, &results)
-    for r, _ in results { declared[r] = true }
+    for r in results { declared[r] = true }
     for a in c.assigns {
         lhs, rhs := _assign_split(_named(a))
         if !_is_decl_assign(lhs, rhs, lines) { continue }

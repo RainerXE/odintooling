@@ -303,6 +303,7 @@ _run_odin_check_handler :: proc(params: json.Value, allocator: runtime.Allocator
     if len(stdout_bytes) > 0 { append(&combined_parts, string(stdout_bytes)) }
     combined := strings.concatenate(combined_parts[:], allocator)
 
+    // olt:ignore C001 the server hands every handler its per-request temp allocator and frees it after the call
     diags := make([dynamic]OdinCheckDiag, allocator)
     lines := strings.split_lines(combined)
     defer delete(lines)

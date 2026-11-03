@@ -76,10 +76,34 @@ SILENT — correct pattern:
         parse(buf)
     }
 
+WHAT COUNTS AS HANDLED (no violation)
+  The rule asks a whole-procedure ownership analysis (the same one behind the
+  code graph) what became of the allocation. It stays silent when the memory is:
+    - released: defer delete(x), defer { delete(a); delete(b) }, or a delete(x)
+      / free(x) on any path of the procedure
+    - returned to the caller: return x, return n, x[:], true, a named result,
+      return cstring(raw_data(x)), return &x[0], a composite that carries it
+    - stored somewhere that outlives the call: a field, a list (append(&l, x)),
+      a global, a map key
+    - drawn from an arena or from context.temp_allocator, which release it
+      wholesale (also when the allocator is held in a local variable)
+    - in an initialiser: a procedure whose name ends in _init, starts with
+      init_, or is exactly init. These allocate state that lives as long as
+      the program
+  It reports when nothing at all is done with the memory (never freed, returned,
+  stored or passed on), even if the variable merely appears in a return
+  statement (return len(xs) does not return xs) or an argument mentions
+  'allocator' (a parameter allocator belongs to the caller; it is not an arena).
+  When the value is passed to another procedure the rule cannot know whether
+  that procedure frees it: it reports at INFO level ("may transfer ownership").
+
 ESCAPE HATCHES
-  - Returning the allocation transfers ownership to the caller (no violation).
-  - Add a suppression comment to silence a specific line:
+  - An allocator that the CALLER installed and releases (for example the
+    per-request temp allocator an MCP server hands to its handlers) cannot be
+    seen from inside the procedure. Silence a specific line, with the reason:
       buf := make([]u8, 1024)  // olt:ignore C001 caller owns this
+  - [correctness] c001_ownership_hints = false in olt.toml turns the INFO hint
+    for passed-on values off.
 
 FIX
   Add 'defer delete(buf)' for slices/maps/dynamic arrays, or 'defer free(ptr)'
