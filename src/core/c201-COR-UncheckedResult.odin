@@ -47,11 +47,18 @@ c201_scm_run :: proc(
     defer free_query_results(results)
 
     // What this file imports, so a qualified call can be followed into the package it goes to.
+    // (A defer is scoped to the block it is in, not to the procedure: the map must be deleted from this level, or it would
+    // be freed at the end of the `if` below, before a single lookup.)
     resolver_begin_run()
+    file_imports: map[string]string
     if type_ctx != nil {
+        file_imports      = _file_imports(root_node, file_lines)
         type_ctx.file_dir = filepath.dir(file_path)
-        type_ctx.imports  = _file_imports(root_node, file_lines)
-        defer delete(type_ctx.imports)
+        type_ctx.imports  = file_imports
+    }
+    defer {
+        if type_ctx != nil { type_ctx.imports = nil }
+        delete(file_imports)
     }
 
     suppressions := collect_suppressions(1, len(file_lines), file_lines)

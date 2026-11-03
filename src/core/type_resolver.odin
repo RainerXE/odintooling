@@ -277,11 +277,12 @@ _index_declarations :: proc(node: TSNode, source: string, idx: ^PackageIndex, gr
                 id := ts_node_child(c, u32(j))
                 if string(ts_node_type(id)) != "identifier" { continue }
                 text := source[ts_node_start_byte(id):ts_node_end_byte(id)]
+                // the file's text is freed once this file is done, and the groups are resolved after all files: copy
                 if gname == "" {
-                    gname = text
+                    gname = strings.clone(text, context.temp_allocator)
                 } else {
                     list := groups[gname]
-                    append(&list, strings.clone(text))
+                    append(&list, strings.clone(text, context.temp_allocator))
                     groups[gname] = list
                 }
             }

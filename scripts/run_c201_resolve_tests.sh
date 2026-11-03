@@ -40,5 +40,15 @@ out="$("$OLT_BINARY" --rule C201 "$d/c.odin" 2>&1)"
 echo "$out" | grep -q "error return of 'os.open'" && ok "the curated list still reports os.open" || bad "os.open is no longer reported: $out"
 rm -rf "$d"
 
+# 4. no invalid memory access. A read of freed memory returns the right bytes by luck on some platforms (it did on Linux while
+# the imports map was freed too early) and garbage on others (macOS), so this class of bug can only be seen with a checker.
+if command -v valgrind >/dev/null 2>&1; then
+  vg="$(env -u ODIN_ROOT valgrind -q --error-limit=no --num-callers=8 "$OLT_BINARY" --rule C201 "$FIX" 2>&1)"
+  bad_n="$(echo "$vg" | grep -c "Invalid read\|Invalid write\|Invalid free")"
+  [ "$bad_n" = 0 ] && ok "no invalid memory accesses under valgrind" || { bad "valgrind reports $bad_n invalid memory accesses"; echo "$vg" | grep -A8 "Invalid" | head -30 | sed 's/^/      /'; }
+else
+  echo "  ⏭  SKIP: valgrind not installed — memory safety of the resolver is not checked here"
+fi
+
 echo "c201 resolve: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
