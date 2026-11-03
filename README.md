@@ -471,7 +471,6 @@ vendor/odin-mcp      MCP protocol library (https://github.com/RainerXE/odin-mcp)
 vendor/odin-sqlite3  SQLite bindings (https://github.com/RainerXE/odin-sqlite)
 tests/               Rule test fixtures (tests/OWNERSHIP is the ownership fixture)
 scripts/             Build and test scripts
-ARCHITECTURE.md      Generated architecture map (arch/architecture.json is its declared model)
 ```
 
 ---

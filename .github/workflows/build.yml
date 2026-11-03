@@ -26,9 +26,8 @@ jobs:
   # Labels set when you registered the runner: self-hosted, macos, arm64
   build-macos:
     name: macOS ARM64
-    # Skip on Forgejo (repo is Rainer/odintooling there); this legacy GitHub
-    # CI only runs on the GitHub mirror (RainerXE/odintooling). The Forgejo
-    # CI lives in .forgejo/workflows/ci.yml.
+    # This is the CI for the repository on GitHub (RainerXE/odintooling); the
+    # condition below keeps it from running in any other copy of the repository.
     if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","macos"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
     runs-on: [self-hosted, macos, arm64]
     steps:
