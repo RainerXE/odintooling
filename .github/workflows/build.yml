@@ -16,18 +16,16 @@ on:
         required: false
 
 # ─── Jobs ────────────────────────────────────────────────────────────────────
-# Each job runs on a DIFFERENT machine identified by its labels.
-# You register a runner on a machine once; GitHub routes matching jobs to it.
+# Each job runs on a DIFFERENT machine identified by its labels. A runner is
+# registered on a machine once; GitHub routes the matching jobs to it. The jobs
+# only run in RainerXE/odintooling, so a fork does not wait for runners it lacks.
 
 jobs:
 
   # ── macOS ARM64 ─────────────────────────────────────────────────────────────
-  # Runs on: your Apple Silicon Mac (the one you develop on)
-  # Labels set when you registered the runner: self-hosted, macos, arm64
+  # Runs on: an Apple Silicon Mac registered as a runner (self-hosted, macos, arm64)
   build-macos:
     name: macOS ARM64
-    # This is the CI for the repository on GitHub (RainerXE/odintooling); the
-    # condition below keeps it from running in any other copy of the repository.
     if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","macos"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
     runs-on: [self-hosted, macos, arm64]
     steps:
@@ -35,6 +33,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Build the tree-sitter libraries
+        # They are build artefacts, not committed, and a clean checkout does not have them. The grammar is pinned to a
+        # tag, so build from clean: a library left over from another version links fine and parses a different grammar.
+        run: |
+          for d in ffi/tree_sitter/tree-sitter-lib ffi/tree_sitter/tree-sitter-odin; do
+            (cd "$d" && { make clean >/dev/null 2>&1 || true; } && make)
+          done
 
       - name: Build olt, olt-mcp, olt-lsp
         run: |
@@ -89,11 +95,9 @@ jobs:
           retention-days: 7
 
   # ── Linux x86_64 ────────────────────────────────────────────────────────────
-  # Runs on: your Debian 13 x86_64 machine
-  # Labels set when you registered the runner: self-hosted, linux, x86_64
+  # Runs on: a Debian 13 x86_64 machine registered as a runner (self-hosted, linux, x86_64)
   build-linux-x86:
     name: Linux x86_64
-    # Skip on Forgejo; see build-macos note.
     if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","linux"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
     runs-on: [self-hosted, linux, x86_64]
     steps:
@@ -114,11 +118,9 @@ jobs:
           retention-days: 7
 
   # ── Windows x86_64 ──────────────────────────────────────────────────────────
-  # Runs on: your Windows 11 VM or machine
-  # Labels set when you registered the runner: self-hosted, windows, x86_64
+  # Runs on: a Windows 11 machine registered as a runner (self-hosted, windows, x86_64)
   build-windows:
     name: Windows x86_64
-    # Skip on Forgejo; see build-macos note.
     if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","windows"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
     runs-on: [self-hosted, windows, x86_64]
     steps:

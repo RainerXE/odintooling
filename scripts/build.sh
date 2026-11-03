@@ -40,6 +40,12 @@ odin build "$REPO_ROOT/src" -out:"$OUT" \
 # sqlite3 comes in via vendor/odin-sqlite3's named foreign import (its
 # artifacts/libsqlite3.a), not via -extra-linker-flags.
 
+# olt-mcp and olt-lsp are the same binary: argv[0] dispatch in src/main.odin picks the mode. The older rule suites still
+# call it by the name it had before the per-platform layout, ./artifacts/odin-lint.
+ln -sf olt "$OUT_DIR/olt-mcp"
+ln -sf olt "$OUT_DIR/olt-lsp"
+ln -sf "$PLATFORM/olt" "$REPO_ROOT/artifacts/odin-lint"
+
 echo "✅ Build successful!"
 echo "Executable: $OUT"
 echo ""
