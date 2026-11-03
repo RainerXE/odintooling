@@ -146,7 +146,8 @@ analyze_content :: proc(
 	{
 		q, q_ok := load_query_src(ts.adapter.language, UNCHECKED_RESULT_SCM, "unchecked_result.scm")
 		if q_ok {
-			dd := dedupDiagnostics(c201_scm_run(file_path, root, lines, &q, nil))
+			type_ctx: TypeResolveContext   // no graph here: packages are followed through the file's imports
+			dd := dedupDiagnostics(c201_scm_run(file_path, root, lines, &q, &type_ctx))
 			defer delete(dd)
 			for d in dd { append(diags, d) }
 			unload_query(&q)

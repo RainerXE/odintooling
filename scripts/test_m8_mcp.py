@@ -317,6 +317,31 @@ def test_get_ownership(client: MCPClient):
               f"got {one}")
 
 
+def test_c201_follows_edits(client: MCPClient):
+    section("C201 in a long-running server — an edited package is noticed")
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = os.path.realpath(tmp)
+        os.makedirs(os.path.join(tmp, "lib"))
+        lib = os.path.join(tmp, "lib", "lib.odin")
+        main = os.path.join(tmp, "main.odin")
+        with open(main, "w") as f:
+            f.write('package app\nimport "lib"\nmain :: proc() {\n\tlib.run()\n}\n')
+
+        def c201_lines():
+            r = client.tool("lint_file", {"path": main})
+            return sorted(d.get("line") for d in r if d.get("rule_id") == "C201")
+
+        with open(lib, "w") as f:
+            f.write("package lib\nrun :: proc() -> int { return 0 }\n")
+        check("a call to a procedure that returns no error is not reported", c201_lines() == [], f"{c201_lines()}")
+        time.sleep(1.1)   # file modification times have a resolution of a second on some filesystems
+        with open(lib, "w") as f:
+            f.write("package lib\nError :: enum { None, Failed }\nrun :: proc() -> Error { return .None }\n")
+        check("after lib.run is edited to return an Error the same server reports the discarded result",
+              c201_lines() == [4], f"{c201_lines()}")
+
+
 def test_get_callers_callees(client: MCPClient):
     section("LSP parity — get_callers / get_callees")
     DB_PATH = os.path.join(REPO_ROOT, ".codegraph", "olt.db")
@@ -452,6 +477,7 @@ def main():
         test_get_callers_callees(client)
         test_impact_radius_follows_callers(client)
         test_get_ownership(client)
+        test_c201_follows_edits(client)
         test_run_odin_check(client)
     finally:
         client.close()

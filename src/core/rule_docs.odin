@@ -701,7 +701,32 @@ Tier: correctness
 
 WHAT IT DETECTS
   Bare call statements whose result is discarded, where the called procedure
-  is known to return an error or bool success indicator.
+  returns an error.
+
+HOW IT KNOWS A PROCEDURE RETURNS AN ERROR
+  1. A short list of standard-library calls (os.open, os.read, net.send, ...).
+  2. A procedure of your own project called by its bare name (from the graph,
+     when one has been exported).
+  3. The source of the package a qualified call goes to. For util.run() or
+     os.set_env(...) olt reads the file's imports, finds that package and looks
+     at the return type of the procedure: an import under core:, base: or
+     vendor: is read from your Odin installation (ODIN_ROOT, or what 'odin root'
+     prints), a relative import from your project. Without an Odin installation
+     only your own packages are followed. A procedure group counts only when
+     every procedure it lists returns an error.
+  A result type counts when it names an error (os.Error, io.Error, your own
+  Error enum).
+
+WHAT IT DELIBERATELY LEAVES OUT (when reading package source)
+  - mem.Allocator_Error. Odin makes it optional (#optional_allocator_error) and
+    code ignores the result of free and similar calls as a matter of course.
+  - Stream output: procedures whose name starts with write, flush or print, or
+    contains _write (io.write_string, strings.write_rune, os.write_string ...).
+    Their destination
+    is usually a string builder or stdout, and Odin's own source discards the
+    result of io.write_string hundreds of times.
+  The short list in step 1 is unaffected: os.write and os.write_entire_file
+  are still reported.
 
 WHY IT MATTERS
   Silently ignoring errors leads to undefined behaviour on failure paths.
@@ -710,6 +735,7 @@ FIRES:
 
     os.open("config.toml")          // C201: result discarded
     net.dial_tcp(...)               // C201
+    util.run()                      // C201 when util.run returns an Error
 
 SILENT — correct patterns:
 

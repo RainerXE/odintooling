@@ -4,6 +4,8 @@
 package core
 
 import "core:fmt"
+import "core:path/filepath"
+import "core:strings"
 
 // =============================================================================
 // C201: Unchecked error return — bare call to a proc that returns an error
@@ -12,7 +14,7 @@ import "core:fmt"
 // whose proc is known to return an error type. Uses TypeResolveContext:
 //   1. stdlib curated list
 //   2. graph DB (return_type field)
-//   3. OLS stub (future)
+//   3. the source of the package the call goes to (see type_resolver.odin)
 //
 // Parent-block filtering: a call_expression is "bare" (result discarded) only
 // when its parent node is a block. Calls inside assignment_statement,
@@ -43,6 +45,14 @@ c201_scm_run :: proc(
 ) -> []Diagnostic {
     results := run_query(q, root_node, file_lines)
     defer free_query_results(results)
+
+    // What this file imports, so a qualified call can be followed into the package it goes to.
+    resolver_begin_run()
+    if type_ctx != nil {
+        type_ctx.file_dir = filepath.dir(file_path)
+        type_ctx.imports  = _file_imports(root_node, file_lines)
+        defer delete(type_ctx.imports)
+    }
 
     suppressions := collect_suppressions(1, len(file_lines), file_lines)
     defer free_suppressions(suppressions)
@@ -101,6 +111,50 @@ c201_scm_run :: proc(
     }
 
     return diagnostics[:]
+}
+
+// _line_text is the text of a node that sits on one line (an identifier, an import path).
+@(private="file")
+_line_text :: proc(n: TSNode, lines: []string) -> string {
+    sp, ep := ts_node_start_point(n), ts_node_end_point(n)
+    row := int(sp.row)
+    if row < 0 || row >= len(lines) || ep.row != sp.row { return "" }
+    line := lines[row]
+    c0, c1 := int(sp.column), min(int(ep.column), len(line))
+    if c0 > c1 { return "" }
+    return line[c0:c1]
+}
+
+// _file_imports lists a file's imports as the name a qualifier uses -> the import path:
+// `import "core:os"` gives os, `import fp "core:path/filepath"` gives fp.
+@(private="file")
+_file_imports :: proc(root: TSNode, lines: []string) -> map[string]string {
+    out := make(map[string]string)
+    for i in 0 ..< int(ts_node_child_count(root)) {
+        decl := ts_node_child(root, u32(i))
+        if string(ts_node_type(decl)) != "import_declaration" { continue }
+        alias, path := "", ""
+        for j in 0 ..< int(ts_node_child_count(decl)) {
+            c := ts_node_child(decl, u32(j))
+            switch string(ts_node_type(c)) {
+            case "identifier": alias = _line_text(c, lines)
+            case "string":
+                for k in 0 ..< int(ts_node_child_count(c)) {
+                    sc := ts_node_child(c, u32(k))
+                    if string(ts_node_type(sc)) == "string_content" { path = _line_text(sc, lines) }
+                }
+            }
+        }
+        if path == "" { continue }
+        if alias == "" {
+            last := path
+            if slash := strings.last_index_byte(last, '/'); slash >= 0 { last = last[slash+1:] }
+            if colon := strings.last_index_byte(last, ':'); colon >= 0 { last = last[colon+1:] }
+            alias = last
+        }
+        out[alias] = path
+    }
+    return out
 }
 
 // c201_extract_fn_name returns the package-qualified function name for calls whose

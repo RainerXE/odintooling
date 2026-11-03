@@ -27,6 +27,9 @@ every allocation, which allocator it came from and what became of the memory.
 - **Better Odin resolution.** A bare call resolves only inside its package (a directory); `pkg.fn()` resolves through the file's imports;
   procedure groups are one node with `references` edges. Against CodeGraph's own Odin index, olt has 95% (odin-http) and 96% (ols) of
   its distinct call edges, up from 79% and 85%.
+- **C201 follows a call into the package it goes to.** Your own packages, and the standard library when an Odin installation is found.
+  Discarded results of `os.set_env`, `net.set_option`, `os.remove_all` and the like are now reported; allocator errors and stream
+  writes are not.
 - **Directory scans honour `.gitignore`**, read by git itself.
 
 ## Upgrading from 0.97.3
@@ -38,6 +41,7 @@ every allocation, which allocator it came from and what became of the memory.
 | **Analysis changes** re-index a graph written by an older olt in full on the next export. | Nothing. It happens automatically, once per analysis change. |
 | **`--codegraph-init` / `--codegraph-sync`** run the normal export into `.codegraph/codegraph.db` instead of converting a second database. | Update scripts that relied on the old two-database behaviour. |
 | **Scans skip what `.gitignore` excludes** (including tracked files that match an ignore pattern). | `--no-gitignore` restores the old behaviour. |
+| **C201 reports more.** On 18 public Odin repositories it goes from 39 to 83 reports (discarded `net.set_option`, `os.remove_all`, `http.listen_and_serve`, ...). It adds about a second to a lint run on a project the size of `ols`. | Expect new reports; `olt --explain C201` says what is and is not reported. |
 | **C001 output changes.** Fewer false reports, and a few new ones for allocations nothing touches (including `return len(xs)` and a parameter allocator). | Expect a different list; `olt --explain C001` says exactly when it reports. |
 | **`[target] odin_version` and `[tools] odin_path` are removed from `olt.toml`.** Nothing ever read them. | An `olt.toml` that has them still works and prints a warning; delete the lines. |
 | **A CodeGraph reindex drops olt's own tables** (ownership, roles). | Run `olt --export-symbols` again. |

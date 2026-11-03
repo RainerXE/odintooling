@@ -143,7 +143,7 @@ olt lsp                       # start LSP proxy (editor interface)
 | C010 | `Small_Array` can be replaced by the built-in `[dynamic; N]T` |
 | C011 | FFI C resource (`ts_*_new`) without matching `defer ts_*_delete` |
 | C101 | `context.allocator` reassigned without defer restore |
-| C201 | Error return value discarded (unchecked result) |
+| C201 | Error return value discarded (unchecked result). Follows a qualified call into the package it goes to: your own packages, and `core:`/`base:`/`vendor:` when an Odin installation is found. Allocator errors and stream writes (`io.write_string`) are not reported |
 | C202 | Switch on enum not exhaustive (requires `--export-symbols`) |
 | C203 | `defer` in inner block fires before outer scope uses the handle |
 | C031 | `panic()` on expected runtime failure — consider an error return (INFO) |
