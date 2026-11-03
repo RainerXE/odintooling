@@ -21,9 +21,6 @@ import "core:strings"
 //   ffi             = true   # enable C011 FFI safety rules
 //   odin_2026       = true   # enable C009, C010 migration rules
 //   semantic_naming = false  # enable C012 ownership hints (opt-in)
-//
-//   [target]
-//   odin_version = "dev-2026-04"
 // =============================================================================
 
 // OdinLintConfig holds the parsed project configuration.
@@ -43,11 +40,7 @@ OdinLintConfig :: struct {
     naming_c020_min_length: int,  // C020 threshold: flag names shorter than this (default: 3)
     naming_c020_allowed: string,  // C020 comma-separated allowlist (default: "i,j,k,x,y,z,n,ok,err,db,id")
 
-    // Target settings.
-    odin_version: string, // e.g. "dev-2026-04"
-
     // Tool paths — empty string means "search PATH".
-    tools_odin_path: string, // path to odin executable
     tools_ols_path:  string, // path to our OLS fork
 
     // Go-compatibility domain — off by default (pure Odin codebases don't need it).
@@ -83,7 +76,6 @@ default_config :: proc() -> OdinLintConfig {
         naming_c020_allowed    = "i,j,k,x,y,z,n,ok,err,db,id",
         go_migration_domain    = false,
         c001_ownership_hints   = true,
-        odin_version           = "",
         loaded                 = false,
     }
 }
@@ -189,8 +181,12 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             current_section       = line[1 : len(line)-1]
             current_section_known = _toml_section_known(current_section)
             if !current_section_known {
-                fmt.eprintfln("%s:%d: warning: unknown section [%s] — ignored (known: domains, naming, target, correctness, tools, ignore)",
-                    path, line_num, current_section)
+                if hint := _toml_removed_hint(current_section, ""); hint != "" {
+                    fmt.eprintfln("%s:%d: warning: section [%s] %s", path, line_num, current_section, hint)
+                } else {
+                    fmt.eprintfln("%s:%d: warning: unknown section [%s] — ignored (known: domains, naming, correctness, tools, ignore)",
+                        path, line_num, current_section)
+                }
             }
             continue
         }
@@ -211,8 +207,12 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
 
         // Warn on unknown keys within known sections (helps catch typos).
         if !_toml_key_known(current_section, key) {
-            fmt.eprintfln("%s:%d: warning: unknown key '%s' in [%s] — ignored",
-                path, line_num, key, current_section)
+            if hint := _toml_removed_hint(current_section, key); hint != "" {
+                fmt.eprintfln("%s:%d: warning: key '%s' in [%s] %s", path, line_num, key, current_section, hint)
+            } else {
+                fmt.eprintfln("%s:%d: warning: unknown key '%s' in [%s] — ignored",
+                    path, line_num, key, current_section)
+            }
             continue
         }
 
@@ -240,11 +240,6 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             case "c020_allowed":
                 cfg.naming_c020_allowed = strings.clone(strings.trim(val, "\"'"))
             }
-        case "target":
-            if key == "odin_version" {
-                v := strings.trim(val, "\"'")
-                cfg.odin_version = strings.clone(v)
-            }
         case "correctness":
             switch key {
             case "c001_ownership_hints":
@@ -252,8 +247,6 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
             }
         case "tools":
             switch key {
-            case "odin_path":
-                cfg.tools_odin_path = strings.clone(strings.trim(val, "\"'"))
             case "ols_path":
                 cfg.tools_ols_path = strings.clone(strings.trim(val, "\"'"))
             }
@@ -280,10 +273,24 @@ parse_toml_config :: proc(path: string, cfg: ^OdinLintConfig) -> bool {
 @(private)
 _toml_section_known :: proc(s: string) -> bool {
     switch s {
-    case "domains", "naming", "target", "correctness", "tools", "ignore":
+    case "domains", "naming", "correctness", "tools", "ignore":
         return true
     }
     return false
+}
+
+// _toml_removed_hint explains a setting that olt.toml used to accept and no longer does. Both were parsed
+// but never read by anything, so removing them changes no behaviour; the warning tells you to delete the line.
+// key == "" asks about the section itself.
+@(private)
+_toml_removed_hint :: proc(section, key: string) -> string {
+    switch {
+    case section == "target" && key == "":
+        return "was removed: its only setting, odin_version, was never used — ignored, delete it"
+    case section == "tools" && key == "odin_path":
+        return "was removed: it was never used (run_odin_check takes the compiler path as a tool argument) — ignored, delete it"
+    }
+    return ""
 }
 
 // _toml_key_known returns true when key is a valid key inside section.
@@ -300,13 +307,11 @@ _toml_key_known :: proc(section, key: string) -> bool {
         case "c016", "c017", "c018", "c019", "c020", "c020_min_length", "c020_allowed":
             return true
         }
-    case "target":
-        return key == "odin_version"
     case "correctness":
         return key == "c001_ownership_hints"
     case "tools":
         switch key {
-        case "odin_path", "ols_path":
+        case "ols_path":
             return true
         }
     case "ignore":
@@ -353,13 +358,6 @@ config_domain_enabled :: proc(rule_id: string, cfg: OdinLintConfig) -> bool {
     return true // all other rules: not domain-gated
 }
 
-// effective_odin_path returns the odin executable to use.
-// Respects [tools] odin_path from config; falls back to "odin" (PATH lookup).
-effective_odin_path :: proc(cfg: OdinLintConfig) -> string {
-    if cfg.tools_odin_path != "" { return cfg.tools_odin_path }
-    return "odin"
-}
-
 // effective_ols_path returns the ols executable to use.
 // Respects [tools] ols_path from config; falls back to "ols" (PATH lookup).
 effective_ols_path :: proc(cfg: OdinLintConfig) -> string {
@@ -390,13 +388,8 @@ print_config_summary :: proc(cfg: OdinLintConfig) {
     fmt.eprintfln("  naming:  c016=%v c017=%v c018=%v c019=%v c020=%v (min=%d allowed=%s)",
         cfg.naming_c016, cfg.naming_c017, cfg.naming_c018,
         cfg.naming_c019, cfg.naming_c020, cfg.naming_c020_min_length, cfg.naming_c020_allowed)
-    if cfg.odin_version != "" {
-        fmt.eprintfln("  target odin_version: %s", cfg.odin_version)
-    }
-    if cfg.tools_odin_path != "" || cfg.tools_ols_path != "" {
-        fmt.eprintfln("  tools: odin=%s ols=%s",
-            cfg.tools_odin_path if cfg.tools_odin_path != "" else "(PATH)",
-            cfg.tools_ols_path  if cfg.tools_ols_path  != "" else "(PATH)")
+    if cfg.tools_ols_path != "" {
+        fmt.eprintfln("  tools: ols=%s", cfg.tools_ols_path)
     }
     if len(cfg.ignore_paths) > 0 {
         fmt.eprintfln("  ignore paths: %d pattern(s)", len(cfg.ignore_paths))

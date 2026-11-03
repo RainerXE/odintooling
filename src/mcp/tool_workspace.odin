@@ -236,7 +236,7 @@ make_run_odin_check_tool :: proc() -> mcp.Tool {
                     },
                     "odin_path": {
                         "type": "string",
-                        "description": "Path to the odin executable (default: odin from PATH, or [tools] odin_path in olt.toml)"
+                        "description": "Path to the odin executable (default: odin from PATH)"
                     }
                 },
                 "required": ["path"]

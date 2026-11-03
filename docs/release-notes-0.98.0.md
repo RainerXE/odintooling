@@ -39,6 +39,7 @@ every allocation, which allocator it came from and what became of the memory.
 | **`--codegraph-init` / `--codegraph-sync`** run the normal export into `.codegraph/codegraph.db` instead of converting a second database. | Update scripts that relied on the old two-database behaviour. |
 | **Scans skip what `.gitignore` excludes** (including tracked files that match an ignore pattern). | `--no-gitignore` restores the old behaviour. |
 | **C001 output changes.** Fewer false reports, and a few new ones for allocations nothing touches (including `return len(xs)` and a parameter allocator). | Expect a different list; `olt --explain C001` says exactly when it reports. |
+| **`[target] odin_version` and `[tools] odin_path` are removed from `olt.toml`.** Nothing ever read them. | An `olt.toml` that has them still works and prints a warning; delete the lines. |
 | **A CodeGraph reindex drops olt's own tables** (ownership, roles). | Run `olt --export-symbols` again. |
 
 ## New and changed in detail
@@ -66,8 +67,6 @@ not exist. The full list is in `CHANGELOG.md`.
   leaks: 34 go to code the graph cannot see into, in 4 the callee keeps the value.
 - **A free on any path counts as freed for the whole procedure.** An allocation freed on the happy path and leaked on an error path is
   not flagged; that needs path analysis, which olt does not do.
-- **Two `olt.toml` keys are accepted but not read**: `[target] odin_version` and `[tools] odin_path` (`run_odin_check` takes its
-  compiler path as a tool argument).
 - **Calls through values** (`obj->f()`, a procedure stored in a variable) are recorded as unresolved, not guessed.
 
 ## Verified with

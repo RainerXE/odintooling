@@ -278,9 +278,6 @@ ols_path = "/usr/local/bin/ols_lsp"   # OLS, if it is not in PATH
 paths = "tests/,generated/"   # comma-separated path fragments to skip
 ```
 
-`[target] odin_version` and `[tools] odin_path` are accepted but nothing reads them yet; `run_odin_check` takes the compiler path as a
-tool argument instead.
-
 Directory scans also skip whatever `.gitignore` excludes (`--no-gitignore` turns that off).
 
 ### Inline suppression
