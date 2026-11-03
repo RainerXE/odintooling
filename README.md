@@ -66,9 +66,9 @@ cd odintooling
 ./scripts/build.sh        # → artifacts/<platform>/olt   (builds libsqlite3.a on first use)
 ```
 
-To build and run every test suite in one go, use `./scripts/forgejo-ci.sh`. The tree-sitter grammar is pinned to
-`tree-sitter-odin` v1.3.0; a library built from another version links silently and parses a different grammar, so the script
-rebuilds both libraries from clean.
+The tree-sitter grammar is pinned to `tree-sitter-odin` v1.3.0. A library built from another version links without complaint and
+parses a different grammar, so after changing a submodule version, rebuild both libraries from clean (`make clean && make`).
+The build also creates `olt-mcp` and `olt-lsp` next to `olt` (the same binary, chosen by the name it is started under).
 
 ### First-run setup
 
@@ -477,15 +477,16 @@ scripts/             Build and test scripts
 
 ## Contributing
 
-Build as described under [Build from source](#build-from-source), then run everything the project runs:
+Build as described under [Build from source](#build-from-source), then run what CI runs:
 
 ```bash
-./scripts/forgejo-ci.sh      # builds the libraries and olt, runs every suite and the CodeGraph contract test
+for t in scripts/run_*.sh scripts/test_m9_config.sh; do bash "$t" || echo "FAILED: $t"; done
+python3 scripts/test_m8_mcp.py                          # needs odin on PATH for run_odin_check
+CODEGRAPH_BIN=codegraph ./scripts/test_codegraph_contract.sh   # optional: CodeGraph compatibility
 ```
 
-Individual suites are `scripts/run_*.sh` (one per rule, plus `run_ownership_tests.sh` and `run_gitignore_tests.sh`),
-`scripts/test_m8_mcp.py` for the MCP tools (it needs `odin` on `PATH` for `run_odin_check`) and
-`scripts/test_codegraph_contract.sh` for the CodeGraph compatibility (set `CODEGRAPH_BIN` to the CodeGraph to test against).
+The suites are `scripts/run_*.sh` (one per rule, plus `run_ownership_tests.sh` and `run_gitignore_tests.sh`).
+`test_codegraph_contract.sh` drives a real CodeGraph over an olt graph; set `CODEGRAPH_BIN` to the CodeGraph to test against.
 
 Before submitting:
 
@@ -496,9 +497,10 @@ Before submitting:
 
 ---
 
-## Changelog
+## Release notes
 
-See [CHANGELOG.md](CHANGELOG.md). The release notes for the next version are in [docs/release-notes-0.98.0.md](docs/release-notes-0.98.0.md).
+The notes for the next version are in [docs/release-notes-0.98.0.md](docs/release-notes-0.98.0.md). Released versions are on the
+[Releases](https://github.com/RainerXE/odintooling/releases) page.
 
 ## License
 

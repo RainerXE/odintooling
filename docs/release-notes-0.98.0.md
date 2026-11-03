@@ -1,8 +1,7 @@
 # olt 0.98.0 — release notes (draft)
 
-> **Status: draft, not released.** The version in the source is still `0.97.3`. To release: raise `OLT_VERSION` in
-> `src/core/cli.odin`, rename the `[Unreleased]` heading in `CHANGELOG.md` to `[0.98.0]` with the date, tag, and publish these notes.
-> The version is a minor bump because an upgrade changes the graph database, the licence and some C001 output; see *Upgrading*.
+> **Status: draft, not released.** The version in the source is still `0.97.3`. The version is a minor bump because an upgrade changes
+> the graph database, the licence and some C001 and C201 output; see *Upgrading*.
 
 ## What this release is
 
@@ -55,12 +54,12 @@ return callees). `find_all_references`, `find_allocators` and `run_lint_denoise`
 rewritten to match the rule.
 
 **Tooling.** `scripts/crosscheck_c001.py` compares the lint rule with the graph on any project. `scripts/test_codegraph_contract.sh`
-checks compatibility with a real CodeGraph. `scripts/forgejo-ci.sh` builds, runs every suite and the contract test.
+checks compatibility with a real CodeGraph. `scripts/build.sh` now also creates `olt-mcp`, `olt-lsp` and the name older suites call, so a clean checkout can build and run them.
 
 **Fixed.** A real crash in the LSP proxy (a read past tree-sitter's capture-name buffer); CodeGraph failing to `sync` an olt-written
 database (`duplicate column name`); calls after a nested procedure attributed to it; duplicated unresolved references on every
 incremental export; phantom duplicate nodes for every member of a procedure group; and a CI job that called build scripts that do
-not exist. The full list is in `CHANGELOG.md`.
+not exist. Every change is in the commit history.
 
 ## Known limits
 
