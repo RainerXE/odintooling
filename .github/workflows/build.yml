@@ -170,7 +170,7 @@ jobs:
           "package s; p::proc(){_=1+1}" | Out-File "$env:TEMP/s.odin" -Encoding ascii
           & $olt "$env:TEMP/s.odin" | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "a clean file should exit 0" }
-          "package l; l::proc(){_=make([]u8,10)}" | Out-File "$env:TEMP/l.odin" -Encoding ascii
+          "package l`nleak :: proc() {`n`txs := make([]u8, 10)`n`txs[0] = 1`n}" | Out-File "$env:TEMP/l.odin" -Encoding ascii
           & $olt "$env:TEMP/l.odin" | Out-Null
           if ($LASTEXITCODE -ne 1) { throw "a leaking file should exit 1" }
 

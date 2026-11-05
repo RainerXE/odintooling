@@ -15,7 +15,7 @@ fail() { echo "  FAIL $1"; FAILED=1; }
 "$OLT" --list-rules | grep -q 'C001' && ok "--list-rules lists C001" || fail "--list-rules lists C001"
 
 printf 'package s\nclean :: proc() { _ = 1 + 1 }\n' > "$TMP/clean.odin"
-printf 'package l\nleak :: proc() { _ = make([]u8, 10) }\n' > "$TMP/leak.odin"
+printf 'package l\nleak :: proc() {\n\txs := make([]u8, 10)\n\txs[0] = 1\n}\n' > "$TMP/leak.odin"
 
 rc=0; "$OLT" "$TMP/clean.odin" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok "a clean file exits 0" || fail "a clean file exits 0 (got $rc)"
