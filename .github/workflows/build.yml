@@ -6,7 +6,7 @@ name: Build
 # • Manual trigger (Actions tab)  → build on demand, choose which platforms
 #
 # All jobs run on GitHub-hosted runners, so nothing needs to be registered and a fork can build too. The
-# `github.server_url` guard keeps them skipped on a Forgejo instance that also reads .github/workflows, where they
+# `github.server_url` guard keeps them skipped on any other Git host that also reads .github/workflows, where they
 # would queue forever.
 on:
   push:
