@@ -47,10 +47,14 @@ mixes languages, or you want CodeGraph's explore tools and viewer: CodeGraph. Bo
 
 ### Pre-built binaries
 
-Download from [Releases](https://github.com/RainerXE/odintooling/releases) for your platform, then:
+Download the archive for your platform from [Releases](https://github.com/RainerXE/odintooling/releases)
+(`olt-<version>-macos-arm64.tar.gz`, `olt-<version>-linux-x86_64.tar.gz` or `olt-<version>-windows-x86_64.zip`). It holds
+`olt`, `olt-mcp` and `olt-lsp`. Unpack it, then:
 
 ```bash
-olt setup        # OLS detection → install → MCP registration (3-step wizard)
+tar xzf olt-<version>-<platform>.tar.gz     # on Windows: unzip the .zip
+cd olt-<version>-<platform>
+./olt setup      # OLS detection → install → MCP registration (3-step wizard)
 ```
 
 ### Build from source

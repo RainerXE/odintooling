@@ -192,21 +192,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist/
 
-      - name: Attach binaries to release
+      - name: Package one archive per platform
+        # Every platform builds files with the same names (olt, olt-mcp, olt-lsp), so uploading them directly makes
+        # one overwrite another. Each archive is named for its platform and restores the executable bit and the
+        # olt-mcp and olt-lsp links, which an artifact upload loses.
+        run: bash scripts/ci_package.sh "${GITHUB_REF_NAME#v}" dist out
+
+      - name: Attach archives to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/macos-arm64/olt
-            dist/macos-arm64/olt-mcp
-            dist/macos-arm64/olt-lsp
-            dist/linux-x86_64/olt
-            dist/linux-x86_64/olt-mcp
-            dist/linux-x86_64/olt-lsp
-            dist/windows-x86_64/olt.exe
-            dist/windows-x86_64/olt-mcp.exe
-            dist/windows-x86_64/olt-lsp.exe
+            out/*.tar.gz
+            out/*.zip
