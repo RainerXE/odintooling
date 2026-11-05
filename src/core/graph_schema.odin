@@ -22,7 +22,7 @@ CODEGRAPH_SCHEMA_VERSION :: 16
 // roles, packages, imports). Exports are incremental, so a file whose content has not changed
 // keeps what an older analysis derived from it; when this number moves, an olt-written graph is
 // re-indexed in full instead. Raise it whenever a change alters what the analysis records.
-ODIN_ANALYSIS_VERSION :: 7
+ODIN_ANALYSIS_VERSION :: 8
 
 CODEGRAPH_SCHEMA_VERSION_NOTE :: "Initial schema includes all migrations"
 

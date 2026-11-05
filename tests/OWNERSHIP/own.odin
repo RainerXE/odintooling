@@ -330,3 +330,7 @@ give_to_second :: proc() {
 	n := new(Node)
 	second(5, n)
 }
+// the blank identifier throws the result away: nothing can free it
+blank_discard :: proc() {
+	_ = make([]u8, 4)
+}

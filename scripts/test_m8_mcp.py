@@ -282,7 +282,7 @@ def test_get_ownership(client: MCPClient):
         leaks = client.tool("get_ownership", {"db_path": db, "disposition": "unfreed"}).get("sites", [])
         flagged = sorted(x["proc"] for x in leaks if x["leak_candidate"])
         check("leak_candidate is set only for default/param memory that is never freed",
-              flagged == ["alias_leak", "branch_leak", "give_to_looker", "group_leak", "index_read", "inner", "leaks", "printed", "read_all", "read_only", "rebound", "shadow_inner_leak", "siblings", "slab_leak", "wrapper_leak"], f"flagged: {flagged}")
+              flagged == ["alias_leak", "blank_discard", "branch_leak", "give_to_looker", "group_leak", "index_read", "inner", "leaks", "printed", "read_all", "read_only", "rebound", "shadow_inner_leak", "siblings", "slab_leak", "wrapper_leak"], f"flagged: {flagged}")
         lib2 = [x for x in leaks if x["proc"] == "lib2_user"]
         check("a same-named factory in another package does not lend its callers' evidence",
               len(lib2) == 1 and not lib2[0]["leak_candidate"], f"lib2_user: {lib2}")

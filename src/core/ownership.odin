@@ -783,6 +783,8 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
                 switch {
                 case _ntype(target) != "identifier":
                     site.disposition = "stored"
+                case _text(target, lines) == "_":
+                    site.disposition = "unfreed"                  // `_ = make(...)` throws the result away: nothing can free it
                 case _text(target, lines) in results:
                     site.disposition = "returned"                 // a named result
                 case !(_text(target, lines) in declared):

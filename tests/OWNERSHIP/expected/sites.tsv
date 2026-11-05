@@ -73,3 +73,4 @@ give_to_keeper	318	new	Node	default	n	stored
 give_to_looker	322	new	Node	default	n	unfreed
 give_to_passer	326	new	Node	default	n	passed
 give_to_second	330	new	Node	default	n	freed
+blank_discard	335	make	u8	default		unfreed

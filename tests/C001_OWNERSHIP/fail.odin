@@ -41,3 +41,8 @@ split_leak :: proc() {
 		make([]int, 4)
 	buf[0] = 1
 }
+
+// a result thrown away with the blank identifier: nothing can free it
+blank_discard :: proc() {
+	_ = make([]int, 4)
+}

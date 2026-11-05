@@ -74,3 +74,4 @@ give_to_keeper	allocator
 give_to_looker	allocator
 give_to_passer	allocator
 give_to_second	borrower
+blank_discard	allocator
