@@ -173,6 +173,8 @@ jobs:
           "package l`nleak :: proc() {`n`txs := make([]u8, 10)`n`txs[0] = 1`n}" | Out-File "$env:TEMP/l.odin" -Encoding ascii
           & $olt "$env:TEMP/l.odin" | Out-Null
           if ($LASTEXITCODE -ne 1) { throw "a leaking file should exit 1" }
+          # pwsh ends the step with the exit code of the last native command, and the leak check above expects 1
+          exit 0
 
       - uses: actions/upload-artifact@v4
         with:
