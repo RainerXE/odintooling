@@ -317,7 +317,45 @@ check_block :: proc(
         })
     }
 
+    // Allocations nothing is bound to: `_ = len(make(...))`, `f(make(...))` with a callee that only reads its
+    // argument, a bare `make(...)`. The scan above looks for `x := make(...)`, so only the whole-procedure
+    // analysis can see these. A statement that holds blocks (if, for, switch ...) is skipped: its blocks are
+    // checked on their own, and so is anything already tracked as an allocation above.
+    if ownership != nil {
+        for &child in block.children {
+            if is_allocation_assignment(&child, file_lines) || c001_has_block(&child) do continue
+            for v in c001_dropped_allocations(ownership, child.start_line, child.end_line) {
+                if is_suppressed("C001", v.line, suppressions) do continue
+                dtype := DiagnosticType.VIOLATION
+                msg   := "Allocation result is dropped — nothing can free it"
+                if ctx.is_perf_critical {
+                    msg   = "[C001] Allocation in performance-critical block — verify this is intentional"
+                    dtype = DiagnosticType.CONTEXTUAL
+                }
+                append(&diags, Diagnostic{
+                    file      = file_path,
+                    line      = v.line,
+                    column    = v.col + 1,
+                    rule_id   = "C001",
+                    tier      = "correctness",
+                    message   = msg,
+                    fix       = "Bind the result to a variable and add 'defer delete()', or remove the allocation",
+                    has_fix   = true,
+                    diag_type = dtype,
+                })
+            }
+        }
+    }
+
     return diags[:]
+}
+
+// c001_has_block says whether a statement contains a nested block (an if, for, switch or procedure literal).
+c001_has_block :: proc(node: ^ASTNode) -> bool {
+    for &child in node.children {
+        if child.node_type == "block" || c001_has_block(&child) do return true
+    }
+    return false
 }
 
 

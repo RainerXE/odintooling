@@ -17,6 +17,8 @@ C001Verdict :: struct {
     var_name:       string,
     disposition:    string,   // freed_deferred | freed | returned | stored | passed | unfreed
     allocator_kind: string,   // default | temp | param | custom
+    line:           int,      // where the allocation call is (1-based)
+    col:            int,      // its column (0-based, as tree-sitter counts)
 }
 
 // C001Ownership holds the verdicts for one file, by the line of the allocation.
@@ -56,6 +58,8 @@ c001_ownership_for :: proc(lines: []string) -> ^C001Ownership {
                 var_name       = strings.clone(site.var_name),
                 disposition    = strings.clone(site.disposition),
                 allocator_kind = strings.clone(site.allocator_kind),
+                line           = site.line,
+                col            = site.col,
             })
             out.by_line[site.line] = list
         }
@@ -114,4 +118,24 @@ c001_confirmed_leak :: proc(o: ^C001Ownership, start, end: int, var_name: string
     v, ok := c001_verdict_for(o, start, end, var_name)
     if !ok { return false }
     return v.disposition == "unfreed" && (v.allocator_kind == "default" || v.allocator_kind == "param")
+}
+
+// c001_dropped_allocations lists the allocations on lines start..end that are bound to no variable and that
+// nothing ever frees, returns, stores or hands on: `_ = len(make(...))`, `f(make(...))` where f only reads
+// its argument, a bare `make(...)`. C001's own statement scan never sees these (it looks for `x := make(...)`),
+// so the analysis is the only source. Same bar as c001_confirmed_leak: the default or a parameter allocator.
+// The result lives in the temp allocator.
+c001_dropped_allocations :: proc(o: ^C001Ownership, start, end: int) -> []C001Verdict {
+    if o == nil { return nil }
+    out := make([dynamic]C001Verdict, context.temp_allocator)
+    for line in start ..= max(end, start) {
+        list, has := o.by_line[line]
+        if !has { continue }
+        for v in list {
+            if v.var_name != "" || v.disposition != "unfreed" { continue }
+            if v.allocator_kind != "default" && v.allocator_kind != "param" { continue }
+            append(&out, v)
+        }
+    }
+    return out[:]
 }

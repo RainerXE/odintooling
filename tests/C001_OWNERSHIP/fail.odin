@@ -46,3 +46,19 @@ split_leak :: proc() {
 blank_discard :: proc() {
 	_ = make([]int, 4)
 }
+
+// the result is only measured, then dropped: no variable holds it
+dropped_len :: proc() -> int {
+	return len(make([]int, 4))
+}
+
+// an allocation used as a statement
+dropped_statement :: proc() {
+	make([]int, 4)
+}
+
+// bound to a variable that only gets a number: the slice itself is dropped
+dropped_in_expression :: proc() {
+	n := len(make([]int, 4))
+	_ = n
+}

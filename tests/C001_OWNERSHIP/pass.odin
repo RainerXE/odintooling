@@ -108,3 +108,18 @@ addr_returned :: proc() -> ^int {
 	xs := make([]int, 4)
 	return &xs[0]
 }
+
+// an allocation nothing is bound to, from the temp allocator: released wholesale
+temp_dropped :: proc() -> int {
+	return len(make([]int, 4, context.temp_allocator))
+}
+
+// a result handed to a procedure that may keep it
+handed_on :: proc(keep: proc([]int)) {
+	keep(make([]int, 4))
+}
+
+// a deliberate drop, suppressed
+ignored_drop :: proc() -> int {
+	return len(make([]int, 4)) // olt:ignore C001
+}
