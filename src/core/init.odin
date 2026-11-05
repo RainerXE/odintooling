@@ -474,8 +474,9 @@ _env_or :: proc(key, fallback: string) -> string {
 @(private = "file")
 _get_home :: proc() -> string {
 	when ODIN_OS == .Windows {
-		v, ok := os.lookup_env_alloc("USERPROFILE", context.allocator)
-		if ok && v != "" { return v }
+		// a `when` block shares the enclosing scope, so these names must differ from the ones below
+		profile, profile_ok := os.lookup_env_alloc("USERPROFILE", context.allocator)
+		if profile_ok && profile != "" { return profile }
 	}
 	v, ok := os.lookup_env_alloc("HOME", context.allocator)
 	if ok && v != "" { return v }
