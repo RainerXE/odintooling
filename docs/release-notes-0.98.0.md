@@ -61,6 +61,16 @@ database (`duplicate column name`); calls after a nested procedure attributed to
 incremental export; phantom duplicate nodes for every member of a procedure group; and a CI job that called build scripts that do
 not exist. Every change is in the commit history.
 
+## Repository changes
+
+- **History was republished.** `master` was rebuilt, so its commit IDs differ from before. An existing clone cannot fast-forward:
+  clone again, or `git fetch` and `git reset --hard origin/master` if you have no local work.
+- **Committed binaries and a few one-off files are no longer in the tree** (`artifacts/`, old test archives, a local `ols.json`, a
+  prebuilt `libsqlite3.a`). Build with `scripts/build.sh`; it builds SQLite from the `vendor/odin-sqlite3` submodule.
+- **Submodules** `vendor/odin-mcp` and `vendor/odin-sqlite3` point at their published snapshots. Clone with `--recurse-submodules`.
+- **The `v0.97.3` tag** moved to the same content in the new history. Other old tags stay where they were.
+- **Builds run on GitHub Actions** (`.github/workflows/build.yml`) for macOS arm64, Linux x86_64 and Windows.
+
 ## Known limits
 
 - **`leak_candidate` is a pointer, not a verdict.** The analysis is syntactic and per procedure plus the project's own call graph.
