@@ -4,6 +4,10 @@ name: Build
 # • Every push to master          → build all platforms, keep artifacts 7 days
 # • Every version tag (v*)        → build all platforms, attach to GitHub Release
 # • Manual trigger (Actions tab)  → build on demand, choose which platforms
+#
+# All jobs run on GitHub-hosted runners, so nothing needs to be registered and a fork can build too. The
+# `github.server_url` guard keeps them skipped on a Forgejo instance that also reads .github/workflows, where they
+# would queue forever.
 on:
   push:
     branches: [master]
@@ -15,24 +19,28 @@ on:
         default: 'all'
         required: false
 
-# ─── Jobs ────────────────────────────────────────────────────────────────────
-# Each job runs on a DIFFERENT machine identified by its labels. A runner is
-# registered on a machine once; GitHub routes the matching jobs to it. The jobs
-# only run in RainerXE/odintooling, so a fork does not wait for runners it lacks.
+permissions:
+  contents: read
+
+env:
+  # The Odin release the rule suites are verified against (see ODIN_TESTED_VERSION in src/core/cli.odin).
+  ODIN_RELEASE: dev-2026-10
 
 jobs:
 
   # ── macOS ARM64 ─────────────────────────────────────────────────────────────
-  # Runs on: an Apple Silicon Mac registered as a runner (self-hosted, macos, arm64)
   build-macos:
     name: macOS ARM64
-    if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","macos"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
-    runs-on: [self-hosted, macos, arm64]
+    if: ${{ github.server_url == 'https://github.com' && (github.event.inputs.platforms == '' || contains(fromJSON('["all","macos"]'), github.event.inputs.platforms)) }}
+    runs-on: macos-latest
     steps:
-      - name: Checkout (with submodules)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - uses: laytan/setup-odin@v2
+        with:
+          release: ${{ env.ODIN_RELEASE }}
 
       - name: Build the tree-sitter libraries
         # They are build artefacts, not committed, and a clean checkout does not have them. The grammar is pinned to a
@@ -43,110 +51,141 @@ jobs:
           done
 
       - name: Build olt, olt-mcp, olt-lsp
-        run: |
-          ./scripts/build.sh
-          # olt-mcp and olt-lsp are symlinks — argv[0] dispatch in src/main.odin
-          # handles routing (same approach as build_linux_x86.sh / _build_linux_inner.sh).
-          ln -sf olt ./artifacts/macos-arm64/olt-mcp
-          ln -sf olt ./artifacts/macos-arm64/olt-lsp
+        # scripts/build.sh builds SQLite from vendor/odin-sqlite3 and creates the olt-mcp and olt-lsp symlinks
+        # (argv[0] dispatch in src/main.odin picks the mode).
+        run: ./scripts/build.sh
 
       - name: Smoke test
-        run: |
-          BIN=./artifacts/macos-arm64/olt
-          $BIN --version | grep -q 'olt' || (echo "version check failed" && exit 1)
-          $BIN --list-rules | grep -q 'C001' || (echo "list-rules check failed" && exit 1)
-          echo 'package s; p::proc(){_=1+1}' > /tmp/s.odin
-          $BIN /tmp/s.odin && echo "clean lint OK"
-          echo 'package l; l::proc(){_=make([]u8,10)}' > /tmp/l.odin
-          $BIN /tmp/l.odin; [ $? -eq 1 ] && echo "leak detection OK"
-          # olt-mcp / olt-lsp: start cleanly and exit on EOF (same check as Linux).
-          mcp_rc=0; echo "" | timeout 3 ./artifacts/macos-arm64/olt-mcp >/dev/null 2>&1 || mcp_rc=$?
-          [ "$mcp_rc" -ne 139 ] && [ "$mcp_rc" -ne 134 ] && echo "olt-mcp starts OK" || (echo "olt-mcp crashed" && exit 1)
-          lsp_rc=0; echo "" | timeout 3 ./artifacts/macos-arm64/olt-lsp >/dev/null 2>&1 || lsp_rc=$?
-          [ "$lsp_rc" -ne 139 ] && [ "$lsp_rc" -ne 134 ] && echo "olt-lsp starts OK" || (echo "olt-lsp crashed" && exit 1)
+        run: bash scripts/ci_smoke.sh artifacts/macos-arm64
 
       - name: Rule test suites
-        # Runs every scripts/run_*.sh fixture suite (C001, C002, B001-B003,
-        # C012, C014-C025, C029-C033, C101, C201-C203, M7 — self-updating as
-        # new run_*.sh scripts are added) plus the MCP and config test suites.
-        # Previously only the 4-line smoke test above ran in CI, so a rule
-        # regression could ship silently to a tagged release.
-        run: |
-          set -e
-          FAILED=0
-          for t in scripts/run_*.sh; do
-            echo "--- $t ---"
-            if ! bash "$t"; then
-              echo "FAILED: $t"
-              FAILED=1
-            fi
-          done
-          echo "--- scripts/test_m9_config.sh ---"
-          bash scripts/test_m9_config.sh || FAILED=1
-          echo "--- scripts/test_m8_mcp.py ---"
-          python3 scripts/test_m8_mcp.py || FAILED=1
-          exit $FAILED
+        run: bash scripts/ci_suites.sh
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: macos-arm64
           path: artifacts/macos-arm64/
           retention-days: 7
 
   # ── Linux x86_64 ────────────────────────────────────────────────────────────
-  # Runs on: a Debian 13 x86_64 machine registered as a runner (self-hosted, linux, x86_64)
   build-linux-x86:
     name: Linux x86_64
-    if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","linux"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
-    runs-on: [self-hosted, linux, x86_64]
+    if: ${{ github.server_url == 'https://github.com' && (github.event.inputs.platforms == '' || contains(fromJSON('["all","linux"]'), github.event.inputs.platforms)) }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout (with submodules)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Build + smoke test
-        # build_linux_x86.sh calls _build_linux_inner.sh which includes 8 smoke tests
-        run: ./scripts/build_linux_x86.sh
+      - uses: laytan/setup-odin@v2
+        with:
+          release: ${{ env.ODIN_RELEASE }}
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Install valgrind
+        # scripts/run_c201_resolve_tests.sh runs under valgrind when it is installed. It found a use-after-free that
+        # Linux otherwise hid (freed memory kept its bytes).
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
+
+      - name: Build the tree-sitter libraries
+        run: |
+          for d in ffi/tree_sitter/tree-sitter-lib ffi/tree_sitter/tree-sitter-odin; do
+            (cd "$d" && { make clean >/dev/null 2>&1 || true; } && make)
+          done
+
+      - name: Build olt, olt-mcp, olt-lsp
+        run: ./scripts/build.sh
+
+      - name: Smoke test
+        run: bash scripts/ci_smoke.sh artifacts/linux-x86_64
+
+      - name: Rule test suites
+        run: bash scripts/ci_suites.sh
+
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64
           path: artifacts/linux-x86_64/
           retention-days: 7
 
   # ── Windows x86_64 ──────────────────────────────────────────────────────────
-  # Runs on: a Windows 11 machine registered as a runner (self-hosted, windows, x86_64)
+  # Best effort: this job is new and has not been run before. continue-on-error keeps a Windows problem from
+  # blocking the macOS and Linux builds or the release; read its log to see whether it passed.
   build-windows:
     name: Windows x86_64
-    if: ${{ (github.event.inputs.platforms == '' || contains(fromJSON('["all","windows"]'), github.event.inputs.platforms)) && github.repository == 'RainerXE/odintooling' }}
-    runs-on: [self-hosted, windows, x86_64]
+    if: ${{ github.server_url == 'https://github.com' && (github.event.inputs.platforms == '' || contains(fromJSON('["all","windows"]'), github.event.inputs.platforms)) }}
+    runs-on: windows-latest
+    continue-on-error: true
+    defaults:
+      run:
+        shell: pwsh
     steps:
-      - name: Checkout (with submodules)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Build + smoke test
-        shell: pwsh
-        run: .\scripts\build_windows.ps1
+      - uses: laytan/setup-odin@v2
+        with:
+          release: ${{ env.ODIN_RELEASE }}
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      # Odin links with MSVC on Windows; this puts cl.exe, lib.exe and link.exe on PATH.
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build the tree-sitter libraries
+        # Static CRT (/MT), as Odin links it; the SQLite step below does the same.
+        run: |
+          $ts = "ffi/tree_sitter/tree-sitter-lib/lib"
+          $lang = "ffi/tree_sitter/tree-sitter-odin/src"
+          New-Item -ItemType Directory -Force build/ci | Out-Null
+          cl /nologo /c /O2 /MT /std:c11 /I"$ts/include" /I"$ts/src" /Fo"build/ci/ts-lib.obj" "$ts/src/lib.c"
+          if ($LASTEXITCODE -ne 0) { throw "compiling tree-sitter failed" }
+          lib /nologo /OUT:build/ci/tree-sitter.lib build/ci/ts-lib.obj
+          if ($LASTEXITCODE -ne 0) { throw "creating tree-sitter.lib failed" }
+          cl /nologo /c /O2 /MT /std:c11 /I"$ts/include" /I"$ts/src" /Fo"build/ci/ts-parser.obj" "$lang/parser.c"
+          if ($LASTEXITCODE -ne 0) { throw "compiling the Odin grammar parser failed" }
+          cl /nologo /c /O2 /MT /std:c11 /I"$ts/include" /I"$ts/src" /Fo"build/ci/ts-scanner.obj" "$lang/scanner.c"
+          if ($LASTEXITCODE -ne 0) { throw "compiling the Odin grammar scanner failed" }
+          lib /nologo /OUT:build/ci/tree-sitter-odin.lib build/ci/ts-parser.obj build/ci/ts-scanner.obj
+          if ($LASTEXITCODE -ne 0) { throw "creating tree-sitter-odin.lib failed" }
+
+      - name: Build SQLite
+        # Produces vendor/odin-sqlite3/artifacts/sqlite3.lib, which the binding links by default on Windows.
+        run: ./vendor/odin-sqlite3/build.ps1
+
+      - name: Build olt
+        run: |
+          New-Item -ItemType Directory -Force artifacts/windows-x86_64 | Out-Null
+          $libs = "$PWD/build/ci/tree-sitter.lib $PWD/build/ci/tree-sitter-odin.lib"
+          odin build src -out:artifacts/windows-x86_64/olt.exe "-extra-linker-flags:$libs"
+          if ($LASTEXITCODE -ne 0) { throw "odin build failed" }
+          # olt.exe also serves as the MCP server and LSP proxy: argv[0] dispatch picks the mode, so ship copies.
+          Copy-Item artifacts/windows-x86_64/olt.exe artifacts/windows-x86_64/olt-mcp.exe
+          Copy-Item artifacts/windows-x86_64/olt.exe artifacts/windows-x86_64/olt-lsp.exe
+
+      - name: Smoke test
+        run: |
+          $olt = "artifacts/windows-x86_64/olt.exe"
+          & $olt --version
+          if ($LASTEXITCODE -ne 0) { throw "--version failed" }
+          if (-not ((& $olt --list-rules) -match "C001")) { throw "--list-rules lacks C001" }
+          "package s; p::proc(){_=1+1}" | Out-File "$env:TEMP/s.odin" -Encoding ascii
+          & $olt "$env:TEMP/s.odin" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "a clean file should exit 0" }
+          "package l; l::proc(){_=make([]u8,10)}" | Out-File "$env:TEMP/l.odin" -Encoding ascii
+          & $olt "$env:TEMP/l.odin" | Out-Null
+          if ($LASTEXITCODE -ne 1) { throw "a leaking file should exit 1" }
+
+      - uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64
           path: artifacts/windows-x86_64/
           retention-days: 7
 
   # ── Attach to GitHub Release (only on version tags) ──────────────────────
-  # Waits for all three platform builds to finish, then uploads binaries
-  # to the GitHub Release page that was created when you pushed the tag.
+  # Needs the macOS and Linux builds. Windows is attached when it built.
   release:
     name: Publish release assets
     needs: [build-macos, build-linux-x86, build-windows]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/v') && needs.build-macos.result == 'success' && needs.build-linux-x86.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
