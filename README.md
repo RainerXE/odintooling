@@ -497,10 +497,27 @@ Before submitting:
 
 ---
 
-## Release notes
+## Changelog
 
-The notes for the next version are in [docs/release-notes-0.98.0.md](docs/release-notes-0.98.0.md). Released versions are on the
+Full notes for the latest version: [docs/release-notes-0.98.0.md](docs/release-notes-0.98.0.md). Binaries are on the
 [Releases](https://github.com/RainerXE/odintooling/releases) page.
+
+### 0.98.0 (2026-11-05)
+- Memory ownership: the graph records every allocation with its allocator and what became of the memory, followed across procedures; new MCP tool `get_ownership`, and `get_dna_context` returns ownership
+- The graph database is now a CodeGraph database (schema v16); a database from an older olt is rebuilt automatically
+- C001 uses the ownership analysis: fewer false reports, and reports for allocations nothing touches
+- C201 follows a qualified call into the package it goes to (39 to 83 reports on 18 public Odin repositories)
+- Better call resolution through imports; procedure groups are one node
+- Directory scans skip what `.gitignore` excludes (`--no-gitignore` restores the old behaviour)
+- The licence is now zlib-style (was MIT); `[target] odin_version` and `[tools] odin_path` are gone from `olt.toml`
+- Fixes: LSP proxy crash, CodeGraph `sync` of an olt database, wrong call attribution after a nested procedure, `get_impact_radius` direction
+- Repository: history republished, binaries no longer committed, submodules pinned to published snapshots (see the release notes)
+
+### 0.97.3 (2026-07-10)
+- Fix installer issues: binary now properly installs to target directory
+- Fix MCP configuration corruption issues
+- Add backup/restore for existing configurations
+- Improve error handling in installation process
 
 ## License
 

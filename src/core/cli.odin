@@ -21,7 +21,7 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 // CLI — argument parsing, version, help, rule listing
 // =============================================================================
 
-OLT_VERSION          :: "0.97.3"
+OLT_VERSION          :: "0.98.0"
 ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
 ODIN_TESTED_VERSION  :: "dev-2026-10"                // the Odin release the rule suites last passed on (Linux and macOS)
 ODIN_GRAMMAR_VERSION :: "tree-sitter-odin v1.3.0"     // the pinned grammar tag (ffi/tree_sitter/tree-sitter-odin)

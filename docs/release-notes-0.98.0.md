@@ -1,7 +1,7 @@
-# olt 0.98.0 — release notes (draft)
+# olt 0.98.0 — release notes
 
-> **Status: draft, not released.** The version in the source is still `0.97.3`. The version is a minor bump because an upgrade changes
-> the graph database, the licence and some C001 and C201 output; see *Upgrading*.
+> Released 2026-11-05. The version is a minor bump because an upgrade changes the graph database, the licence and some C001 and
+> C201 output; see *Upgrading*.
 
 ## What this release is
 
