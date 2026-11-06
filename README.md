@@ -503,8 +503,12 @@ Before submitting:
 
 ## Changelog
 
-Full notes for the latest version: [docs/release-notes-0.98.0.md](docs/release-notes-0.98.0.md). Binaries are on the
+Full notes: [0.98.1](docs/release-notes-0.98.1.md), [0.98.0](docs/release-notes-0.98.0.md). Binaries are on the
 [Releases](https://github.com/RainerXE/odintooling/releases) page.
+
+### 0.98.1 (2026-11-06)
+- C001 reports an allocation that nothing is bound to and nothing frees: `_ = len(make(...))`, `return len(make(...))`, a bare `make(...)` statement and `n := len(make(...))`. Memory from the temp allocator or an arena, results that are returned, stored or handed on, `*_init` procedures and `// olt:ignore C001` stay quiet
+- No change in reports on Odin's own `core` and `vendor` or on eight other Odin projects
 
 ### 0.98.0 (2026-11-05)
 - Memory ownership: the graph records every allocation with its allocator and what became of the memory, followed across procedures; new MCP tool `get_ownership`, and `get_dna_context` returns ownership
