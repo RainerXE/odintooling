@@ -263,13 +263,25 @@ _install_step :: proc() {
 			_mkdir_p(dir)
 		}
 		
-		// Copy with proper error handling
-		state, _, _, err := os.process_exec(
-			os.Process_Desc{command = []string{"cp", "-f", olt_src, olt_dst}},
-			context.allocator,
-		)
-		if err != nil || !state.success {
-			fmt.printfln("  ✗  Failed to copy binary: %v", err)
+		// Copy to a fresh inode and rename over the destination. Overwriting a
+		// signed arm64 binary in place leaves macOS's per-vnode signature cache
+		// holding the old hash, and every later exec is killed with "Code Signature
+		// Invalid" even though the file itself verifies. A rename installs a new
+		// inode, which also means a concurrent exec sees either the old binary or
+		// the new one, never a half-written one.
+		tmp_dst := fmt.aprintf("%s/.olt.new-%d", dst_dir, os.get_pid())
+		defer delete(tmp_dst)
+		_ = os.remove(tmp_dst)
+
+		if cerr := os.copy_file(tmp_dst, olt_src); cerr != nil {
+			fmt.printfln("  ✗  Failed to copy binary: %v", cerr)
+			_ = os.remove(tmp_dst)
+		} else if chmod_err := os.chmod(tmp_dst, os.Permissions_All); chmod_err != nil {
+			fmt.printfln("  ✗  Failed to make the binary executable: %v", chmod_err)
+			_ = os.remove(tmp_dst)
+		} else if rerr := os.rename(tmp_dst, olt_dst); rerr != nil {
+			fmt.printfln("  ✗  Failed to install %s: %v", olt_dst, rerr)
+			_ = os.remove(tmp_dst)
 		} else {
 			if already_installed {
 				fmt.println("  ✓  olt updated")
