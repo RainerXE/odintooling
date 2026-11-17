@@ -38,6 +38,7 @@ main :: proc() {
         case "version": core.print_version(); return
         case "setup": os.exit(core.run_setup_command())
         case "init":  os.exit(core.run_local_init())
+        case "update": os.exit(core.run_update_command(os.args[2:]))
         }
     }
 

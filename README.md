@@ -57,6 +57,11 @@ cd olt-<version>-<platform>
 ./olt setup      # OLS detection → install → MCP registration (3-step wizard)
 ```
 
+After that, `olt update` checks the [Releases](https://github.com/RainerXE/odintooling/releases) page and installs a
+newer build over the running binary. The archive's SHA-256 is verified against the digest the GitHub API publishes
+before anything is replaced; a directory the user cannot write to gets printed instructions instead of sudo.
+`olt update --check` only reports, exiting 1 when a newer release exists.
+
 ### Build from source
 
 Needs [Odin](https://odin-lang.org) (tested with `dev-2026-11`; `olt --version` prints the Odin and grammar versions a build was
@@ -508,6 +513,9 @@ Before submitting:
 
 Full notes: [0.98.1](docs/release-notes-0.98.1.md), [0.98.0](docs/release-notes-0.98.0.md). Binaries are on the
 [Releases](https://github.com/RainerXE/odintooling/releases) page.
+
+### Unreleased
+- `olt update` installs the latest GitHub release over the running binary after verifying its SHA-256 (`--check` reports only, `--force` reinstalls)
 
 ### 0.98.1 (2026-11-06)
 - C001 reports an allocation that nothing is bound to and nothing frees: `_ = len(make(...))`, `return len(make(...))`, a bare `make(...)` statement and `n := len(make(...))`. Memory from the temp allocator or an arena, results that are returned, stored or handed on, `*_init` procedures and `// olt:ignore C001` stay quiet

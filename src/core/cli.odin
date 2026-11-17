@@ -226,6 +226,8 @@ print_help :: proc() {
     fmt.println("  olt setup              Full system setup: OLS detection, install olt + symlinks")
     fmt.println("  olt mcp                Start MCP server (stdio JSON-RPC for Claude Code etc.)")
     fmt.println("  olt lsp                Start LSP proxy (wraps OLS, injects olt diagnostics)")
+    fmt.println("  olt update             Install the latest GitHub release over the running binary")
+    fmt.println("                         (--check reports only; --force reinstalls the current release)")
     fmt.println()
     fmt.println("Options:")
     fmt.println("  --init                 Alias for 'olt setup' (backward compat)")

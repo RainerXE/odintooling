@@ -218,7 +218,7 @@ _install_step :: proc() {
 	// This prevents olt from removing itself before the copy (source == destination).
 	if abs_bin_dir == dst_dir {
 		fmt.println("  olt is running from the install location — install step skipped.")
-		fmt.println("  To upgrade: rebuild olt and run 'olt setup' from the build artifacts folder.")
+		fmt.println("  To upgrade: run 'olt update', or rebuild and run 'olt setup' from the build artifacts folder.")
 		return
 	}
 
