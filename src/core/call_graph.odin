@@ -72,9 +72,10 @@ TARGET_KINDS :: `('function','struct','enum','union','type_alias','constant','va
 
 // graph_open opens (or creates) the graph database at path.
 // A database written by an older olt (its own schema, before the CodeGraph
-// schema) is a derived cache: it is discarded and rebuilt rather than migrated.
+// schema), or one whose schema script stopped partway, is a derived cache: it
+// is discarded and rebuilt rather than migrated.
 graph_open :: proc(path: string) -> (db: ^GraphDB, ok: bool) {
-    if _is_legacy_graph_db(path) {
+    if _is_stale_graph_db(path) {
         _ = os.remove(path)
         _ = os.remove(fmt.tprintf("%s-wal", path))
         _ = os.remove(fmt.tprintf("%s-shm", path))
@@ -125,7 +126,7 @@ graph_open :: proc(path: string) -> (db: ^GraphDB, ok: bool) {
 // without graph data. Only the exporter, via graph_open, creates a database.
 graph_open_existing :: proc(path: string) -> (db: ^GraphDB, ok: bool) {
     if !os.is_file(path) { return nil, false }
-    if _is_legacy_graph_db(path) { return nil, false }
+    if _is_stale_graph_db(path) { return nil, false }
     return graph_open(path)
 }
 
@@ -167,10 +168,14 @@ _table_exists :: proc(conn: ^sq.Connection, name: string) -> bool {
     return sq.stmt_step(&s)
 }
 
-// _is_legacy_graph_db reports whether path holds a database from before the
-// CodeGraph schema: it has a nodes table, but no file_path column.
+// _is_stale_graph_db reports whether path holds a graph olt must not trust: one
+// written before the CodeGraph schema (its nodes table has no file_path), or one
+// whose schema script stopped partway. A script that fails on the FTS5 table
+// leaves nodes and edges behind but no nodes_fts — a SQLite built without FTS5
+// does exactly that — so the missing tables mark the database incomplete.
+// Either way it is a derived cache, so the exporter rebuilds it from scratch.
 @(private)
-_is_legacy_graph_db :: proc(path: string) -> bool {
+_is_stale_graph_db :: proc(path: string) -> bool {
     if !os.is_file(path) { return false }
     conn, ok := sq.db_open(path)
     if !ok { return false }
@@ -179,7 +184,14 @@ _is_legacy_graph_db :: proc(path: string) -> bool {
     s, s_ok := sq.db_prepare(conn, "SELECT COUNT(*) FROM pragma_table_info('nodes') WHERE name='file_path';")
     if !s_ok { return false }
     defer sq.stmt_finalize(&s)
-    if sq.stmt_step(&s) { return sq.stmt_col_int(&s, 0) == 0 }
+    if sq.stmt_step(&s) && sq.stmt_col_int(&s, 0) == 0 { return true }
+
+    if !_table_exists(conn, "schema_versions")  { return true }
+    if !_table_exists(conn, "nodes_fts")        { return true }
+    if !_table_exists(conn, "project_metadata") { return true }
+    if !_table_exists(conn, "edges")            { return true }
+    if !_table_exists(conn, "files")            { return true }
+    if !_table_exists(conn, "unresolved_refs")  { return true }
     return false
 }
 

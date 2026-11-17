@@ -34,5 +34,32 @@ for tool in olt-mcp olt-lsp; do
   if [ "$rc" -ne 139 ] && [ "$rc" -ne 134 ]; then ok "$tool starts without crashing"; else fail "$tool starts without crashing (got $rc)"; fi
 done
 
+# The code graph must build with its full schema. A SQLite built without FTS5 creates the
+# base tables and then fails on nodes_fts, leaving nothing usable (how the 0.97.x Linux
+# builds lost the graph), so this checks the export, the node rows and the FTS index.
+mkdir -p "$TMP/proj"
+printf 'package p\n\nStatus :: enum { ok, busy }\n\nfiber_status :: proc(s: Status) -> int {\n\treturn int(s)\n}\n' > "$TMP/proj/sym.odin"
+rc=0; "$OLT" "$TMP/proj" --export-symbols --db "$TMP/proj/.codegraph/g.db" >"$TMP/export.log" 2>&1 || rc=$?
+if [ "$rc" -eq 0 ]; then
+  ok "--export-symbols exits 0"
+else
+  fail "--export-symbols exits 0 (got $rc)"
+  sed 's/^/       /' "$TMP/export.log"
+fi
+
+if python3 - "$TMP/proj/.codegraph/g.db" <<'PY'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+assert db.execute("select count(*) from nodes").fetchone()[0] > 0, "no nodes"
+row = db.execute("select kind, start_line, end_line from nodes where name='fiber_status'").fetchone()
+assert row and row[1] > 0 and row[2] >= row[1], "symbol row missing"
+assert db.execute("select count(*) from nodes_fts where nodes_fts match 'fiber_status'").fetchone()[0] > 0, "FTS index empty"
+PY
+then
+  ok "the graph has nodes and a working FTS5 index"
+else
+  fail "the graph has nodes and a working FTS5 index"
+fi
+
 rm -rf "$TMP"
 exit "$FAILED"

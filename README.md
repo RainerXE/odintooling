@@ -332,6 +332,9 @@ Homebrew installs it as `ols_lsp` — `olt setup` detects both names automatical
 
 `olt mcp` exposes olt as an [MCP](https://modelcontextprotocol.io) server for Claude Code and other AI agents.
 
+`olt mcp` speaks newline-delimited JSON-RPC 2.0 on stdin/stdout: one JSON object per line, which is what MCP clients send
+by default. It does not use LSP `Content-Length` framing.
+
 `olt setup` registers `olt-mcp` automatically for every detected tool (see [First-run setup](#first-run-setup)).
 
 For manual registration, add to your tool's MCP config file — the binary is `~/.local/bin/olt-mcp` after setup:
