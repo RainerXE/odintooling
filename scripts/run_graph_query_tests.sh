@@ -44,6 +44,7 @@ ODIN
 
 if "$OLT_BINARY" "$PROJ" --export-symbols --db "$DB" >"$WORK/export.log" 2>&1; then
   ok "export builds the code graph"
+  check "export notes a test-free target" 'grep -q "no Odin test files" "$WORK/export.log"'
 else
   bad "export builds the code graph"
   cat "$WORK/export.log"
@@ -111,6 +112,14 @@ check "--db without a path exits 2"        '[ "$rc" -eq 2 ]'
 
 "$OLT_BINARY" symbol foo --db "$WORK/none.db" >/dev/null 2>"$WORK/err"; rc=$?
 check "missing database exits 2"           '[ "$rc" -eq 2 ] && grep -q "graph db not found" "$WORK/err"'
+
+"$OLT_BINARY" "$PROJ/alpha/a.odin" --export-symbols --db "$WORK/single.db" >"$WORK/single.log" 2>&1
+check "a single-file export does not warn about tests" '! grep -q "no Odin test files" "$WORK/single.log"'
+
+# A source file changed after the export: the query still answers, with a note.
+touch -t 203001010000 "$PROJ/alpha/a.odin"
+"$OLT_BINARY" symbol alpha::foo --db "$DB" --json >/dev/null 2>"$WORK/stale_err"
+check "a changed source file is flagged" 'grep -q "changed after the graph was built" "$WORK/stale_err"'
 
 echo "graph query tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

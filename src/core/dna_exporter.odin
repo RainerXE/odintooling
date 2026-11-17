@@ -18,6 +18,7 @@ SYMBOLS_JSON_PATH :: ".codegraph/symbols.json"
 // ExportResult summarises what the exporter produced.
 ExportResult :: struct {
     files_indexed:    int,
+    test_files:       int,   // *_test.odin files in the exported target
     nodes_written:    int,
     edges_written:    int,
     unresolved:       int,
@@ -63,6 +64,13 @@ export_symbols :: proc(
     defer {
         for f in files { delete(f) }
         delete(files)
+    }
+
+    // List the target's test files, so callers from tests are not silently absent.
+    for f in files {
+        if strings.has_suffix(f, "_test.odin") {
+            result.test_files += 1
+        }
     }
 
     // -----------------------------------------------------------------------

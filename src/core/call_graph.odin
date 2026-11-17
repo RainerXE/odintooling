@@ -1419,6 +1419,39 @@ graph_get_references :: proc(db: ^GraphDB, node_id: i64) -> [dynamic]GraphEdgeIn
     return result
 }
 
+// graph_stale_file returns an indexed source file that changed after the graph was built,
+// if any. The graph is still usable, but call edges from that file may be missing. The
+// comparison uses files.indexed_at (the export time) with a one-second tolerance: file
+// mtimes are stored in whole seconds on some filesystems.
+graph_stale_file :: proc(db: ^GraphDB) -> (path: string, stale: bool) {
+    s, ok := sq.db_prepare(db.conn, `SELECT MAX(indexed_at) FROM files;`)
+    if !ok { return "", false }
+    export_ms := i64(0)
+    if sq.stmt_step(&s) { export_ms = sq.stmt_col_i64(&s, 0) }
+    sq.stmt_finalize(&s)
+    if export_ms <= 0 { return "", false }
+
+    f, f_ok := sq.db_prepare(db.conn, `SELECT path FROM files;`)
+    if !f_ok { return "", false }
+    defer sq.stmt_finalize(&f)
+    for sq.stmt_step(&f) {
+        rel := sq.stmt_col_text(&f, 0)
+        abs := graph_abs(db, rel)
+        mtime, err := os.modification_time_by_path(abs)
+        changed := err != nil ||
+            time.time_to_unix_nano(mtime) / 1_000_000 > export_ms + 1000
+        if changed {
+            path = strings.clone(abs)
+            delete(rel)
+            delete(abs)
+            return path, true
+        }
+        delete(rel)
+        delete(abs)
+    }
+    return "", false
+}
+
 // RenameLocation is a single site where a symbol name must be changed.
 RenameLocation :: struct {
     file:   string,

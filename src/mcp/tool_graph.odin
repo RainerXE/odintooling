@@ -21,12 +21,13 @@ make_get_dna_context_tool :: proc() -> mcp.Tool {
     return mcp.Tool{
         defn = mcp.ToolDefinition{
             name        = "get_dna_context",
-            description = "Return callers, callees, memory role, return type, lint violations, allocator-typed variables and ownership (allocation sites with their allocator and what became of the memory, whether the procedure is a factory or frees a parameter, and which allocations are leak candidates) for a named Odin procedure.",
+            description = "Return callers, callees, memory role, return type, lint violations, allocator-typed variables and ownership (allocation sites with their allocator and what became of the memory, whether the procedure is a factory or frees a parameter, and which allocations are leak candidates) for a named Odin procedure. Pass token_budget to trim the lists to an approximate output size and set truncated.",
             input_schema = `{
                 "type": "object",
                 "properties": {
-                    "proc_name": {"type": "string", "description": "Exact procedure name to look up"},
-                    "db_path":   {"type": "string", "description": "Path to graph db (default: .codegraph/olt.db)"}
+                    "proc_name":    {"type": "string", "description": "Exact procedure name to look up"},
+                    "db_path":      {"type": "string", "description": "Path to graph db (default: .codegraph/olt.db)"},
+                    "token_budget": {"type": "integer", "description": "Approximate output budget in tokens (4 chars per token). Trims callers, callees, allocator vars and ownership sites, reports token_budget/estimated_tokens/truncated. 0 (default) returns everything."}
                 },
                 "required": ["proc_name"]
             }`,
@@ -39,6 +40,8 @@ make_get_dna_context_tool :: proc() -> mcp.Tool {
 _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
     proc_name, err := _extract_string_param(params, "proc_name")
     if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
+    token_budget := _graph_opt_int(params, "token_budget", 0)
+    if token_budget < 0 { token_budget = 0 }
     db_path := _graph_opt_string(params, "db_path", core.GRAPH_DB_PATH)
 
     db, ok := core.graph_open_existing(db_path)
@@ -61,6 +64,22 @@ _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocato
     callees := core.graph_get_callees(db, node.id)
     defer { _free_nodes(callers[:]); delete(callers); _free_nodes(callees[:]); delete(callees) }
 
+    // A token budget trims the optional lists; the proc header and the ownership
+    // summary are always kept. 4 characters per token is the usual rough estimate.
+    caller_limit, callee_limit, alloc_limit, site_limit := -1, -1, -1, -1
+    if token_budget > 0 {
+        avail := token_budget * 4 - 700
+        if avail < 0 { avail = 0 }
+        caller_limit = (avail * 45 / 100) / 120
+        callee_limit = (avail * 25 / 100) / 120
+        alloc_limit  = (avail * 10 / 100) / 80
+        site_limit   = (avail * 20 / 100) / 160
+        if caller_limit > 200 { caller_limit = 200 }
+        if callee_limit > 200 { callee_limit = 200 }
+        if alloc_limit  > 100 { alloc_limit  = 100 }
+        if site_limit   > 100 { site_limit   = 100 }
+    }
+
     sb := strings.builder_make(context.temp_allocator)
     role       := node.memory_role if node.memory_role != "" else "neutral"
     violations := node.lint_violations if node.lint_violations != "" else "[]"
@@ -71,31 +90,44 @@ _get_dna_context_handler :: proc(params: json.Value, allocator: runtime.Allocato
 
     strings.write_string(&sb, `,"callers":[`)
     for n, idx in callers {
+        if caller_limit >= 0 && idx >= caller_limit { break }
         if idx > 0 { strings.write_string(&sb, ",") }
         fmt.sbprintf(&sb, `{{"name":%s,"file":%s,"line":%d}`, _gj(n.name), _gj(n.file), n.line)
     }
-    strings.write_string(&sb, `],"callees":[`)
+    fmt.sbprintf(&sb, `],"caller_count":%d,"callees":[`, len(callers))
     for n, idx in callees {
+        if callee_limit >= 0 && idx >= callee_limit { break }
         if idx > 0 { strings.write_string(&sb, ",") }
         fmt.sbprintf(&sb, `{{"name":%s,"file":%s,"line":%d}`, _gj(n.name), _gj(n.file), n.line)
     }
 
     allocator_vars := core.graph_find_file_allocator_vars(db, node.file)
     defer { _free_nodes(allocator_vars[:]); delete(allocator_vars) }
-    strings.write_string(&sb, `],"allocator_vars":[`)
+    fmt.sbprintf(&sb, `],"callee_count":%d,"allocator_vars":[`, len(callees))
     for n, idx in allocator_vars {
+        if alloc_limit >= 0 && idx >= alloc_limit { break }
         if idx > 0 { strings.write_string(&sb, ",") }
         fmt.sbprintf(&sb, `{{"name":%s,"line":%d}`, _gj(n.name), n.line)
     }
-    strings.write_string(&sb, `]`)
-    _write_ownership(&sb, db, node.id)
+    fmt.sbprintf(&sb, `],"allocator_var_count":%d`, len(allocator_vars))
+    sites_truncated := _write_ownership(&sb, db, node.id, site_limit)
+    if token_budget > 0 {
+        truncated := sites_truncated ||
+            (caller_limit >= 0 && len(callers) > caller_limit) ||
+            (callee_limit >= 0 && len(callees) > callee_limit) ||
+            (alloc_limit >= 0 && len(allocator_vars) > alloc_limit)
+        estimated := (len(strings.to_string(sb)) + 3) / 4
+        fmt.sbprintf(&sb, `,"token_budget":%d,"estimated_tokens":%d,"truncated":%v`,
+            token_budget, estimated, truncated)
+    }
     strings.write_string(&sb, `}`)
     return mcp.tool_ok(strings.clone(strings.to_string(sb), allocator), allocator)
 }
 
 // _write_ownership appends `,"ownership":{...}`: what the procedure does with memory.
+// site_limit caps the sites list (-1 = all); it returns true when sites were omitted.
 @(private="file")
-_write_ownership :: proc(sb: ^strings.Builder, db: ^core.GraphDB, node: i64) {
+_write_ownership :: proc(sb: ^strings.Builder, db: ^core.GraphDB, node: i64, site_limit: int = -1) -> (truncated: bool) {
     own := core.graph_ownership_of(db, node)
     defer core.graph_free_ownership_info(own)
 
@@ -117,8 +149,9 @@ _write_ownership :: proc(sb: ^strings.Builder, db: ^core.GraphDB, node: i64) {
         if i > 0 { strings.write_string(sb, ",") }
         fmt.sbprintf(sb, `%d`, idx)
     }
-    fmt.sbprintf(sb, `],"free_calls":%d,"leak_candidates":%d,"sites":[`, own.free_calls, leaks)
+    fmt.sbprintf(sb, `],"free_calls":%d,"leak_candidates":%d,"site_count":%d,"sites":[`, own.free_calls, leaks, len(own.sites))
     for a, i in own.sites {
+        if site_limit >= 0 && i >= site_limit { truncated = true; break }
         if i > 0 { strings.write_string(sb, ",") }
         fmt.sbprintf(sb,
             `{{"line":%d,"api":%s,"type":%s,"allocator":%s,"var":%s,"disposition":%s,"leak_candidate":%v}`,
@@ -126,6 +159,7 @@ _write_ownership :: proc(sb: ^strings.Builder, db: ^core.GraphDB, node: i64) {
             _is_leak_candidate(a))
     }
     strings.write_string(sb, `]}`)
+    return truncated
 }
 
 // _is_leak_candidate: memory from the default or a parameter allocator that nothing frees, returns, stores

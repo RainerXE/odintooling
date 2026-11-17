@@ -573,6 +573,19 @@ analyze_file :: proc(
 // Entry point
 // =============================================================================
 
+// _note_missing_tests says so when a directory export has no *_test.odin files: the
+// graph then has no call edges from tests, which looks healthy but is half-blind.
+@(private)
+_note_missing_tests :: proc(r: ExportResult, targets: []string) {
+    if r.test_files > 0 { return }
+    any_dir := false
+    for t in targets {
+        if os.is_dir(t) { any_dir = true; break }
+    }
+    if !any_dir { return }
+    fmt.eprintln("note: no Odin test files (names ending in _test.odin) in the export target; callers from tests are absent (export the repository root to include them)")
+}
+
 // cli_main is the CLI entry point, called from src/main.odin.
 // Returns an OS exit code (0 = success).
 cli_main :: proc() -> int {
@@ -627,6 +640,7 @@ cli_main :: proc() -> int {
         }
         fmt.printfln("  graph db:    %s", r.db_path)
         fmt.printfln("  symbols.json: %s", r.symbols_path)
+        _note_missing_tests(r, opts.targets[:])
         return 0
     }
 
@@ -657,6 +671,7 @@ cli_main :: proc() -> int {
         fmt.printfln("codegraph-init: %d files indexed, %d nodes, %d edges",
             r.files_indexed, r.nodes_written, r.edges_written)
         fmt.printfln("  codegraph db: %s", r.db_path)
+        _note_missing_tests(r, opts.targets[:])
         fmt.println()
         fmt.println("CodeGraph is ready. To keep it updated after code changes:")
         fmt.printfln("  olt --codegraph-sync <target>")
@@ -690,6 +705,7 @@ cli_main :: proc() -> int {
         }
         cached_msg := " (no changes)" if r.cached else ""
         fmt.printfln("codegraph-sync: %d nodes, %d edges%s", r.nodes_written, r.edges_written, cached_msg)
+        _note_missing_tests(r, opts.targets[:])
         return 0
     }
 

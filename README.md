@@ -379,7 +379,7 @@ Available MCP tools:
 | `run_odin_check` | Run `odin check` and return compiler diagnostics |
 | `get_symbol` | Look up a symbol in the code graph |
 | `export_symbols` | Build the code knowledge graph |
-| `get_dna_context` | Callers, callees, memory role for a proc, and its ownership: allocations, factory or sink, leak candidates |
+| `get_dna_context` | Callers, callees, memory role for a proc, and its ownership: allocations, factory or sink, leak candidates (`token_budget` trims the lists) |
 | `get_impact_radius` | Transitive impact of changing a symbol |
 | `get_callers` / `get_callees` | Direct call graph neighbours |
 | `search_symbols` | Full-text symbol search |
@@ -414,6 +414,9 @@ A plain name must be unique; when it is not, the command lists the candidates an
 `--db <path>` selects another database, and `olt --list-kinds` prints the node kinds
 (procedures are `function`, not `proc`). Exit codes: 0 answer printed, 1 symbol not found,
 2 usage, ambiguity or database error.
+
+The export says so when the target has no `*_test.odin` files (call edges from tests would be
+missing), and the query commands note when a source file changed after the database was built.
 
 The database is a [CodeGraph](https://github.com/colbymchenry/codegraph) database. Its core tables come from CodeGraph's schema,
 vendored unmodified in `ffi/codegraph/` (refresh with `scripts/update_codegraph_schema.sh`):
@@ -527,15 +530,18 @@ Before submitting:
 
 ## Changelog
 
-Full notes: [0.98.1](docs/release-notes-0.98.1.md), [0.98.0](docs/release-notes-0.98.0.md). Binaries are on the
+Full notes: [0.98.2](docs/release-notes-0.98.2.md), [0.98.1](docs/release-notes-0.98.1.md), [0.98.0](docs/release-notes-0.98.0.md). Binaries are on the
 [Releases](https://github.com/RainerXE/odintooling/releases) page.
 
-### Unreleased
+### 0.98.2 (2026-11-17)
 - `olt update` installs the latest GitHub release over the running binary after verifying its SHA-256 (`--check` reports only, `--force` reinstalls)
 - `olt --install` writes the binary to a fresh inode and renames it into place; overwriting a signed macOS binary in place can make the kernel kill every later run with `SIGKILL (Code Signature Invalid)`
 - `olt symbol`, `olt callers` and `olt refs` query the code graph from the CLI; `--json` prints the MCP payload shapes and `--db <path>` selects the database
 - `olt --list-kinds` documents the node kinds (`function` for procedures, not `proc`); `olt symbol --json` includes `lint_violations`
 - `--db` is listed in `olt --help`
+- `--export-symbols` notes when the target has no `*_test.odin` files, so callers from tests are not silently absent
+- CLI graph queries note when a source file changed after the database was built
+- `get_dna_context` accepts `token_budget` and trims callers, callees, allocator variables and ownership sites to fit
 
 ### 0.98.1 (2026-11-06)
 - C001 reports an allocation that nothing is bound to and nothing frees: `_ = len(make(...))`, `return len(make(...))`, a bare `make(...)` statement and `n := len(make(...))`. Memory from the temp allocator or an arena, results that are returned, stored or handed on, `*_init` procedures and `// olt:ignore C001` stay quiet

@@ -45,6 +45,11 @@ run_graph_query_command :: proc(command: string, args: []string) -> int {
 	}
 	defer graph_close(db)
 
+	if changed, stale := graph_stale_file(db); stale {
+		defer delete(changed)
+		fmt.eprintfln("note: %s changed after the graph was built; re-run 'olt <target> --export-symbols' for current answers", changed)
+	}
+
 	// Resolve first: a plain name can be ambiguous across packages, and guessing
 	// the first match would silently answer about the wrong declaration.
 	candidates := graph_find_candidates(db, opts.name)

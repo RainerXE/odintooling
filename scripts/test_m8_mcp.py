@@ -316,6 +316,18 @@ def test_get_ownership(client: MCPClient):
               {x["proc"] for x in one} == {"thing_create"} and any(x["allocator"] == "param" for x in one),
               f"got {one}")
 
+        full = client.tool("get_dna_context", {"proc_name": "thing_create", "db_path": db})
+        tiny = client.tool("get_dna_context", {"proc_name": "thing_create", "db_path": db, "token_budget": 30})
+        check("get_dna_context: a tiny token budget reports truncation",
+              tiny.get("truncated") is True and tiny.get("token_budget") == 30, f"{tiny}")
+        check("get_dna_context: a tiny token budget keeps the proc header",
+              tiny.get("proc", {}).get("name") == "thing_create", f"{tiny}")
+        big = client.tool("get_dna_context", {"proc_name": "thing_create", "db_path": db, "token_budget": 100000})
+        check("get_dna_context: a large token budget keeps every site",
+              big.get("truncated") is False and
+              len(big.get("ownership", {}).get("sites", [])) == len(full.get("ownership", {}).get("sites", [])),
+              f"{big.get('ownership', {})}")
+
 
 def test_c201_follows_edits(client: MCPClient):
     section("C201 in a long-running server — an edited package is noticed")
