@@ -24,7 +24,7 @@ permissions:
 
 env:
   # The Odin release the rule suites are verified against (see ODIN_TESTED_VERSION in src/core/cli.odin).
-  ODIN_RELEASE: dev-2026-10
+  ODIN_RELEASE: dev-2026-11
 
 jobs:
 

@@ -9,7 +9,7 @@ import "core:fmt"
 // C009: Flag import "core:os/old" — the legacy OS API
 // =============================================================================
 // core:os2 migration completed Q1 2026; the new API is core:os. core:os/old is not
-// in the Odin source tree as of dev-2026-10, so the import no longer compiles there.
+// in the Odin source tree as of dev-2026-11, so the import no longer compiles there.
 // Category: CORRECTNESS
 // =============================================================================
 
@@ -52,7 +52,7 @@ c009_scm_run :: proc(
             column    = int(pt.column) + 1,
             rule_id   = "C009",
             tier      = "correctness",
-            message   = fmt.aprintf("Import of 'core:os/old', which no longer exists in current Odin (not present in dev-2026-10)"),
+            message   = fmt.aprintf("Import of 'core:os/old', which no longer exists in current Odin (not present in dev-2026-11)"),
             has_fix   = true,
             fix       = "Replace with 'core:os' (new unified OS API since Q1 2026)",
             diag_type = .VIOLATION,

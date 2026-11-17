@@ -59,7 +59,7 @@ cd olt-<version>-<platform>
 
 ### Build from source
 
-Needs [Odin](https://odin-lang.org) (tested with `dev-2026-10`; `olt --version` prints the Odin and grammar versions a build was
+Needs [Odin](https://odin-lang.org) (tested with `dev-2026-11`; `olt --version` prints the Odin and grammar versions a build was
 verified with), `git`, `make` and a C compiler.
 
 ```bash

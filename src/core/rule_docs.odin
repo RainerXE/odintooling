@@ -219,7 +219,7 @@ WHAT IT DETECTS
   Import declarations that reference 'core:os/old', the legacy OS package.
 
 WHY IT MATTERS
-  'core:os/old' is not part of current Odin (it is absent from the dev-2026-10
+  'core:os/old' is not part of current Odin (it is absent from the dev-2026-11
   source tree). Code importing it fails to compile on current builds.
 
 FIRES:
@@ -247,7 +247,7 @@ WHAT IT DETECTS
   fixed-capacity dynamic array syntax '[dynamic; N]T' (Odin dev-2026-04) can replace.
 
 WHY IT MATTERS
-  Small_Array still ships (core:container/small_array exists in dev-2026-10), so
+  Small_Array still ships (core:container/small_array exists in dev-2026-11), so
   this is a suggestion, not a breakage. The built-in '[dynamic; N]T' is
   first-class, composes with the rest of the language, and avoids an import.
 

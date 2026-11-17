@@ -1,7 +1,7 @@
 // c010-MIG-SmallArray.odin — C010: Small_Array where the built-in [dynamic; N]T fits.
 // Flags usage of container.Small_Array, which the built-in [dynamic; N]T
 // fixed-capacity dynamic-array syntax (dev-2026-04) can replace. Small_Array
-// itself still ships (core:container/small_array exists in dev-2026-10).
+// itself still ships (core:container/small_array exists in dev-2026-11).
 package core
 
 import "core:fmt"
