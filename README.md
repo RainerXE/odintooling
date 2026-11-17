@@ -400,11 +400,27 @@ olt src/ --export-symbols
 This writes `.codegraph/olt.db` and `.codegraph/symbols.json`; pass another path with `--db=<path>` or the MCP `export_symbols` tool.
 Add `.codegraph/` to your `.gitignore` to keep generated files out of version control.
 
+Query the graph from the CLI instead of reading SQLite:
+
+```bash
+olt symbol foo                # one declaration: kind, file:line, signature, memory role, lint findings
+olt callers foo               # procedures that call foo
+olt refs foo                  # every reference site
+olt symbol foo --json         # same payload the MCP tools return
+olt symbol pkg::foo --json    # disambiguate when two packages share a name
+```
+
+A plain name must be unique; when it is not, the command lists the candidates and exits 2.
+`--db <path>` selects another database, and `olt --list-kinds` prints the node kinds
+(procedures are `function`, not `proc`). Exit codes: 0 answer printed, 1 symbol not found,
+2 usage, ambiguity or database error.
+
 The database is a [CodeGraph](https://github.com/colbymchenry/codegraph) database. Its core tables come from CodeGraph's schema,
 vendored unmodified in `ffi/codegraph/` (refresh with `scripts/update_codegraph_schema.sh`):
 
 - **nodes** — `file`, `function`, `struct`, `union`, `enum`, `enum_member`, `constant`, `variable` and `import`, each with its
   start and end position, signature, return type and visibility; qualified names are `package::name`
+  (`olt --list-kinds` prints this list; procedures are `function` nodes, not `proc`)
 - **edges** — `contains` (file → declaration, enum → member), `calls`, `references` (procedure group → member) and `instantiates` (procedure → the type it allocates, with the ownership facts as JSON `metadata`)
 - **unresolved_refs** — calls whose target is outside the project (`fmt::println`) or is a value (`a.b.f`)
 - **files**, **nodes_fts** (full-text search), **project_metadata**, **schema_versions**
@@ -516,6 +532,10 @@ Full notes: [0.98.1](docs/release-notes-0.98.1.md), [0.98.0](docs/release-notes-
 
 ### Unreleased
 - `olt update` installs the latest GitHub release over the running binary after verifying its SHA-256 (`--check` reports only, `--force` reinstalls)
+- `olt --install` writes the binary to a fresh inode and renames it into place; overwriting a signed macOS binary in place can make the kernel kill every later run with `SIGKILL (Code Signature Invalid)`
+- `olt symbol`, `olt callers` and `olt refs` query the code graph from the CLI; `--json` prints the MCP payload shapes and `--db <path>` selects the database
+- `olt --list-kinds` documents the node kinds (`function` for procedures, not `proc`); `olt symbol --json` includes `lint_violations`
+- `--db` is listed in `olt --help`
 
 ### 0.98.1 (2026-11-06)
 - C001 reports an allocation that nothing is bound to and nothing frees: `_ = len(make(...))`, `return len(make(...))`, a bare `make(...)` statement and `n := len(make(...))`. Memory from the temp allocator or an arena, results that are returned, stored or handed on, `*_init` procedures and `// olt:ignore C001` stay quiet

@@ -582,6 +582,7 @@ cli_main :: proc() -> int {
     if opts.show_version  { print_version();              return 0 }
     if opts.show_help     { print_help();                 return 0 }
     if opts.list_rules    { print_list_rules();           return 0 }
+    if opts.list_kinds    { print_list_kinds();           return 0 }
     if opts.init_mode     { return run_init_command()               }
     if opts.install_mode  { return run_install_command()            }
 

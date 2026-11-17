@@ -46,6 +46,7 @@ LintOptions :: struct {
     show_help:        bool,
     show_version:     bool,
     list_rules:       bool,
+    list_kinds:       bool,
     init_mode:        bool,            // --init: run first-run setup wizard
     install_mode:     bool,            // --install: create symlinks in ~/.local/bin/
     config:           OdinLintConfig,  // loaded from olt.toml (or auto-detected)
@@ -66,6 +67,8 @@ parse_args :: proc(args: []string) -> (LintOptions, bool) {
             opts.show_version = true
         case arg == "--list-rules":
             opts.list_rules = true
+        case arg == "--list-kinds":
+            opts.list_kinds = true
         case arg == "--init":
             opts.init_mode = true
         case arg == "--install":
@@ -221,6 +224,7 @@ print_help :: proc() {
     fmt.println("  --version              Print version and grammar info")
     fmt.println("  --help                 Show this help message")
     fmt.println("  --list-rules           List all rules (tab-separated: id, tier, message)")
+    fmt.println("  --list-kinds           List code graph node kinds (tab-separated: kind, description)")
     fmt.println("Subcommands:")
     fmt.println("  olt init               Create olt.toml in current directory (runs 'olt setup' first if needed)")
     fmt.println("  olt setup              Full system setup: OLS detection, install olt + symlinks")
@@ -228,6 +232,9 @@ print_help :: proc() {
     fmt.println("  olt lsp                Start LSP proxy (wraps OLS, injects olt diagnostics)")
     fmt.println("  olt update             Install the latest GitHub release over the running binary")
     fmt.println("                         (--check reports only; --force reinstalls the current release)")
+    fmt.println("  olt symbol <name>      Look up a declaration in the code graph (--json, --db)")
+    fmt.println("  olt callers <name>     Procedures that call a declaration (--json, --db)")
+    fmt.println("  olt refs <name>        Reference sites for a declaration (--json, --db)")
     fmt.println()
     fmt.println("Options:")
     fmt.println("  --init                 Alias for 'olt setup' (backward compat)")
@@ -243,6 +250,7 @@ print_help :: proc() {
     fmt.println("  --export-symbols       Build code graph + symbols.json (enables C202, C012-T3, C014, C015)")
     fmt.println("  --codegraph-init       First-time setup: full rebuild + emit .codegraph/codegraph.db")
     fmt.println("  --codegraph-sync       Incremental update of .codegraph/codegraph.db (requires --codegraph-init first)")
+    fmt.println("  --db <path>            Graph database path (default: .codegraph/olt.db)")
     fmt.println("  --fix                  Apply safe machine-applicable fixes in-place (C001)")
     fmt.println("  --unsafe-fix           Apply fixes that change API surface (e.g. C009 os2 migration)")
     fmt.println("  --propose              Show proposed fixes as a diff without writing")

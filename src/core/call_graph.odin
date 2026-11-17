@@ -1227,12 +1227,54 @@ scan_node_info :: proc(db: ^GraphDB, s: ^sq.Stmt) -> GraphNodeInfo {
 graph_get_node :: proc(db: ^GraphDB, name: string) -> (GraphNodeInfo, bool) {
     s, ok := sq.db_prepare(db.conn,
         `SELECT ` + NODE_COLS + ` FROM ` + NODE_FROM + `
-         WHERE n.name=? AND n.kind IN ` + TARGET_KINDS + ` LIMIT 1;`)
+         WHERE (n.name=? OR n.qualified_name=?) AND n.kind IN ` + TARGET_KINDS + ` LIMIT 1;`)
     if !ok { return {}, false }
     defer sq.stmt_finalize(&s)
     sq.stmt_bind_text(&s, 1, name)
+    sq.stmt_bind_text(&s, 2, name)
     if sq.stmt_step(&s) { return scan_node_info(db, &s), true }
     return {}, false
+}
+
+// GraphCandidate is one declaration matching a name, enough to report an ambiguity.
+GraphCandidate :: struct {
+    qualified_name: string,
+    kind:           string,
+    file:           string,   // absolute
+    line:           int,
+}
+
+// graph_find_candidates returns every declaration whose plain name or qualified name matches.
+// More than one means the caller must ask for a package::name instead of guessing.
+graph_find_candidates :: proc(db: ^GraphDB, name: string) -> [dynamic]GraphCandidate {
+    result := make([dynamic]GraphCandidate)
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT n.qualified_name, n.kind, n.file_path, n.start_line
+         FROM ` + NODE_FROM + `
+         WHERE (n.name=? OR n.qualified_name=?) AND n.kind IN ` + TARGET_KINDS + `
+         ORDER BY n.file_path, n.start_line;`)
+    if !ok { return result }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_text(&s, 1, name)
+    sq.stmt_bind_text(&s, 2, name)
+    for sq.stmt_step(&s) {
+        rel := sq.stmt_col_text(&s, 2)
+        append(&result, GraphCandidate{
+            qualified_name = sq.stmt_col_text(&s, 0),
+            kind           = sq.stmt_col_text(&s, 1),
+            file           = graph_abs(db, rel),
+            line           = sq.stmt_col_int(&s, 3),
+        })
+        delete(rel)
+    }
+    return result
+}
+
+graph_free_candidates :: proc(cands: [dynamic]GraphCandidate) {
+    for c in cands {
+        delete(c.qualified_name); delete(c.kind); delete(c.file)
+    }
+    delete(cands)
 }
 
 // graph_free_node_info frees all heap-allocated strings inside a GraphNodeInfo.
@@ -1336,6 +1378,33 @@ graph_find_all_references :: proc(db: ^GraphDB, name: string) -> [dynamic]GraphE
     if !ok { return result }
     defer sq.stmt_finalize(&s)
     sq.stmt_bind_text(&s, 1, name)
+    for sq.stmt_step(&s) {
+        rel := sq.stmt_col_text(&s, 3)
+        append(&result, GraphEdgeInfo{
+            source_name = sq.stmt_col_text(&s, 0),
+            target_name = sq.stmt_col_text(&s, 1),
+            kind        = sq.stmt_col_text(&s, 2),
+            file        = graph_abs(db, rel),
+            line        = sq.stmt_col_int(&s, 4),
+        })
+        delete(rel)
+    }
+    return result
+}
+
+// graph_get_references returns the edge locations that point at one resolved node. Unlike
+// graph_find_all_references it cannot merge same-named declarations from different packages.
+graph_get_references :: proc(db: ^GraphDB, node_id: i64) -> [dynamic]GraphEdgeInfo {
+    result := make([dynamic]GraphEdgeInfo)
+    s, ok := sq.db_prepare(db.conn,
+        `SELECT src.name, tgt.name, e.kind, src.file_path, e.line
+         FROM edges e
+         JOIN nodes src ON e.source = src.id
+         JOIN nodes tgt ON e.target = tgt.id
+         WHERE e.target = (SELECT id FROM nodes WHERE rowid=?) AND e.kind != 'contains';`)
+    if !ok { return result }
+    defer sq.stmt_finalize(&s)
+    sq.stmt_bind_i64(&s, 1, node_id)
     for sq.stmt_step(&s) {
         rel := sq.stmt_col_text(&s, 3)
         append(&result, GraphEdgeInfo{

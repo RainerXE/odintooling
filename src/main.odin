@@ -39,6 +39,8 @@ main :: proc() {
         case "setup": os.exit(core.run_setup_command())
         case "init":  os.exit(core.run_local_init())
         case "update": os.exit(core.run_update_command(os.args[2:]))
+        case "symbol", "callers", "refs":
+            os.exit(core.run_graph_query_command(os.args[1], os.args[2:]))
         }
     }
 
