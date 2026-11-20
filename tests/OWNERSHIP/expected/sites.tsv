@@ -22,7 +22,7 @@ roundtrip	22	make	byte	default	buf	freed_deferred
 conditional	29	new	Thing	default	t	returned
 leaks	39	make	int	default	buf	unfreed
 scratch	46	make	int	temp	tmp	unfreed
-with_arena	53	new	Node	custom	n	unfreed
+with_arena	53	new	Node	arena	n	unfreed
 register	59	new	Thing	default	t	stored
 register	61	make	int	default		stored
 passes	66	new	Node	default	n	freed

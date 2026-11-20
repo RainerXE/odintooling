@@ -147,6 +147,9 @@ def test_error_class_in_lint_file(client: MCPClient):
         d = result[0]
         check("diagnostic has error_class field",    "error_class" in d)
         check("diagnostic has rule_id field",         "rule_id" in d)
+        check("diagnostic has code/severity/col aliases",
+              d.get("code") == d.get("rule_id") and d.get("severity") in ("note", "warning", "error") and d.get("col") == d.get("column"))
+        check("diagnostic has enclosing symbol",     d.get("symbol") == "main", f"got '{d.get('symbol')}'")
         check("error_class is non-empty string",      isinstance(d.get("error_class"), str) and d["error_class"] != "")
         check("error_class matches known taxonomy",
               d["error_class"] in {
@@ -162,6 +165,58 @@ def test_error_class_in_lint_file(client: MCPClient):
         c002 = next((x for x in result if x.get("rule_id") == "C002"), None)
         check("C002 maps to correctness_double_free",
               c002 is not None and c002.get("error_class") == "correctness_double_free")
+
+
+def test_lint_exact_shape(client: MCPClient):
+    section("lint format — exact seven-key MCP payload")
+    import tempfile
+
+    exact = {"file", "line", "col", "severity", "code", "message", "symbol"}
+
+    result = client.tool("lint_file", {"path": FAIL_FIXTURE, "format": "lint"})
+    check("lint_file format lint returns findings", isinstance(result, list) and len(result) > 0, f"got: {result}")
+    if isinstance(result, list) and result:
+        check("lint_file format lint has exactly seven keys",
+              all(set(d) == exact for d in result),
+              f"keys: {[sorted(d.keys()) for d in result[:2]]}")
+        d = result[0]
+        check("lint format code matches the rule id",
+              isinstance(d.get("code"), str) and d["code"].startswith("C"),
+              f"got: {d.get('code')}")
+        check("lint format severity is stable vocabulary",
+              d.get("severity") in ("note", "warning", "error"),
+              f"got: {d.get('severity')}")
+        check("lint format carries the enclosing symbol", isinstance(d.get("symbol"), str))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        clean = os.path.join(tmp, "clean.odin")
+        with open(clean, "w") as f:
+            f.write("package clean\n\nmain :: proc() {}\n")
+        clean_result = client.tool("lint_file", {"path": clean, "format": "lint"})
+        check("lint_file format lint returns [] on a clean file",
+              clean_result == [], f"got: {clean_result}")
+
+    ws = client.tool("lint_workspace", {"path": TEST_DIR, "format": "lint"})
+    check("lint_workspace format lint has exactly seven keys",
+          isinstance(ws, list) and len(ws) > 0 and all(set(d) == exact for d in ws),
+          f"got: {ws[:1] if isinstance(ws, list) else ws}")
+
+    with open(FAIL_FIXTURE, encoding="utf-8") as f:
+        source = f.read()
+    snippet = client.tool("lint_snippet", {
+        "source": source,
+        "filename": "snippet.odin",
+        "format": "lint",
+    })
+    check("lint_snippet format lint has exactly seven keys",
+          isinstance(snippet, list) and len(snippet) > 0 and all(set(d) == exact for d in snippet),
+          f"got: {snippet[:1] if isinstance(snippet, list) else snippet}")
+
+    bad = client.tool("lint_file", {"path": FAIL_FIXTURE, "format": "bogus"})
+    check("unknown lint format returns an MCP error", bad.get("_json_error") is True, f"got: {bad}")
+    check("unknown lint format names the valid choices",
+          "full" in bad.get("_raw", "") and "lint" in bad.get("_raw", ""),
+          f"got: {bad.get('_raw')}")
 
 
 def test_lint_workspace(client: MCPClient):
@@ -200,7 +255,7 @@ def test_list_rules(client: MCPClient):
     check("every rule has all required fields", all_have_fields)
 
     ids = [r["id"] for r in rules]
-    for expected_id in ["C001", "C002", "C003", "C007", "C011", "C101", "B001"]:
+    for expected_id in ["C001", "C002", "C003", "C007", "C011", "C101", "B001", "C040"]:
         check(f"rule {expected_id} is present", expected_id in ids)
 
     # enabled_by_default is bool
@@ -247,6 +302,52 @@ def test_schema_version_in_symbols_json(client: MCPClient):
           symbols.get("schema_version") == "odin-lint-symbols/1.1",
           f"got: {symbols.get('schema_version')}")
     check("old 'schema' key is gone",  "schema" not in symbols)
+
+
+def test_floorplan(client: MCPClient):
+    section("floorplan — MCP data and HTML")
+    import tempfile
+
+    db_path = os.path.join(REPO_ROOT, ".codegraph", "olt.db")
+    data = client.tool("get_floorplan_data", {"db_path": db_path, "title": "MCP Fixture"})
+    check("get_floorplan_data returns schema 1", data.get("schema_version") == 1, f"got: {data}")
+    check("get_floorplan_data uses the requested title",
+          data.get("project", {}).get("name") == "MCP Fixture",
+          f"project: {data.get('project')}")
+    summary = data.get("summary", {})
+    check("get_floorplan_data reports files", summary.get("files", 0) > 0, f"summary: {summary}")
+    check("get_floorplan_data reports packages", len(data.get("packages", [])) > 0)
+    check("get_floorplan_data includes nodes", len(data.get("nodes", [])) > 0)
+    check("get_floorplan_data includes edges", len(data.get("edges", [])) > 0)
+    check("get_floorplan_data reports a findings count", isinstance(summary.get("findings"), int), f"summary: {summary}")
+
+    default_data = client.tool("get_floorplan_data", {"title": "MCP Default"})
+    check("get_floorplan_data uses the default graph path",
+          default_data.get("schema_version") == 1,
+          f"got: {default_data}")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        missing = client.tool("get_floorplan_data", {"db_path": os.path.join(tmp, "missing.db")})
+        check("missing graph returns an MCP error", missing.get("_json_error") is True, f"got: {missing}")
+        check("missing graph points at export_symbols",
+              "export-symbols" in missing.get("_raw", ""), f"got: {missing.get('_raw')}")
+
+        out = os.path.join(tmp, "floorplan.html")
+        generated = client.tool("generate_floorplan", {
+            "db_path": db_path,
+            "out_path": out,
+            "title": "MCP Fixture",
+        })
+        check("generate_floorplan succeeds", generated.get("ok") is True, f"got: {generated}")
+        check("generate_floorplan returns an absolute path",
+              os.path.isabs(generated.get("path", "")) and os.path.exists(out),
+              f"path: {generated.get('path')}")
+        check("generate_floorplan reports bytes", generated.get("bytes", 0) > 0, f"got: {generated.get('bytes')}")
+        check("generate_floorplan returns the data summary",
+              generated.get("summary") == summary, f"got: {generated.get('summary')}")
+        html = open(out, encoding="utf-8").read() if os.path.exists(out) else ""
+        check("generated HTML embeds the floorplan data", 'id="olt-floorplan-data"' in html)
+        check("generated HTML uses the requested title", "<title>MCP Fixture</title>" in html)
 
 
 def test_impact_radius_follows_callers(client: MCPClient):
@@ -462,8 +563,16 @@ def test_tools_list(client: MCPClient):
         "get_symbol", "export_symbols", "get_dna_context",
         "get_impact_radius", "find_allocators", "find_all_references",
         "rename_symbol", "get_callers", "get_callees", "get_ownership",
+        "get_floorplan_data", "generate_floorplan",
     ]:
         check(f"tool '{expected}' is registered", expected in tool_names)
+
+    tools_by_name = {t["name"]: t for t in resp["result"]["tools"]}
+    for name in ("lint_file", "lint_snippet", "lint_workspace"):
+        schema = tools_by_name.get(name, {}).get("inputSchema", {})
+        check(f"tool '{name}' exposes the lint format option",
+              "format" in schema.get("properties", {}),
+              f"schema: {schema}")
 
 
 # ---------------------------------------------------------------------------
@@ -483,9 +592,11 @@ def main():
     try:
         test_tools_list(client)
         test_error_class_in_lint_file(client)
+        test_lint_exact_shape(client)
         test_lint_workspace(client)
         test_list_rules(client)
         test_schema_version_in_symbols_json(client)
+        test_floorplan(client)
         test_get_callers_callees(client)
         test_impact_radius_follows_callers(client)
         test_get_ownership(client)

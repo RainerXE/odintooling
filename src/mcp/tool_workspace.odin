@@ -32,6 +32,11 @@ make_lint_workspace_tool :: proc() -> mcp.Tool {
                     "rules": {
                         "type": "string",
                         "description": "Comma-separated rule IDs to run (e.g. C001,C002). Omit for all default rules."
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": ["full", "lint"],
+                        "description": "Output shape: full (default) or lint (exactly file,line,col,severity,code,message,symbol)"
                     }
                 },
                 "required": ["path"]
@@ -45,6 +50,8 @@ make_lint_workspace_tool :: proc() -> mcp.Tool {
 _lint_workspace_handler :: proc(params: json.Value, allocator: runtime.Allocator) -> mcp.Tool_Result {
     path, err := _extract_string_param(params, "path")
     if err != "" { return mcp.tool_error(.Invalid_Params, err, allocator) }
+    lint_shape, format_err := _lint_format_mode(params)
+    if format_err != "" { return mcp.tool_error(.Invalid_Params, format_err, allocator) }
 
     opts := core.LintOptions{recursive = true}
 
@@ -69,6 +76,9 @@ _lint_workspace_handler :: proc(params: json.Value, allocator: runtime.Allocator
         core.analyze_file(file_path, &_ts_parser, opts, &collector)
     }
 
+    if lint_shape {
+        return mcp.tool_ok(_diags_to_lint_json(collector[:], allocator), allocator)
+    }
     return mcp.tool_ok(_diags_to_json(collector[:], allocator), allocator)
 }
 
@@ -152,6 +162,9 @@ _RULES :: []RuleCatalogEntry{
     {"C203", "correctness", "correctness_defer_scope_trap",
      "defer fires at inner block exit — handle assigned to outer scope becomes dangling (Odin defer is block-scoped, unlike Go)",
      "Move defer to the outer scope, or avoid storing the resource handle in outer variables", true},
+    {"C040", "correctness", "correctness_arena_free",
+     "delete/free of temp-allocator or arena memory is a no-op — the allocator owns the lifetime (requires --export-symbols)",
+     "Remove the free, or allocate from context.allocator if this value must be released individually", true},
     {"C021", "correctness", "correctness_go_fmt_call",
      "Go-style fmt.Println/Printf/Sprintf call — use Odin's lowercase equivalents",
      "Replace with: fmt.println, fmt.printf, fmt.tprintf/fmt.aprintf for formatting", false},

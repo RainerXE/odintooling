@@ -22,7 +22,7 @@ CODEGRAPH_SCHEMA_VERSION :: 16
 // roles, packages, imports). Exports are incremental, so a file whose content has not changed
 // keeps what an older analysis derived from it; when this number moves, an olt-written graph is
 // re-indexed in full instead. Raise it whenever a change alters what the analysis records.
-ODIN_ANALYSIS_VERSION :: 8
+ODIN_ANALYSIS_VERSION :: 9
 
 CODEGRAPH_SCHEMA_VERSION_NOTE :: "Initial schema includes all migrations"
 
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS odin_alloc_site (
     col            INTEGER NOT NULL,
     api            TEXT    NOT NULL,   -- make | new | new_clone | mem.alloc | strings.clone | ...
     elem_type      TEXT,               -- the type allocated, as written ('Foo', 'pkg.Foo'); NULL if unknown
-    allocator_kind TEXT    NOT NULL,   -- default | temp | param | custom
+    allocator_kind TEXT    NOT NULL,   -- default | temp | param | custom | arena
     allocator_expr TEXT,
     var_name       TEXT,               -- the local the result was bound to; NULL if none
     disposition    TEXT    NOT NULL,   -- freed_deferred | freed | returned | stored | passed | unfreed

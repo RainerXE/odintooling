@@ -18,6 +18,7 @@ rule_id_to_error_class :: proc(rule_id: string) -> string {
     case "C201": return "correctness_unchecked_result"
     case "C202": return "correctness_switch_exhaustiveness"
     case "C203": return "correctness_defer_scope_trap"
+    case "C040": return "correctness_arena_free"
     case "C021": return "correctness_go_fmt_call"
     case "C022": return "correctness_go_range_loop"
     case "C023": return "correctness_go_deref_syntax"

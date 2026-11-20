@@ -1,6 +1,7 @@
-// output.odin — diagnostic output formatters: text, JSON, and SARIF.
-// emit_json / emit_sarif serialise collected diagnostics for machine-readable output;
-// emit_or_collect routes individual diagnostics to stdout or a collector slice.
+// output.odin — diagnostic output formatters: text, JSON, lint-channel JSON, and SARIF.
+// emit_json / emit_lint_json / emit_sarif serialise collected diagnostics for
+// machine-readable output; emit_or_collect routes individual diagnostics to
+// stdout or a collector slice.
 package core
 
 import "core:fmt"
@@ -45,7 +46,7 @@ json_write_string :: proc(b: ^strings.Builder, s: string) {
 }
 
 // emit_json writes all diagnostics as a JSON array to stdout.
-// Schema: [{"file":str,"line":int,"column":int,"rule_id":str,"error_class":str,"tier":str,"message":str,"fix":str?}]
+// Schema: [{"file":str,"line":int,"column":int,"col":int,"rule_id":str,"code":str,"error_class":str,"tier":str,"severity":str,"message":str,"symbol":str,"fix":str?}]
 emit_json :: proc(diags: []Diagnostic) {
     b := strings.builder_make()
     defer strings.builder_destroy(&b)
@@ -56,15 +57,21 @@ emit_json :: proc(diags: []Diagnostic) {
         strings.write_string(&b, "  {")
         strings.write_string(&b, `"file":`)
         json_write_string(&b, d.file)
-        fmt.sbprintf(&b, `,"line":%d,"column":%d`, d.line, d.column)
+        fmt.sbprintf(&b, `,"line":%d,"column":%d,"col":%d`, d.line, d.column, d.column)
         strings.write_string(&b, `,"rule_id":`)
+        json_write_string(&b, d.rule_id)
+        strings.write_string(&b, `,"code":`)
         json_write_string(&b, d.rule_id)
         strings.write_string(&b, `,"error_class":`)
         json_write_string(&b, rule_id_to_error_class(d.rule_id))
         strings.write_string(&b, `,"tier":`)
         json_write_string(&b, d.tier)
+        strings.write_string(&b, `,"severity":`)
+        json_write_string(&b, diagnostic_severity(d))
         strings.write_string(&b, `,"message":`)
         json_write_string(&b, d.message)
+        strings.write_string(&b, `,"symbol":`)
+        json_write_string(&b, d.symbol)
         if d.has_fix {
             strings.write_string(&b, `,"fix":`)
             json_write_string(&b, d.fix)
@@ -75,9 +82,37 @@ emit_json :: proc(diags: []Diagnostic) {
     fmt.print(strings.to_string(b))
 }
 
-// sarif_level maps a Diagnostic to the appropriate SARIF result level.
-@(private)
-sarif_level :: proc(d: Diagnostic) -> string {
+// emit_lint_json writes the exact-shape lint channel payload: one JSON array
+// whose objects contain only the fields repair harnesses consume. The stable
+// `code` is the rule ID; `symbol` is the enclosing procedure ("" at file scope).
+// Schema: [{"file":str,"line":int,"col":int,"severity":str,"code":str,"message":str,"symbol":str}]
+emit_lint_json :: proc(diags: []Diagnostic) {
+    b := strings.builder_make()
+    defer strings.builder_destroy(&b)
+
+    strings.write_string(&b, "[")
+    for d, i in diags {
+        if i > 0 { strings.write_string(&b, ",") }
+        strings.write_string(&b, `{"file":`)
+        json_write_string(&b, d.file)
+        fmt.sbprintf(&b, `,"line":%d,"col":%d`, d.line, d.column)
+        strings.write_string(&b, `,"severity":`)
+        json_write_string(&b, diagnostic_severity(d))
+        strings.write_string(&b, `,"code":`)
+        json_write_string(&b, d.rule_id)
+        strings.write_string(&b, `,"message":`)
+        json_write_string(&b, d.message)
+        strings.write_string(&b, `,"symbol":`)
+        json_write_string(&b, d.symbol)
+        strings.write_string(&b, "}")
+    }
+    strings.write_string(&b, "]")
+    fmt.println(strings.to_string(b))
+}
+
+// diagnostic_severity maps a Diagnostic to the three-level severity vocabulary
+// shared by the lint channel and SARIF.
+diagnostic_severity :: proc(d: Diagnostic) -> string {
     switch d.diag_type {
     case .INFO:           return "note"
     case .INTERNAL_ERROR: return "error"
@@ -86,6 +121,12 @@ sarif_level :: proc(d: Diagnostic) -> string {
         return "warning" if d.tier == "style" else "error"
     }
     return "error"
+}
+
+// sarif_level maps a Diagnostic to the appropriate SARIF result level.
+@(private)
+sarif_level :: proc(d: Diagnostic) -> string {
+    return diagnostic_severity(d)
 }
 
 // emit_sarif writes all diagnostics as a SARIF 2.1.0 document to stdout.

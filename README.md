@@ -19,6 +19,22 @@ Fix: Assign the result and handle the error, or use 'or_return'
 
 ---
 
+## What's new in 0.98.5
+
+- **A lint channel for repair harnesses.** `--format lint` emits exactly `file`, `line`, `col`,
+  `severity`, `code`, `message` and `symbol`; `lint_file`, `lint_snippet` and `lint_workspace`
+  accept `format: "lint"` for the same exact shape over MCP.
+- **A map of the graph.** `olt floorplan` writes a self-contained interactive HTML map of packages,
+  files, symbols, call edges, findings and the foreign/external boundary. `get_floorplan_data` and
+  `generate_floorplan` expose the data and the HTML file over MCP.
+- **`C040`: frees that do nothing.** `delete`/`free` on temp-allocator or arena memory is reported
+  when the allocator owns the lifetime. The ownership analysis now records explicit and aliased
+  arenas as `arena`.
+- **Stable finding fields.** `--format json` adds `code`, `severity`, `col` and `symbol` alongside
+  the existing keys, so a harness can histogram stable rule codes without parsing messages.
+
+---
+
 ## olt and CodeGraph
 
 [CodeGraph](https://github.com/colbymchenry/codegraph) is a general code-intelligence MCP server for many languages. olt does
@@ -29,7 +45,7 @@ the same job for one language, and adds what that language lets a tool know.
 | Languages | Odin | many |
 | Database | `.codegraph/olt.db` — CodeGraph's own schema (v16, vendored unmodified) plus olt tables | `.codegraph/codegraph.db` |
 | Odin specifics | a bare call resolves only inside its package (a directory); `pkg.fn()` resolves through the file's imports (alias, declared package name, relative path, `src:`-style collections); who owns each allocation (which allocator, freed / returned / stored / passed on, factories, leak candidates — see [Memory ownership](#memory-ownership)); memory role per procedure (allocator / deallocator / borrower); lint findings attached to the procedure they are in; enum exhaustiveness; FFI resource-safety checks; opt-in dead-code detection | general extraction — Odin support has been proposed upstream ([#3091](https://github.com/colbymchenry/codegraph/pull/3091)) |
-| Also does | linting (22 rules, `--list-rules`), `--fix`, an LSP proxy that merges olt diagnostics into OLS, `rename_symbol`, `run_odin_check` | `explore`/`node`/`context` tools, agent hooks, live file watching |
+| Also does | linting (23 rules, `--list-rules`), `--fix`, an LSP proxy that merges olt diagnostics into OLS, `olt floorplan` for a self-contained HTML map, `rename_symbol`, `run_odin_check` | `explore`/`node`/`context` tools, agent hooks, live file watching |
 | Runtime | one native binary, no Node | Node 22.5+ (the installers bundle it) |
 
 **How close is the graph?** Measured against the Odin index that the CodeGraph proposal above produces, on the same
@@ -121,10 +137,12 @@ olt file.odin                 # lint a single file
 olt src/ --no-gitignore       # also scan files .gitignore excludes (default: skip them)
 olt src/ --fix                # apply safe auto-fixes in-place
 olt src/ --format json        # machine-readable output (json or sarif)
+olt src/ --format lint        # exact-shape JSON for lint/repair harnesses
 olt src/ --rule C001,C201     # run specific rules only
 olt src/ --tier correctness   # run only correctness-tier rules
 olt --explain C001            # detailed rule documentation
 olt --list-rules              # show all available rules
+olt floorplan                 # interactive HTML map from the exported graph
 
 olt mcp                       # start MCP server (AI agent interface)
 olt lsp                       # start LSP proxy (editor interface)
@@ -155,6 +173,7 @@ olt lsp                       # start LSP proxy (editor interface)
 | C201 | Error return value discarded (unchecked result). Follows a qualified call into the package it goes to: your own packages, and `core:`/`base:`/`vendor:` when an Odin installation is found. Allocator errors and stream writes (`io.write_string`) are not reported |
 | C202 | Switch on enum not exhaustive (requires `--export-symbols`) |
 | C203 | `defer` in inner block fires before outer scope uses the handle |
+| C040 | `delete`/`free` on temp-allocator or arena memory, where the free is a no-op and the allocator owns the lifetime (requires `--export-symbols`) |
 | C031 | `panic()` on expected runtime failure — consider an error return (INFO) |
 
 ### Style
@@ -187,8 +206,9 @@ Odin has no garbage collector, so the question that matters is who frees what. o
 allocation inside a procedure (`make`, `new`, `new_clone`, and the allocating calls in `mem`, `strings`, `fmt`, `os` and `slice`):
 
 - **Which allocator** it comes from. `default` is `context.allocator`, so the caller owes a free. `param` is an `allocator`
-  parameter, so the caller of *this* procedure owns the result. `temp` (`context.temp_allocator`) and `custom` (an arena, or a
-  reassigned `context.allocator`) are released wholesale and owe nothing.
+  parameter, so the caller of *this* procedure owns the result. `temp` (`context.temp_allocator`) and `arena` (an explicit
+  arena allocator, directly or through a local) are released wholesale and owe nothing; `custom` is any other allocator,
+  such as a reassigned `context.allocator` or a project allocator the analysis cannot classify.
 - **What became of it.** `freed_deferred`, `freed`, `returned`, `stored` (a field, a global, a map key, `append(&list, x)`),
   `passed` (given to another procedure) or `unfreed`.
 
@@ -384,10 +404,21 @@ Available MCP tools:
 | `get_callers` / `get_callees` | Direct call graph neighbours |
 | `search_symbols` | Full-text symbol search |
 | `get_ownership` | Allocation sites: which allocator, and whether the memory is freed, returned, stored, passed on or leaked |
+| `get_floorplan_data` | Same JSON dataset as `olt floorplan --json` |
+| `generate_floorplan` | Write the self-contained HTML map and return its path, byte size, summary and stale-file marker |
 | `find_all_references` | Every location that references (calls) a symbol |
 | `find_allocators` | Every procedure the graph tags as an allocator |
 | `rename_symbol` | Generate rename patches across the project |
 | `run_lint_denoise` | Lint an in-memory snippet and return structured fixes, for a fix-and-verify loop |
+
+The floorplan tools read an existing graph; call `export_symbols` first. `get_floorplan_data`
+returns the map dataset without writing anything. `generate_floorplan` writes only the requested
+HTML path (default `.codegraph/floorplan.html`) and never opens a browser or changes source.
+
+`lint_file`, `lint_snippet` and `lint_workspace` accept `format: "lint"` to return exactly
+`file`, `line`, `col`, `severity`, `code`, `message` and `symbol`, matching the CLI
+`--format lint` contract. The default `format: "full"` keeps the existing MCP payload with
+`rule_id`, `error_class`, `tier`, `column` and fix details.
 
 ### Code knowledge graph
 
@@ -415,6 +446,26 @@ A plain name must be unique; when it is not, the command lists the candidates an
 (procedures are `function`, not `proc`). Exit codes: 0 answer printed, 1 symbol not found,
 2 usage, ambiguity or database error.
 
+Turn the same graph into a self-contained interactive map:
+
+```bash
+olt floorplan
+# → .codegraph/floorplan.html
+```
+
+The map groups packages into rooms and files into cards, with internal package imports drawn
+between rooms, callers/callees when a symbol is selected, lint findings from the graph, and a
+**Boundary** view for foreign imports, system libraries and unresolved external calls. It is a
+single HTML file with embedded CSS/JS and data: no server, no network, and no source bodies.
+Use `--out <path>`, `--title <text>`, `--open`, or `--json` to print the map data instead. The
+first run needs an exported graph; if `.codegraph/olt.db` is absent, `olt floorplan` says which
+export command to run.
+
+C/C++ source is not indexed yet. A `foreign import "bridge.c"` or `system:objc` appears in the
+Boundary view, and foreign procedure declarations are nodes in the Odin files that declare them,
+but their C definitions and C call graph are outside the graph. The map is built from the existing
+schema, so adding C/C++ later does not require a different renderer.
+
 The export says so when the target has no `*_test.odin` files (call edges from tests would be
 missing), and the query commands note when a source file changed after the database was built.
 
@@ -432,7 +483,8 @@ olt's own data lives beside them in `odin_*` tables, which CodeGraph never touch
 findings per node), `odin_package` (the package each file declares), `odin_import` (what each file's qualifiers refer to),
 and the ownership tables (`odin_alloc_site`, `odin_proc_ownership`, `odin_param_sink`, `odin_param_effect`, `odin_alloc_param`, `odin_site_via`; see [Memory ownership](#memory-ownership)).
 
-Once exported, this enables C202 switch exhaustiveness checking and the `get_*` / `search_symbols` MCP tools.
+Once exported, this enables C202 switch exhaustiveness checking, C040 temp/arena free
+checking and the `get_*` / `search_symbols` MCP tools.
 
 ### CodeGraph integration
 
@@ -478,9 +530,12 @@ CODEGRAPH_BIN="codegraph" ./scripts/test_codegraph_contract.sh
                   shared rule engine
                   analyze_content()
                        │
-                  C001–C203 rules ──── ownership analysis ──▶ .codegraph/olt.db
+                  C001–C040 rules ──── ownership analysis ──▶ .codegraph/olt.db
                                        (also feeds the MCP graph tools)
 ```
+
+`olt floorplan` reads the same database and writes `.codegraph/floorplan.html`; it never writes
+back to the graph or the source.
 
 Symlinks created by `olt setup`:
 - `ols → olt` — IDE OLS integration (argv[0] dispatch → LSP mode)
@@ -498,6 +553,7 @@ src/mcp/             MCP server tools
 src/lsp/             LSP proxy
 ffi/tree_sitter/     Tree-sitter grammar + static libraries
 ffi/codegraph/       CodeGraph's schema, vendored unmodified
+ffi/floorplan/       Embedded HTML/CSS/JS for `olt floorplan`
 vendor/odin-mcp      MCP protocol library (https://github.com/RainerXE/odin-mcp)
 vendor/odin-sqlite3  SQLite bindings (https://github.com/RainerXE/odin-sqlite)
 tests/               Rule test fixtures (tests/OWNERSHIP is the ownership fixture)
@@ -530,8 +586,19 @@ Before submitting:
 
 ## Changelog
 
-Full notes: [0.98.2](docs/release-notes-0.98.2.md), [0.98.1](docs/release-notes-0.98.1.md), [0.98.0](docs/release-notes-0.98.0.md). Binaries are on the
-[Releases](https://github.com/RainerXE/odintooling/releases) page.
+Full notes: [0.98.5](docs/release-notes-0.98.5.md), [0.98.2](docs/release-notes-0.98.2.md), [0.98.1](docs/release-notes-0.98.1.md),
+[0.98.0](docs/release-notes-0.98.0.md). Binaries are on the [Releases](https://github.com/RainerXE/odintooling/releases) page.
+
+### 0.98.5 (2026-11-21)
+- `olt floorplan` writes `.codegraph/floorplan.html`: a self-contained interactive map of the exported graph with package/file rooms, internal import edges, symbol callers/callees, lint findings, a foreign/external boundary view and `--json` data output. No server, network, or source bodies
+- MCP exposes the same map through `get_floorplan_data` (read-only JSON dataset) and `generate_floorplan` (write the HTML file and return its path, size, summary and stale-file marker)
+- `lint_file`, `lint_snippet` and `lint_workspace` accept `format: "lint"` for the exact seven-key lint-channel shape over MCP; the default `full` payload is unchanged
+- `C040` flags `delete`/`free` (including deferred) on memory owned by `context.temp_allocator` or an arena — a free that reads as cleanup but changes nothing. It is a graph fact (`--export-symbols`), so it needs no compiler run and is silent without a database
+- The ownership analysis now takes the allocator argument by position for `make`/`new`/`new_clone`/`mem.*`, instead of matching any argument that contains “allocator” or “arena”. Length constants such as `ARENA_SIZE` are no longer misclassified as custom allocators
+- Explicit and aliased arena allocators are recorded as `arena`, so C001, C040 and memory roles agree on who owns the memory; `ODIN_ANALYSIS_VERSION` is 9, so existing graphs re-index on the next export
+- `--format json` adds `code` (= `rule_id`), `severity` (`note`/`warning`/`error`), `col` (= `column`) and `symbol` (the enclosing procedure) alongside the existing keys, so lint harnesses can histogram stable rule codes without a separate format
+- `--format lint` emits exactly `file`, `line`, `col`, `severity`, `code`, `message` and `symbol` for every finding — one JSON array, no extra keys — for repair harnesses that consume the lint channel directly
+- `--list-rules`, `--help` and `--explain C040` document the new rule
 
 ### 0.98.2 (2026-11-17)
 - `olt update` installs the latest GitHub release over the running binary after verifying its SHA-256 (`--check` reports only, `--force` reinstalls)

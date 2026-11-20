@@ -37,6 +37,9 @@ Diagnostic :: struct {
     fix:       string,
     has_fix:   bool,
     diag_type: DiagnosticType,
+    // Enclosing procedure name, filled in after collection so every rule gets
+    // it without threading AST context through each matcher. Empty at file scope.
+    symbol:    string,
 }
 
 // Rule represents a linting rule
@@ -130,6 +133,15 @@ analyze_file :: proc(
     collector:  ^[dynamic]Diagnostic,
 ) -> (int, bool) {
     violations := 0
+
+    // Attach the enclosing procedure to every diagnostic this file contributes.
+    // Text mode streams (collector == nil), so it has no post-pass to fill symbols;
+    // the machine-readable formats do.
+    collector_start := 0
+    if collector != nil { collector_start = len(collector^) }
+    defer if collector != nil {
+        annotate_file_symbols(file_path, collector[collector_start:], ts_parser)
+    }
 
     // B001: Brace balance — runs before everything else.
     // If braces are unbalanced the AST is unreliable; suppress all other rules.
@@ -392,25 +404,39 @@ analyze_file :: proc(
         }
     }
 
-    // C202: Switch exhaustiveness (requires graph DB with enum members)
-    if rule_enabled("C202", "correctness", opts) {
+    // C202 + C040: graph-backed rules (require a graph DB)
+    c202_on := rule_enabled("C202", "correctness", opts)
+    c040_on := rule_enabled("C040", "correctness", opts)
+    if c202_on || c040_on {
         db_path := opts.graph_db_path if opts.graph_db_path != "" else GRAPH_DB_PATH
         if os.is_file(db_path) {
             content, err := os.read_entire_file_from_path(file_path, context.allocator)
             if err == nil {
                 defer delete(content)
-                c202_lines := strings.split(string(content), "\n")
-                defer delete(c202_lines)
-                tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
-                if tree_ok {
-                    defer ts_tree_delete(tree)
-                    root := getRootNode(tree)
-                    if !ts_node_is_null(root) {
-                        db, db_ok := graph_open_existing(db_path)
-                        if db_ok {
-                            defer graph_close(db)
-                            for d in dedupDiagnostics(c202_run(file_path, root, c202_lines, db)) {
-                                violations += emit_or_collect(d, collector)
+                graph_lines := strings.split(string(content), "\n")
+                defer delete(graph_lines)
+                db, db_ok := graph_open_existing(db_path)
+                if db_ok {
+                    defer graph_close(db)
+
+                    // C040: manual free of temp/arena memory — a fact the ownership
+                    // analysis already recorded, so no AST walk is needed.
+                    if c040_on {
+                        for d in dedupDiagnostics(c040_run(file_path, db, graph_lines)) {
+                            violations += emit_or_collect(d, collector)
+                        }
+                    }
+
+                    // C202: switch exhaustiveness (needs the enum members in the graph)
+                    if c202_on {
+                        tree, tree_ok := parseSource(ts_parser.adapter.parser, ts_parser.adapter.language, string(content))
+                        if tree_ok {
+                            defer ts_tree_delete(tree)
+                            root := getRootNode(tree)
+                            if !ts_node_is_null(root) {
+                                for d in dedupDiagnostics(c202_run(file_path, root, graph_lines, db)) {
+                                    violations += emit_or_collect(d, collector)
+                                }
                             }
                         }
                     }
@@ -730,7 +756,7 @@ cli_main :: proc() -> int {
 
     // For JSON/SARIF/fix/propose, collect all diagnostics before formatting.
     // For text, emit immediately (streaming) by passing nil collector.
-    use_collector := opts.format == "json" || opts.format == "sarif" ||
+    use_collector := opts.format == "json" || opts.format == "sarif" || opts.format == "lint" ||
                      opts.fix_mode || opts.propose_mode
     collector     := make([dynamic]Diagnostic)
     defer delete(collector)
@@ -832,6 +858,9 @@ cli_main :: proc() -> int {
         return 1 if total_violations > 0 else 0
     case "sarif":
         emit_sarif(collector[:])
+        return 1 if total_violations > 0 else 0
+    case "lint":
+        emit_lint_json(collector[:])
         return 1 if total_violations > 0 else 0
     }
     return 0

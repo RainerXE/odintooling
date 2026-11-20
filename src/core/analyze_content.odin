@@ -193,4 +193,6 @@ analyze_content :: proc(
 		for d in dd { append(diags, d) }
 	}
 
+	// Fill the repair symbol for callers that serialise these diagnostics (MCP).
+	annotate_diagnostic_symbols(diags[:], root, content)
 }

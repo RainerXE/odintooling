@@ -42,6 +42,7 @@ explain_rule :: proc(id: string) -> (string, bool) {
     case "C201": return C201_DOCS, true
     case "C202": return C202_DOCS, true
     case "C203": return C203_DOCS, true
+    case "C040": return C040_DOCS, true
     }
     return fmt.tprintf("Unknown rule '%s'. Run 'olt --list-rules' for available rules.\n", id), false
 }
@@ -793,4 +794,45 @@ FIX
   Move defer to the outer scope, or avoid storing the handle in outer
   variables until after the inner block completes.
   Suppress: // olt:ignore C203
+`
+
+@(private)
+C040_DOCS :: `
+=============================================================================
+C040 — Manual free of temp/arena memory
+Tier: correctness
+=============================================================================
+
+WHAT IT DETECTS
+  A delete()/free() (or defer delete()/defer free()) on memory that the
+  ownership analysis recorded as allocated from context.temp_allocator, or
+  from an explicit arena allocator (mem.arena_allocator,
+  mem.dynamic_arena_allocator, ...).
+
+WHY IT MATTERS
+  The temp allocator and arenas release their memory wholesale. Freeing one
+  allocation through them does nothing, so the cleanup reads as real
+  lifetime management while the arena still owns the memory. The bug this
+  hides is usually an allocation that should have used context.allocator.
+
+REQUIRES
+  Build the graph first: olt src/ --export-symbols
+
+FIRES — will produce a C040 violation:
+
+    args := make([dynamic]string, 0, 10, context.temp_allocator)
+    defer delete(args)   // no-op: the temp allocator owns args
+
+SILENT — correct patterns:
+
+    args := make([dynamic]string, 0, 10, context.allocator)
+    defer delete(args)   // the caller owns this memory
+
+    args := make([dynamic]string, 0, 10, context.temp_allocator)
+    // no delete: released with the rest of the temp arena
+
+FIX
+  Remove the free, or allocate from context.allocator when the value must be
+  released individually.
+  Suppress: // olt:ignore C040
 `

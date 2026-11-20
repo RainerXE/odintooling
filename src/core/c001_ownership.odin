@@ -16,7 +16,7 @@ import "base:runtime"
 C001Verdict :: struct {
     var_name:       string,
     disposition:    string,   // freed_deferred | freed | returned | stored | passed | unfreed
-    allocator_kind: string,   // default | temp | param | custom
+    allocator_kind: string,   // default | temp | param | custom | arena
     line:           int,      // where the allocation call is (1-based)
     col:            int,      // its column (0-based, as tree-sitter counts)
 }
@@ -106,7 +106,7 @@ c001_handled_elsewhere :: proc(o: ^C001Ownership, start, end: int, var_name: str
     switch v.disposition {
     case "freed_deferred", "freed", "returned", "stored": return true
     }
-    return v.allocator_kind == "temp" || v.allocator_kind == "custom"
+    return v.allocator_kind == "temp" || v.allocator_kind == "arena" || v.allocator_kind == "custom"
 }
 
 // c001_confirmed_leak says whether the analysis found nothing at all done with the allocation: memory

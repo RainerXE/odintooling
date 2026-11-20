@@ -37,6 +37,8 @@
 	    find_all_references  — all call sites for a symbol (rename foundation)
 	    get_callers          — all direct callers of a proc (LSP incoming calls)
 	    get_callees          — all direct callees of a proc (LSP outgoing calls)
+	    get_floorplan_data   — same JSON dataset as `olt floorplan --json`
+	    generate_floorplan   — write the self-contained HTML map, return path/summary
 */
 package mcp_server
 
@@ -84,6 +86,8 @@ mcp_run :: proc() {
     mcp.server_register_tool(&s, make_get_callees_tool())
     mcp.server_register_tool(&s, make_search_symbols_tool())
     mcp.server_register_tool(&s, make_get_ownership_tool())
+    mcp.server_register_tool(&s, make_get_floorplan_data_tool())
+    mcp.server_register_tool(&s, make_generate_floorplan_tool())
 
     mcp.server_run(&s) // blocks until stdin EOF
 }

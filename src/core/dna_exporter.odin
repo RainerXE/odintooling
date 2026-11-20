@@ -806,7 +806,7 @@ _infer_role :: proc(db: ^GraphDB, node_id: i64) -> string {
                 switch {
                 case disp == "freed" || disp == "freed_deferred":
                     contained += 1
-                case kind == "temp":
+                case kind == "temp" || kind == "arena":
                     // released wholesale: nothing is owed
                 case disp == "unfreed" && kind == "custom":
                     // an arena (or a reassigned context.allocator) releases it
@@ -938,6 +938,10 @@ _pass4_attach_violations :: proc(
                 }
                 // C203 — pure AST walker, no SCM query needed
                 for d in dedupDiagnostics(c203_run(file_path, root, lines)) {
+                    append(&collector, d)
+                }
+                // C040 — ownership fact: a manual free of temp/arena memory
+                for d in dedupDiagnostics(c040_run(file_path, db, lines)) {
                     append(&collector, d)
                 }
             }

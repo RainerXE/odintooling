@@ -21,7 +21,7 @@ append_rule_list :: proc(raw: string, dest: ^[dynamic]string) {
 // CLI — argument parsing, version, help, rule listing
 // =============================================================================
 
-OLT_VERSION          :: "0.98.2"
+OLT_VERSION          :: "0.98.5"
 ODIN_LINT_VERSION    :: OLT_VERSION  // backwards-compat alias
 ODIN_TESTED_VERSION  :: "dev-2026-11"                // the Odin release the rule suites last passed on (Linux and macOS)
 ODIN_GRAMMAR_VERSION :: "tree-sitter-odin v1.3.0"     // the pinned grammar tag (ffi/tree_sitter/tree-sitter-odin)
@@ -34,7 +34,7 @@ LintOptions :: struct {
     rule_filter:      [dynamic]string, // empty = all rules
     tier_filter:      string,          // "" = all tiers
     c012_enabled:     bool,
-    format:           string,          // "text" (default), "json", "sarif"
+    format:           string,          // "text" (default), "json", "sarif", "lint"
     explain_rule:     string,          // rule ID for --explain, or ""
     fix_mode:         bool,            // --fix: apply safe machine-applicable fixes in-place
     unsafe_fix_mode:  bool,            // --unsafe-fix: apply fixes that change API surface
@@ -107,20 +107,20 @@ parse_args :: proc(args: []string) -> (LintOptions, bool) {
             // legacy flag, silently ignored
         case strings.has_prefix(arg, "--format="):
             val := arg[len("--format="):]
-            if val != "text" && val != "json" && val != "sarif" {
-                fmt.eprintfln("error: unknown format '%s'. Valid formats: text, json, sarif", val)
+            if val != "text" && val != "json" && val != "sarif" && val != "lint" {
+                fmt.eprintfln("error: unknown format '%s'. Valid formats: text, json, sarif, lint", val)
                 return opts, false
             }
             opts.format = val
         case arg == "--format":
             if i+1 >= len(args) {
-                fmt.eprintln("error: --format requires a value (text, json, sarif)")
+                fmt.eprintln("error: --format requires a value (text, json, sarif, lint)")
                 return opts, false
             }
             i += 1
             val := args[i]
-            if val != "text" && val != "json" && val != "sarif" {
-                fmt.eprintfln("error: unknown format '%s'. Valid formats: text, json, sarif", val)
+            if val != "text" && val != "json" && val != "sarif" && val != "lint" {
+                fmt.eprintfln("error: unknown format '%s'. Valid formats: text, json, sarif, lint", val)
                 return opts, false
             }
             opts.format = val
@@ -219,6 +219,7 @@ print_help :: proc() {
     fmt.println("  C201  correctness  Error return value ignored (unchecked result)")
     fmt.println("  C202  correctness  Switch on enum is not exhaustive (requires --export-symbols)")
     fmt.println("  C203  correctness  Defer in inner block fires before outer scope uses the handle")
+    fmt.println("  C040  correctness  Manual free of temp/arena memory is a no-op (requires --export-symbols)")
     fmt.println()
     fmt.println("Options:")
     fmt.println("  --version              Print version and grammar info")
@@ -235,6 +236,8 @@ print_help :: proc() {
     fmt.println("  olt symbol <name>      Look up a declaration in the code graph (--json, --db)")
     fmt.println("  olt callers <name>     Procedures that call a declaration (--json, --db)")
     fmt.println("  olt refs <name>        Reference sites for a declaration (--json, --db)")
+    fmt.println("  olt floorplan          Interactive HTML map from the code graph")
+    fmt.println("                         (--db, --out, --title, --open, --json)")
     fmt.println()
     fmt.println("Options:")
     fmt.println("  --init                 Alias for 'olt setup' (backward compat)")
@@ -242,12 +245,13 @@ print_help :: proc() {
     fmt.println("  --explain C001         Show detailed documentation for a rule")
     fmt.println("  --rule C001,C002       Run only the specified rules")
     fmt.println("  --tier correctness     Run only rules of the given tier (correctness|style)")
-    fmt.println("  --format text|json|sarif  Output format (default: text)")
+    fmt.println("  --format text|json|sarif|lint  Output format (default: text)")
+    fmt.println("                         lint: exact-shape JSON for repair harnesses")
     fmt.println("  --non-recursive        Scan directories without recursing into subdirectories")
     fmt.println("  --include-vendor       Include vendor/ directories in scan")
     fmt.println("  --no-gitignore         Also scan files that .gitignore excludes (default: skip them)")
     fmt.println("  --enable-c012          Enable C012 semantic ownership naming hints")
-    fmt.println("  --export-symbols       Build code graph + symbols.json (enables C202, C012-T3, C014, C015)")
+    fmt.println("  --export-symbols       Build code graph + symbols.json (enables C202, C040, C012-T3, C014, C015)")
     fmt.println("  --codegraph-init       First-time setup: full rebuild + emit .codegraph/codegraph.db")
     fmt.println("  --codegraph-sync       Incremental update of .codegraph/codegraph.db (requires --codegraph-init first)")
     fmt.println("  --db <path>            Graph database path (default: .codegraph/olt.db)")
@@ -290,4 +294,5 @@ print_list_rules :: proc() {
     fmt.println("C201\tcorrectness\tError return value ignored (unchecked result)")
     fmt.println("C202\tcorrectness\tSwitch on enum is not exhaustive (requires --export-symbols graph DB)")
     fmt.println("C203\tcorrectness\tDefer in inner block fires before outer scope uses the handle")
+    fmt.println("C040\tcorrectness\tManual free of temp/arena memory is a no-op (requires --export-symbols graph DB)")
 }

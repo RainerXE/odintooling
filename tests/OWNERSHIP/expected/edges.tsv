@@ -18,7 +18,7 @@ slab_scratch	Slab	returned	param	new
 slab_new	Slab	returned	param	new
 thing_create	Thing	returned	param	new
 conditional	Thing	returned	default	new
-with_arena	Node	unfreed	custom	new
+with_arena	Node	unfreed	arena	new
 register	Thing	stored	default	new
 passes	Node	freed	default	new
 cleanup	Thing	freed_deferred	default	thing_create()

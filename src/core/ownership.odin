@@ -32,7 +32,7 @@ import "core:strings"
 AllocSite :: struct {
     api:            string,   // make | new | new_clone | mem.alloc | strings.clone | ...
     elem_type:      string,   // the type allocated, as written ("Foo", "pkg.Foo"); "" if unknown
-    allocator_kind: string,   // default | temp | param | custom
+    allocator_kind: string,   // default | temp | param | custom | arena
     allocator_expr: string,   // the allocator argument as written; "" when none was given
     var_name:       string,   // the local the result was bound to; "" if none
     disposition:    string,   // freed_deferred | freed | returned | stored | passed | unfreed
@@ -351,6 +351,7 @@ _param_default_kinds :: proc(params: TSNode, lines: []string, param_allocs: map[
             switch {
             case value == "":                                  dk = "none"
             case strings.contains(value, "temp_allocator"):    dk = "temp"
+            case strings.contains(value, "arena_allocator"):   dk = "arena"
             case strings.contains(value, "context.allocator"): dk = "default"
             case:                                              dk = "custom"
             }
@@ -593,13 +594,85 @@ _type_name :: proc(n: TSNode, lines: []string) -> string {
     return ""
 }
 
-// _allocator_of finds the allocator argument of an allocating call, if one was passed.
+// _is_builtin_alloc_api says whether the call is one of the builtins whose allocator
+// position is fixed by its signature. Their other arguments (a length, a capacity, a
+// size constant) must never be mistaken for an allocator.
 @(private="file")
-_allocator_of :: proc(call: TSNode, lines: []string, param_allocs: map[string]bool, locals: map[string]string, ctx_override: bool) -> (kind, expr: string) {
+_is_builtin_alloc_api :: proc(qual, name: string) -> bool {
+    if qual == "" {
+        switch name {
+        case "make", "new", "new_clone": return true
+        }
+    }
+    if qual == "mem" {
+        switch name {
+        case "alloc", "alloc_bytes", "alloc_bytes_non_zeroed", "new", "new_clone": return true
+        }
+    }
+    return false
+}
+
+// _builtin_allocator_index is the 0-based position of the allocator argument of a
+// builtin allocating call, or -1 when none was passed or the position is ambiguous.
+// `make` has one overload per container shape, so the first argument decides which
+// position the allocator has:
+//   make([]T, len, alloc)                 -> 2
+//   make([dynamic]T, len, cap, alloc)     -> 3
+//   make(map[K]V, cap, alloc)             -> 2
+//   make([^]T, len, alloc)                -> 2
+// `make([dynamic]T, len, cap)` and `make(map[K]V, cap)` use the default allocator, so
+// a trailing integer there is a capacity, not an allocator. Those positions are left
+// to the last-argument check, which only accepts something that looks like an allocator.
+@(private="file")
+_builtin_allocator_index :: proc(call: TSNode, lines: []string, qual, name: string) -> int {
+    kids := _named(call)
+    argc := len(kids) - 1
+    if argc < 1 { return -1 }
+
+    if qual == "mem" {
+        switch name {
+        case "new", "new_clone":                                 return 1 if argc >= 2 else -1
+        case "alloc", "alloc_bytes", "alloc_bytes_non_zeroed":   return 2 if argc >= 3 else -1
+        }
+        return -1
+    }
+    if qual != "" { return -1 }
+
+    switch name {
+    case "new", "new_clone":
+        return 1 if argc >= 2 else -1
+    case "make":
+        ty := _text(kids[1], lines)
+        switch {
+        case strings.has_prefix(ty, "[dynamic]"):
+            if argc >= 4 { return 3 }
+        case strings.has_prefix(ty, "map["):
+            if argc >= 3 { return 2 }
+        case strings.has_prefix(ty, "[^]"):
+            if argc >= 3 { return 2 }
+        case strings.has_prefix(ty, "[]"):
+            if argc >= 3 { return 2 }
+        }
+    }
+    return -1
+}
+
+// _allocator_of finds the allocator argument of an allocating call, if one was passed.
+//
+// For builtins the allocator position is part of the signature, so only that argument
+// is consulted. Other allocating APIs (strings.clone, fmt.aprintf, os.read_entire_file,
+// a project factory) take it last by convention, so only the last positional argument
+// is a candidate — and it must look like an allocator, not like a length or a string.
+@(private="file")
+_allocator_of :: proc(call: TSNode, lines: []string, param_allocs: map[string]bool, locals: map[string]string, ctx_override: bool, qual: string = "", name: string = "") -> (kind, expr: string) {
     found := false
     seen_fn := false
     prev: TSNode
     after_eq := false
+    last_pos: TSNode
+    pos_idx := 0
+    is_builtin := _is_builtin_alloc_api(qual, name)
+    builtin_idx := _builtin_allocator_index(call, lines, qual, name) if is_builtin else -1
     for i in 0 ..< int(ts_node_child_count(call)) {
         c := ts_node_child(call, u32(i))
         if !bool(ts_node_is_named(c)) {
@@ -613,12 +686,21 @@ _allocator_of :: proc(call: TSNode, lines: []string, param_allocs: map[string]bo
             prev = c
             continue
         }
-        lower := strings.to_lower(_text(c, lines), context.temp_allocator)
-        if strings.contains(lower, "allocator") || strings.contains(lower, "arena") || _text(c, lines) in locals || param_allocs[_text(c, lines)] {
-            expr = _text(c, lines)
+        if is_builtin && builtin_idx >= 0 {
+            if pos_idx == builtin_idx { expr = _text(c, lines); found = true }
+        } else {
+            last_pos = c
+        }
+        pos_idx += 1
+        prev = c
+    }
+    if !found && builtin_idx < 0 && !ts_node_is_null(last_pos) {
+        txt := _text(last_pos, lines)
+        low := strings.to_lower(txt, context.temp_allocator)
+        if strings.contains(low, "allocator") || txt in locals || param_allocs[txt] {
+            expr = txt
             found = true
         }
-        prev = c
     }
 
     kind = "default"
@@ -628,6 +710,7 @@ _allocator_of :: proc(call: TSNode, lines: []string, param_allocs: map[string]bo
         case expr == "context.allocator", strings.contains(expr, "default_allocator"): kind = "default"
         case param_allocs[expr]:                                               kind = "param"
         case expr in locals:                                                   kind = locals[expr]
+        case strings.contains(expr, "arena_allocator"):                        kind = "arena"
         case:                                                                  kind = "custom"
         }
     }
@@ -694,10 +777,11 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
             if _ntype(lhs[idx]) != "identifier" { continue }
             txt := _text(r, lines)
             low := strings.to_lower(txt, context.temp_allocator)
-            if !strings.contains(low, "allocator") && !strings.contains(low, "arena") { continue }
+            if !strings.contains(low, "allocator") { continue }
             if _rhs_allocates(r, lines) { continue }
             switch {
             case strings.contains(txt, "temp_allocator"):  locals[_text(lhs[idx], lines)] = "temp"
+            case strings.contains(txt, "arena_allocator"): locals[_text(lhs[idx], lines)] = "arena"
             case txt == "context.allocator":                locals[_text(lhs[idx], lines)] = "default"
             case param_allocs[txt]:                         locals[_text(lhs[idx], lines)] = "param"
             case:                                           locals[_text(lhs[idx], lines)] = "custom"
@@ -748,6 +832,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
                     // nothing passed: the factory's own default decides (temp_allocator for read_slice)
                     switch cc.default_kind {
                     case "temp":   site.allocator_kind = "temp"
+                    case "arena":  site.allocator_kind = "arena"
                     case "custom": site.allocator_kind = "custom"
                     }
                 }
@@ -762,7 +847,7 @@ ownership_analyze :: proc(decl: TSNode, lines: []string, x: ^CrossInfo = nil) ->
             case:             site.elem_type = cc.elem_type
             }
         } else {
-            site.allocator_kind, site.allocator_expr = _allocator_of(call, lines, param_allocs, locals, ctx_override)
+            site.allocator_kind, site.allocator_expr = _allocator_of(call, lines, param_allocs, locals, ctx_override, qual, name)
             if kids := _named(call); len(kids) >= 2 && (api == "make" || api == "new" || api == "mem.new") {
                 site.elem_type = _type_name(kids[1], lines)
             }
